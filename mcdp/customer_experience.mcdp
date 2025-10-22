@@ -1,0 +1,8 @@
+mcdp {
+    provides average_travel_time [min]
+    provides discomfort [dimensionless]
+    provides average_num_transfers [dimensionless]
+    provides average_num_hops [dimensionless]
+
+    requires dissatisfaction_level [dimensionless]
+}

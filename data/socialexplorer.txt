@@ -1,0 +1,518 @@
+--------------------------------------------------------------------------------
+Codebook for Social Explorer report ID: R50022040
+--------------------------------------------------------------------------------
+
+Contents
+    - Table Summary
+    - Data Dictionary
+    - Citation and Use
+
+
+--------------------------------------------------------------------------------
+Table Summary
+--------------------------------------------------------------------------------
+ 
+Survey:           ACS 2023 (5-Year Estimates)
+Dataset:          Social Explorer Tables: ACS 2023 (5-Year Estimates)
+Tables:
+
+      1. Total Population
+         Universe:  Total Population
+         Name:      A00001
+         Variables:
+            A00001_001:   Total Population
+
+
+      2. Population Density (Per Sq. Mile)
+         Universe:  Total Population
+         Name:      A00002
+         Variables:
+            A00002_001:   Total Population
+            A00002_002:   Population Density (Per Sq. Mile)
+            A00002_003:   Area (Land)
+
+
+      3. Race
+         Universe:  Total Population
+         Name:      A03001
+         Variables:
+            A03001_001:   Total Population:
+            A03001_002:      White Alone
+            A03001_003:      Black or African American Alone
+            A03001_004:      American Indian and Alaska Native Alone
+            A03001_005:      Asian Alone
+            A03001_006:      Native Hawaiian and Other Pacific Islander Alone
+            A03001_007:      Some Other Race Alone
+            A03001_008:      Two or More Races
+
+
+      4. Educational Attainment for Population 25 Years and Over
+         Universe:  Population 25 Years and Over
+         Name:      A12001
+         Variables:
+            A12001_001:   Population 25 Years and Over:
+            A12001_002:      Less than High School
+            A12001_003:      High School Graduate or More (Includes Equivalency)
+            A12001_004:      Some College or More
+            A12001_005:      Bachelor's Degree or More
+            A12001_006:      Master's Degree or More
+            A12001_007:      Professional School Degree or More
+            A12001_008:      Doctorate Degree
+
+
+      5. Means of Transportation to Work for Workers 16 Years and Over
+         Universe:  Workers 16 Years and Over
+         Name:      A09005
+         Variables:
+            A09005_001:   Workers 16 Years and Over:
+            A09005_002:      Car, Truck, or Van
+            A09005_009:         Drove Alone
+            A09005_010:         Carpooled
+            A09005_003:      Public Transportation (Includes Taxicab)
+            A09005_004:      Motorcycle
+            A09005_005:      Bicycle
+            A09005_006:      Walked
+            A09005_007:      Other Means
+            A09005_008:      Worked At Home
+
+
+      6. Means of Transportation to Work (Renter-Occupied Housing Units)
+         Universe:  Universe:  Workers 16 years and Over in households
+         Name:      A09004B
+         Variables:
+            A09004B_008:   Workers 16 Years and Over in Households:
+            A09004B_001:      Householder Lived in Renter-Occupied Housing Units:
+            A09004B_002:         Car, Truck, or Van - Drove Alone
+            A09004B_003:         Car, Truck, or Van - Carpooled
+            A09004B_004:         Public Transportation (Excluding Taxicab)
+            A09004B_005:         Walked
+            A09004B_006:         Taxicab, Motorcycle, Bicycle, or Other Means
+            A09004B_007:         Worked At Home
+
+
+      7. Travel Time to Work for Workers 16 Years and Over
+         Universe:  Workers 16 Years and Over
+         Name:      A09001
+         Variables:
+            A09001_001:   Workers 16 Years and Over:
+            A09001_002:      Did Not Work At Home:
+            A09001_003:         Less than 10 Minutes
+            A09001_004:         10 to 19 Minutes
+            A09001_005:         20 to 29 Minutes
+            A09001_006:         30 to 39 Minutes
+            A09001_007:         40 to 59 Minutes
+            A09001_008:         60 to 89 Minutes
+            A09001_009:         90 or More Minutes
+            A09001_010:      Worked At Home
+
+
+      8. Poverty Status in of Families by Family Type by Presence of Children Under 18 Years
+         Universe:  Families
+         Name:      A13002
+         Variables:
+            A13002_001:   Families:
+            A13002_002:      Income Below Poverty Level:
+            A13002_003:         Married Couple Family: with Related Child Living  Below Poverty Level
+            A13002_004:         Married Couple Family: No Related Children Under 18 Years
+            A13002_005:         Male Householder, No Wife Present:
+            A13002_006:            With Related Children Under 18 Years
+            A13002_007:            No Related Children Under 18 Years
+            A13002_008:         Female Householder, No Husband Present:
+            A13002_009:            With Related Children Under 18 Years
+            A13002_010:            No Related Children Under 18 Years
+            A13002_011:      Income At or Above Poverty Level
+
+
+      9. Place of Birth for the Foreign-Born Population
+         Universe:  Foreign-born population
+         Name:      A07001
+         Variables:
+            A07001_001:   Foreign-Born Population:
+            A07001_002:      Europe:
+            A07001_003:         Northern Europe:
+            A07001_004:            United Kingdom:
+            A07001_005:               United Kingdom, Excluding England and Scotland
+            A07001_006:               England
+            A07001_007:               Scotland
+            A07001_008:            Ireland
+            A07001_009:            Other Northern Europe
+            A07001_010:         Western Europe:
+            A07001_011:            Austria
+            A07001_012:            France
+            A07001_013:            Germany
+            A07001_014:            Netherlands
+            A07001_015:            Other Western Europe
+            A07001_016:         Southern Europe:
+            A07001_017:            Greece
+            A07001_018:            Italy
+            A07001_019:            Portugal
+            A07001_020:            Spain
+            A07001_021:            Other Southern Europe
+            A07001_022:         Eastern Europe:
+            A07001_023:            Croatia
+            A07001_024:            Czechoslovakia (Includes Czech Republic and Slovakia)
+            A07001_025:            Hungary
+            A07001_026:            Poland
+            A07001_027:            Romania
+            A07001_028:            Russia
+            A07001_029:            Ukraine
+            A07001_030:            Bosnia and Herzegovina
+            A07001_031:            Serbia
+            A07001_032:            Other Eastern Europe
+            A07001_033:         Europe, N.e.c.
+            A07001_034:      Asia:
+            A07001_035:         Eastern Asia:
+            A07001_036:            China:
+            A07001_037:               China, Excluding Hong Kong and Taiwan
+            A07001_038:               Hong Kong
+            A07001_039:               Taiwan
+            A07001_040:            Japan
+            A07001_041:            Korea
+            A07001_042:            Other Eastern Asia
+            A07001_043:         South Central Asia:
+            A07001_044:            Afghanistan
+            A07001_045:            Bangladesh
+            A07001_046:            India
+            A07001_047:            Iran
+            A07001_048:            Pakistan
+            A07001_049:            Other South Central Asia
+            A07001_050:         South Eastern Asia:
+            A07001_051:            Cambodia
+            A07001_052:            Indonesia
+            A07001_053:            Laos
+            A07001_054:            Philippines
+            A07001_055:            Thailand
+            A07001_056:            Vietnam
+            A07001_057:            Other South Eastern Asia
+            A07001_058:         Western Asia:
+            A07001_059:            Iraq
+            A07001_060:            Israel
+            A07001_061:            Lebanon
+            A07001_062:            Syria
+            A07001_063:            Turkey
+            A07001_064:            Armenia
+            A07001_065:            Other Western Asia
+            A07001_066:         Asia, N.e.c.
+            A07001_067:      Africa:
+            A07001_068:         Eastern Africa:
+            A07001_069:            Ethiopia
+            A07001_070:            Kenya
+            A07001_071:            Other Eastern Africa
+            A07001_072:         Middle Africa
+            A07001_073:         Northern Africa:
+            A07001_074:            Egypt
+            A07001_075:            Other Northern Africa
+            A07001_076:         Southern Africa:
+            A07001_077:            South Africa
+            A07001_078:            Other Southern Africa
+            A07001_079:         Western Africa:
+            A07001_080:            Ghana
+            A07001_081:            Liberia
+            A07001_082:            Nigeria
+            A07001_083:            Other Western Africa
+            A07001_084:         Africa, N.e.c.
+            A07001_085:      Oceania:
+            A07001_086:         Australia and New Zealand Subregion:
+            A07001_087:            Australia
+            A07001_088:            Other Australian and New Zealand Subregion
+            A07001_089:         Oceania, N.e.c.
+            A07001_090:      Americas:
+            A07001_091:         Latin America:
+            A07001_092:            Caribbean:
+            A07001_093:               Barbados
+            A07001_094:               Cuba
+            A07001_095:               Dominican Republic
+            A07001_096:               Haiti
+            A07001_097:               Jamaica
+            A07001_098:               Trinidad and Tobago
+            A07001_099:               Other Caribbean
+            A07001_100:            Central America:
+            A07001_101:               Mexico
+            A07001_102:               Costa Rica
+            A07001_103:               El Salvador
+            A07001_104:               Guatemala
+            A07001_105:               Honduras
+            A07001_106:               Nicaragua
+            A07001_107:               Panama
+            A07001_108:               Other Central America
+            A07001_109:            South America:
+            A07001_110:               Argentina
+            A07001_111:               Bolivia
+            A07001_112:               Brazil
+            A07001_113:               Chile
+            A07001_114:               Colombia
+            A07001_115:               Ecuador
+            A07001_116:               Guyana
+            A07001_117:               Peru
+            A07001_118:               Uruguay
+            A07001_119:               Venezuela
+            A07001_120:               Other South America
+            A07001_121:         Northern America:
+            A07001_122:            Canada
+            A07001_123:            Other Northern America
+
+
+
+
+
+ 
+ 
+ 
+--------------------------------------------------------------------------------
+Data Dictionary
+--------------------------------------------------------------------------------
+ 
+Variables 
+      Geo__geoid_:    FIPS
+      Geo_qname:      Qualified Area Name
+      Geo_STUSAB:     State Postal Abbreviation
+      Geo_SUMLEV:     Summary Level
+      Geo_GEOCOMP:    Geographic Component
+      Geo_US:         US
+      Geo_REGION:     Census Region
+      Geo_DIVISION:   Census Division
+      Geo_STATE:      State (FIPS Code)
+      Geo_COUNTY:     County of current residence
+      Geo_COUSUB:     County Subdivision (FIPS)
+      Geo_PLACE:      Place (FIPS Code)
+      Geo_TRACT:      Census Tract
+      Geo_BLKGRP:     Block Group
+      Geo_CONCIT:     Consolidated City
+      Geo_AIANHH:     American Indian Area/Alaska Native Area/ Hawaiian Home Land (Census)
+      Geo_AIANHHFP:   American Indian Area/Alaska Native Area/ Hawaiian Home Land (FIPS)
+      Geo_AIHHTLI:    American Indian Trust Land/Hawaiian Home Land Indicator
+      Geo_AITS:       American Indian Tribal Subdivision (FIPS)
+      Geo_ANRC:       Alaska Native Regional Corporation (FIPS)
+      Geo_CBSA:       Metropolitan and Micropolitan Statistical Area
+      Geo_CSA:        Combined Statistical Area
+      Geo_METDIV:     Metropolitan Statistical Area-Metropolitan Division
+      Geo_MACC:       Metropolitan Area Central City
+      Geo_MEMI:       Metropolitan/Micropolitan Indicator Flag
+      Geo_NECTA:      New England City and Town Area
+      Geo_CNECTA:     New England City and Town Combined Statistical Area
+      Geo_NECTADIV:   New England City and Town Area Division
+      Geo_UA:         Urban Area
+      Geo_CDCURR:     Current Congressional District ***
+      Geo_SLDU:       State Legislative District Upper
+      Geo_SLDL:       State Legislative District Lower
+      Geo_ZCTA3:      ZIP Code Tabulation Area (3-digit)
+      Geo_ZCTA5:      5-digit ZIP Code Tabulation Area
+      Geo_SUBMCD:     Subminor Civil Division (FIPS)
+      Geo_SDELM:      State-School District (Elementary)
+      Geo_SDSEC:      State-School District (Secondary)
+      Geo_SDUNI:      State-School District (Unified)
+      Geo_UR:         Urban/Rural
+      Geo_PCI:        Principal City Indicator
+      Geo_PUMA5:      Public Use Microdata Area – 5% File
+      Geo_GEO_ID:     Geographic Identifier
+      Geo_NAME:       Area Name
+      Geo_BTTR:       Tribal Tract
+      Geo_BTBG:       Tribal Block Group
+      Geo_PLACESE:    Place (State FIPS + Place FIPS)
+      SE_A00001_001:  Total Population
+      SE_A00002_001:  Total Population
+      SE_A00002_002:  Population Density (Per Sq. Mile)
+      SE_A00002_003:  Area (Land)
+      SE_A03001_001:  Total Population:
+      SE_A03001_002:  Total Population: White Alone
+      SE_A03001_003:  Total Population: Black or African American Alone
+      SE_A03001_004:  Total Population: American Indian and Alaska Native Alone
+      SE_A03001_005:  Total Population: Asian Alone
+      SE_A03001_006:  Total Population: Native Hawaiian and Other Pacific Islander Alone
+      SE_A03001_007:  Total Population: Some Other Race Alone
+      SE_A03001_008:  Total Population: Two or More Races
+      SE_A12001_001:  Population 25 Years and Over:
+      SE_A12001_002:  Population 25 Years and Over: Less than High School
+      SE_A12001_003:  Population 25 Years and Over: High School Graduate or More (Includes Equivalency)
+      SE_A12001_004:  Population 25 Years and Over: Some College or More
+      SE_A12001_005:  Population 25 Years and Over: Bachelor's Degree or More
+      SE_A12001_006:  Population 25 Years and Over: Master's Degree or More
+      SE_A12001_007:  Population 25 Years and Over: Professional School Degree or More
+      SE_A12001_008:  Population 25 Years and Over: Doctorate Degree
+      SE_A09005_001:  Workers 16 Years and Over:
+      SE_A09005_002:  Workers 16 Years and Over: Car, Truck, or Van
+      SE_A09005_009:  Workers 16 Years and Over: Drove Alone
+      SE_A09005_010:  Workers 16 Years and Over: Carpooled
+      SE_A09005_003:  Workers 16 Years and Over: Public Transportation (Includes Taxicab)
+      SE_A09005_004:  Workers 16 Years and Over: Motorcycle
+      SE_A09005_005:  Workers 16 Years and Over: Bicycle
+      SE_A09005_006:  Workers 16 Years and Over: Walked
+      SE_A09005_007:  Workers 16 Years and Over: Other Means
+      SE_A09005_008:  Workers 16 Years and Over: Worked At Home
+      SE_A09004B_008: Workers 16 Years and Over in Households
+      SE_A09004B_001: Workers 16 Years and Over in Households: Householder Lived in Renter-Occupied Housing Units
+      SE_A09004B_002: Workers 16 Years and Over in Households: Householder Lived in Renter-Occupied Housing Units: Car, Truck, or Van - Drove Alone
+      SE_A09004B_003: Workers 16 Years and Over in Households: Householder Lived in Renter-Occupied Housing Units: Car, Truck, or Van - Carpooled
+      SE_A09004B_004: Workers 16 Years and Over in Households: Householder Lived in Renter-Occupied Housing Units: Public Transportation (Excluding Taxicab)
+      SE_A09004B_005: Workers 16 Years and Over in Households: Householder Lived in Renter-Occupied Housing Units: Walked
+      SE_A09004B_006: Workers 16 Years and Over in Households: Householder Lived in Renter-Occupied Housing Units: Taxicab, Motorcycle, Bicycle, or Other Means
+      SE_A09004B_007: Workers 16 Years and Over in Households: Householder Lived in Renter-Occupied Housing Units: Worked At Home
+      SE_A09001_001:  Workers 16 Years and Over:
+      SE_A09001_002:  Workers 16 Years and Over: Did Not Work At Home
+      SE_A09001_003:  Workers 16 Years and Over: Did Not Work At Home: Less than 10 Minutes
+      SE_A09001_004:  Workers 16 Years and Over: Did Not Work At Home: 10 to 19 Minutes
+      SE_A09001_005:  Workers 16 Years and Over: Did Not Work At Home: 20 to 29 Minutes
+      SE_A09001_006:  Workers 16 Years and Over: Did Not Work At Home: 30 to 39 Minutes
+      SE_A09001_007:  Workers 16 Years and Over: Did Not Work At Home: 40 to 59 Minutes
+      SE_A09001_008:  Workers 16 Years and Over: Did Not Work At Home: 60 to 89 Minutes
+      SE_A09001_009:  Workers 16 Years and Over: Did Not Work At Home: 90 or More Minutes
+      SE_A09001_010:  Workers 16 Years and Over: Worked At Home
+      SE_A13002_001:  Families:
+      SE_A13002_002:  Families: Income Below Poverty Level
+      SE_A13002_003:  Families: Income Below Poverty Level: Married Couple Family: with Related Child Living  Below Poverty Level
+      SE_A13002_004:  Families: Income Below Poverty Level: Married Couple Family: No Related Children Under 18 Years
+      SE_A13002_005:  Families: Income Below Poverty Level: Male Householder, No Wife Present
+      SE_A13002_006:  Families: Income Below Poverty Level: Male Householder, No Wife Present: With Related Children Under 18 Years
+      SE_A13002_007:  Families: Income Below Poverty Level: Male Householder, No Wife Present: No Related Children Under 18 Years
+      SE_A13002_008:  Families: Income Below Poverty Level: Female Householder, No Husband Present
+      SE_A13002_009:  Families: Income Below Poverty Level: Female Householder, No Husband Present: With Related Children Under 18 Years
+      SE_A13002_010:  Families: Income Below Poverty Level: Female Householder, No Husband Present: No Related Children Under 18 Years
+      SE_A13002_011:  Families: Income At or Above Poverty Level
+      SE_A07001_001:  Foreign-Born Population:
+      SE_A07001_002:  Foreign-Born Population: Europe
+      SE_A07001_003:  Foreign-Born Population: Europe: Northern Europe
+      SE_A07001_004:  Foreign-Born Population: Europe: Northern Europe: United Kingdom
+      SE_A07001_005:  Foreign-Born Population: Europe: Northern Europe: United Kingdom: United Kingdom, Excluding England and Scotland
+      SE_A07001_006:  Foreign-Born Population: Europe: Northern Europe: United Kingdom: England
+      SE_A07001_007:  Foreign-Born Population: Europe: Northern Europe: United Kingdom: Scotland
+      SE_A07001_008:  Foreign-Born Population: Europe: Northern Europe: Ireland
+      SE_A07001_009:  Foreign-Born Population: Europe: Northern Europe: Other Northern Europe
+      SE_A07001_010:  Foreign-Born Population: Europe: Western Europe
+      SE_A07001_011:  Foreign-Born Population: Europe: Western Europe: Austria
+      SE_A07001_012:  Foreign-Born Population: Europe: Western Europe: France
+      SE_A07001_013:  Foreign-Born Population: Europe: Western Europe: Germany
+      SE_A07001_014:  Foreign-Born Population: Europe: Western Europe: Netherlands
+      SE_A07001_015:  Foreign-Born Population: Europe: Western Europe: Other Western Europe
+      SE_A07001_016:  Foreign-Born Population: Europe: Southern Europe
+      SE_A07001_017:  Foreign-Born Population: Europe: Southern Europe: Greece
+      SE_A07001_018:  Foreign-Born Population: Europe: Southern Europe: Italy
+      SE_A07001_019:  Foreign-Born Population: Europe: Southern Europe: Portugal
+      SE_A07001_020:  Foreign-Born Population: Europe: Southern Europe: Spain
+      SE_A07001_021:  Foreign-Born Population: Europe: Southern Europe: Other Southern Europe
+      SE_A07001_022:  Foreign-Born Population: Europe: Eastern Europe
+      SE_A07001_023:  Foreign-Born Population: Europe: Eastern Europe: Croatia
+      SE_A07001_024:  Foreign-Born Population: Europe: Eastern Europe: Czechoslovakia (Includes Czech Republic and Slovakia)
+      SE_A07001_025:  Foreign-Born Population: Europe: Eastern Europe: Hungary
+      SE_A07001_026:  Foreign-Born Population: Europe: Eastern Europe: Poland
+      SE_A07001_027:  Foreign-Born Population: Europe: Eastern Europe: Romania
+      SE_A07001_028:  Foreign-Born Population: Europe: Eastern Europe: Russia
+      SE_A07001_029:  Foreign-Born Population: Europe: Eastern Europe: Ukraine
+      SE_A07001_030:  Foreign-Born Population: Europe: Eastern Europe: Bosnia and Herzegovina
+      SE_A07001_031:  Foreign-Born Population: Europe: Eastern Europe: Serbia
+      SE_A07001_032:  Foreign-Born Population: Europe: Eastern Europe: Other Eastern Europe
+      SE_A07001_033:  Foreign-Born Population: Europe: Europe, N.e.c.
+      SE_A07001_034:  Foreign-Born Population: Asia
+      SE_A07001_035:  Foreign-Born Population: Asia: Eastern Asia
+      SE_A07001_036:  Foreign-Born Population: Asia: Eastern Asia: China
+      SE_A07001_037:  Foreign-Born Population: Asia: Eastern Asia: China: China, Excluding Hong Kong and Taiwan
+      SE_A07001_038:  Foreign-Born Population: Asia: Eastern Asia: China: Hong Kong
+      SE_A07001_039:  Foreign-Born Population: Asia: Eastern Asia: China: Taiwan
+      SE_A07001_040:  Foreign-Born Population: Asia: Eastern Asia: Japan
+      SE_A07001_041:  Foreign-Born Population: Asia: Eastern Asia: Korea
+      SE_A07001_042:  Foreign-Born Population: Asia: Eastern Asia: Other Eastern Asia
+      SE_A07001_043:  Foreign-Born Population: Asia: South Central Asia
+      SE_A07001_044:  Foreign-Born Population: Asia: South Central Asia: Afghanistan
+      SE_A07001_045:  Foreign-Born Population: Asia: South Central Asia: Bangladesh
+      SE_A07001_046:  Foreign-Born Population: Asia: South Central Asia: India
+      SE_A07001_047:  Foreign-Born Population: Asia: South Central Asia: Iran
+      SE_A07001_048:  Foreign-Born Population: Asia: South Central Asia: Pakistan
+      SE_A07001_049:  Foreign-Born Population: Asia: South Central Asia: Other South Central Asia
+      SE_A07001_050:  Foreign-Born Population: Asia: South Eastern Asia
+      SE_A07001_051:  Foreign-Born Population: Asia: South Eastern Asia: Cambodia
+      SE_A07001_052:  Foreign-Born Population: Asia: South Eastern Asia: Indonesia
+      SE_A07001_053:  Foreign-Born Population: Asia: South Eastern Asia: Laos
+      SE_A07001_054:  Foreign-Born Population: Asia: South Eastern Asia: Philippines
+      SE_A07001_055:  Foreign-Born Population: Asia: South Eastern Asia: Thailand
+      SE_A07001_056:  Foreign-Born Population: Asia: South Eastern Asia: Vietnam
+      SE_A07001_057:  Foreign-Born Population: Asia: South Eastern Asia: Other South Eastern Asia
+      SE_A07001_058:  Foreign-Born Population: Asia: Western Asia
+      SE_A07001_059:  Foreign-Born Population: Asia: Western Asia: Iraq
+      SE_A07001_060:  Foreign-Born Population: Asia: Western Asia: Israel
+      SE_A07001_061:  Foreign-Born Population: Asia: Western Asia: Lebanon
+      SE_A07001_062:  Foreign-Born Population: Asia: Western Asia: Syria
+      SE_A07001_063:  Foreign-Born Population: Asia: Western Asia: Turkey
+      SE_A07001_064:  Foreign-Born Population: Asia: Western Asia: Armenia
+      SE_A07001_065:  Foreign-Born Population: Asia: Western Asia: Other Western Asia
+      SE_A07001_066:  Foreign-Born Population: Asia: Asia, N.e.c.
+      SE_A07001_067:  Foreign-Born Population: Africa
+      SE_A07001_068:  Foreign-Born Population: Africa: Eastern Africa
+      SE_A07001_069:  Foreign-Born Population: Africa: Eastern Africa: Ethiopia
+      SE_A07001_070:  Foreign-Born Population: Africa: Eastern Africa: Kenya
+      SE_A07001_071:  Foreign-Born Population: Africa: Eastern Africa: Other Eastern Africa
+      SE_A07001_072:  Foreign-Born Population: Africa: Middle Africa
+      SE_A07001_073:  Foreign-Born Population: Africa: Northern Africa
+      SE_A07001_074:  Foreign-Born Population: Africa: Northern Africa: Egypt
+      SE_A07001_075:  Foreign-Born Population: Africa: Northern Africa: Other Northern Africa
+      SE_A07001_076:  Foreign-Born Population: Africa: Southern Africa
+      SE_A07001_077:  Foreign-Born Population: Africa: Southern Africa: South Africa
+      SE_A07001_078:  Foreign-Born Population: Africa: Southern Africa: Other Southern Africa
+      SE_A07001_079:  Foreign-Born Population: Africa: Western Africa
+      SE_A07001_080:  Foreign-Born Population: Africa: Western Africa: Ghana
+      SE_A07001_081:  Foreign-Born Population: Africa: Western Africa: Liberia
+      SE_A07001_082:  Foreign-Born Population: Africa: Western Africa: Nigeria
+      SE_A07001_083:  Foreign-Born Population: Africa: Western Africa: Other Western Africa
+      SE_A07001_084:  Foreign-Born Population: Africa: Africa, N.e.c.
+      SE_A07001_085:  Foreign-Born Population: Oceania
+      SE_A07001_086:  Foreign-Born Population: Oceania: Australia and New Zealand Subregion
+      SE_A07001_087:  Foreign-Born Population: Oceania: Australia and New Zealand Subregion: Australia
+      SE_A07001_088:  Foreign-Born Population: Oceania: Australia and New Zealand Subregion: Other Australian and New Zealand Subregion
+      SE_A07001_089:  Foreign-Born Population: Oceania: Oceania, N.e.c.
+      SE_A07001_090:  Foreign-Born Population: Americas
+      SE_A07001_091:  Foreign-Born Population: Americas: Latin America
+      SE_A07001_092:  Foreign-Born Population: Americas: Latin America: Caribbean
+      SE_A07001_093:  Foreign-Born Population: Americas: Latin America: Caribbean: Barbados
+      SE_A07001_094:  Foreign-Born Population: Americas: Latin America: Caribbean: Cuba
+      SE_A07001_095:  Foreign-Born Population: Americas: Latin America: Caribbean: Dominican Republic
+      SE_A07001_096:  Foreign-Born Population: Americas: Latin America: Caribbean: Haiti
+      SE_A07001_097:  Foreign-Born Population: Americas: Latin America: Caribbean: Jamaica
+      SE_A07001_098:  Foreign-Born Population: Americas: Latin America: Caribbean: Trinidad and Tobago
+      SE_A07001_099:  Foreign-Born Population: Americas: Latin America: Caribbean: Other Caribbean
+      SE_A07001_100:  Foreign-Born Population: Americas: Latin America: Central America
+      SE_A07001_101:  Foreign-Born Population: Americas: Latin America: Central America: Mexico
+      SE_A07001_102:  Foreign-Born Population: Americas: Latin America: Central America: Costa Rica
+      SE_A07001_103:  Foreign-Born Population: Americas: Latin America: Central America: El Salvador
+      SE_A07001_104:  Foreign-Born Population: Americas: Latin America: Central America: Guatemala
+      SE_A07001_105:  Foreign-Born Population: Americas: Latin America: Central America: Honduras
+      SE_A07001_106:  Foreign-Born Population: Americas: Latin America: Central America: Nicaragua
+      SE_A07001_107:  Foreign-Born Population: Americas: Latin America: Central America: Panama
+      SE_A07001_108:  Foreign-Born Population: Americas: Latin America: Central America: Other Central America
+      SE_A07001_109:  Foreign-Born Population: Americas: Latin America: South America
+      SE_A07001_110:  Foreign-Born Population: Americas: Latin America: South America: Argentina
+      SE_A07001_111:  Foreign-Born Population: Americas: Latin America: South America: Bolivia
+      SE_A07001_112:  Foreign-Born Population: Americas: Latin America: South America: Brazil
+      SE_A07001_113:  Foreign-Born Population: Americas: Latin America: South America: Chile
+      SE_A07001_114:  Foreign-Born Population: Americas: Latin America: South America: Colombia
+      SE_A07001_115:  Foreign-Born Population: Americas: Latin America: South America: Ecuador
+      SE_A07001_116:  Foreign-Born Population: Americas: Latin America: South America: Guyana
+      SE_A07001_117:  Foreign-Born Population: Americas: Latin America: South America: Peru
+      SE_A07001_118:  Foreign-Born Population: Americas: Latin America: South America: Uruguay
+      SE_A07001_119:  Foreign-Born Population: Americas: Latin America: South America: Venezuela
+      SE_A07001_120:  Foreign-Born Population: Americas: Latin America: South America: Other South America
+      SE_A07001_121:  Foreign-Born Population: Americas: Northern America
+      SE_A07001_122:  Foreign-Born Population: Americas: Northern America: Canada
+      SE_A07001_123:  Foreign-Born Population: Americas: Northern America: Other Northern America
+
+
+
+
+--------------------------------------------------------------------------------
+Citation and Use of Data
+--------------------------------------------------------------------------------
+ 
+All persons are granted a limited license to use this documentation and the
+accompanying data, subject to the following conditions:
+
+* Publications and research reports employing the data
+  must cite it appropriately. The citation should include the following:
+
+	  www.socialexplorer.com
+	  New York City, NY: Social Explorer 2025
+
+
+* Citations should also include the URL for this report.
+
+If you have any questions contact info@socialexplorer.com
+ 
+--------------------------------------------------------------------------------
+Compiler version: 2.2.9.0
+Last compiled on: 2025-06-10 09:02:39Z

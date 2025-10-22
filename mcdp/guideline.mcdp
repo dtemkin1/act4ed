@@ -1,0 +1,5 @@
+mcdp {
+    provides roi [$]
+
+    requires total_satisfied_od_pairs [dimensionless]
+}

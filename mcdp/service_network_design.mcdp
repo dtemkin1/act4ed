@@ -1,0 +1,10 @@
+mcdp {
+    provides total_satisfied_od_pairs [dimensionless]
+
+    requires fleet_composition [dimensionless]
+    requires average_travel_time [min]
+    requires discomfort [dimensionless]
+    requires average_num_transfers [dimensionless]
+    requires average_num_hops [dimensionless]
+    requires emissions [kg/year]
+}
