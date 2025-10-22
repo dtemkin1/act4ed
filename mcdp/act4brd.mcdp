@@ -1,6 +1,6 @@
 mcdp {
     provides total_satisfied_od_pairs [dimensionless]
-    provides cost_per_operator [$/dimensionless]
+    provides cost_per_operator [$/Nat]
 
     requires total_cost [$]
     requires dissatisfaction_level [dimensionless]
