@@ -14,4 +14,4 @@ data/*
 !data/*.md
 !data/*.txt
 
-mcdp/out-plot/*
+*.mcdplib/out-plot/*
