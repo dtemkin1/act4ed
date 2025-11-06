@@ -7,6 +7,7 @@ requires-python = ">=3.13"
 dependencies = [
     "matplotlib>=3.10.7",
     "mcdp-format2-py>=2.17.2507141632",
+    "networkx[default,extra]>=3.5",
     "pygris>=0.2.0",
     "python-dotenv>=1.1.1",
     "requests>=2.32.5",
