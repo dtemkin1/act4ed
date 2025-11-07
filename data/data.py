@@ -22,7 +22,7 @@ FEED_ID = "f-drt0-metrowestregionaltransitauthority"
 
 TRANSITLAND_API_KEY = os.getenv("TRANSITLAND_API_KEY")
 BASE_API_URL = "https://transit.land/api/v2/rest"
-FOLDER = pathlib.Path(__file__).parent.resolve() / "data"
+FOLDER = pathlib.Path(__file__).parent.resolve()
 
 
 def main():
