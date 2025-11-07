@@ -1,0 +1,24 @@
+[project]
+name = "act4brd"
+version = "0.1.0"
+description = ""
+readme = "README.md"
+requires-python = ">=3.12,<4"
+authors = [
+    { name = "Riccardo Fiorista", email = "fiorista.riccardo@gmail.com" },
+    { name = "Xinling Li", email = "xinli831@mit.edu" },
+]
+
+dependencies = [
+    "networkx>=3.4.2,<4.0.0",
+    "matplotlib>=3.9.3,<4.0.0",
+    "tqdm>=4.67.1,<5.0.0",
+]
+
+[dependency-groups]
+dev = ["pytest>=8.3.4,<9.0.0"]
+
+# If you plan to build/publish the package, keep a build backend:
+[build-system]
+requires = ["hatchling>=1.21.1"]
+build-backend = "hatchling.build"
