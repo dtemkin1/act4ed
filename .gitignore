@@ -10,9 +10,5 @@ wheels/
 .venv
 
 .env
-data/*
-!data/*.md
-!data/*.txt
-!data/*.py
 
 *.mcdplib/out-plot/*

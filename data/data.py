@@ -91,7 +91,8 @@ def scrape_gtfs(feed_key: str, latest: bool = True):
     response.raise_for_status()
 
     with open(
-        FOLDER / f"gtfs_{feed_key}_{"latest" if latest else "archived"}.zip", "wb"
+        FOLDER / "gtfs" / f"gtfs_{feed_key}_{"latest" if latest else "archived"}.zip",
+        "wb",
     ) as f:
         f.write(response.content)
 
@@ -111,7 +112,7 @@ def scrape_lodes(state: str, year: int = 2022):
     assert isinstance(lodes_od, pandas.DataFrame)
 
     with open(
-        FOLDER / f"lodes_od_{state.lower()}_{year}.csv", "w", encoding="utf-8"
+        FOLDER / "lodes" / f"lodes_od_{state.lower()}_{year}.csv", "w", encoding="utf-8"
     ) as f:
         f.write(lodes_od.to_csv(encoding="utf-8"))
 
