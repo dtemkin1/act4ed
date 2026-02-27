@@ -1,0 +1,32 @@
+mcdp {
+    provides total_satisfied_od_pairs [`demand]
+
+    requires total_cost [$]
+    requires dissatisfaction_level [Reals]
+    requires emissions [kg/year]
+
+    constant cost_per_operator = 50000 $
+
+    sub customer_experience = instance `customer_experience
+    sub fleet = instance `fleet
+    sub guideline = instance `guideline
+    sub service_network_design = instance `service_network_design
+
+    provided total_satisfied_od_pairs ≤ total_satisfied_od_pairs provided by service_network_design
+    dissatisfaction_level required by customer_experience ≤ required dissatisfaction_level
+    emissions required by service_network_design ≤ required emissions
+    
+    # fleet_composition required by service_network_design ≤ fleet_composition provided by fleet
+    amount_fleet_1 required by service_network_design <= amount_fleet_1 provided by fleet
+    amount_fleet_2 required by service_network_design <= amount_fleet_2 provided by fleet
+
+    average_travel_time required by service_network_design ≤ average_travel_time provided by customer_experience
+    discomfort required by service_network_design ≤ discomfort provided by customer_experience
+    average_num_transfers required by service_network_design ≤ average_num_transfers provided by customer_experience
+    average_num_hops required by service_network_design ≤ average_num_hops provided by customer_experience
+    
+    total_satisfied_od_pairs required by guideline ≤ total_satisfied_od_pairs provided by service_network_design
+    capital_cost = num_operators required by fleet · cost_per_operator + capital_cost required by fleet
+    capital_cost ≤ roi provided by guideline
+    required total_cost ≥ capital_cost
+}

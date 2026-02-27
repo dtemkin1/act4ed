@@ -1,0 +1,49 @@
+F:
+  - "`fleet"
+R:
+  - "car"
+  - "car"
+
+implementations:
+  fleet1:
+    f_max:
+      - "`fleet: fleet_1_1"
+    r_min:
+      - "1 car"
+      - "1 car"
+  fleet2:
+    f_max:
+      - "`fleet: fleet_2_0"
+    r_min:
+      - "2 car"
+      - "0 car"
+  fleet3:
+    f_max:
+      - "`fleet: fleet_0_2"
+    r_min:
+      - "0 car"
+      - "2 car"
+  fleet4:
+    f_max:
+      - "`fleet: fleet_2_1"
+    r_min:
+      - "2 car"
+      - "1 car"
+  fleet5:
+    f_max:
+      - "`fleet: fleet_1_2"
+    r_min:
+      - "1 car"
+      - "2 car"
+  fleet6:
+    f_max:
+      - "`fleet: fleet_0_3"
+    r_min:
+      - "0 car"
+      - "3 car"
+  fleet8:
+    f_max:
+      - "`fleet: fleet_3_0"
+    r_min:
+      - "3 car"
+      - "0 car"

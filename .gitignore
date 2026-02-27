@@ -12,3 +12,4 @@ wheels/
 .env
 
 *.mcdplib/out-plot/*
+*.mcdplib/out-solve-query/*

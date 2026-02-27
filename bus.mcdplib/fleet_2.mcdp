@@ -1,0 +1,13 @@
+mcdp {
+    provides amount_fleet_2 [car]
+
+    requires capital_cost [USD]
+    requires num_operators [Nat]
+
+    # using electric bus analysis from NYC MTA
+    price = 1348000 USD/car
+    person = 1 dimensionless/car
+    
+    required capital_cost >= price * provided amount_fleet_2
+    required num_operators >= person * provided amount_fleet_2
+}

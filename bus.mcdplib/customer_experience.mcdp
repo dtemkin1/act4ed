@@ -1,0 +1,14 @@
+mcdp {
+    provides average_travel_time [s]
+    provides discomfort [Reals]
+    provides average_num_transfers [Reals]
+    provides average_num_hops [Reals]
+
+    requires dissatisfaction_level [Reals]
+
+    constant weight_of_hops = 1
+    constant weight_of_transfers = 1
+    constant weight_of_travel_time = 1 1/s
+
+    required dissatisfaction_level >= weight_of_travel_time * provided average_travel_time + provided discomfort + weight_of_hops * provided average_num_hops + weight_of_transfers * provided average_num_transfers
+}

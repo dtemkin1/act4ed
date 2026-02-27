@@ -1,0 +1,16 @@
+F:
+  - "$"
+R:
+  - "`demand"
+
+implementations:
+  guideline1:
+    f_max:
+      - "100000000000000 $"
+    r_min:
+      - "`demand: demand_1_8_190__2_6_10"
+  guideline2:
+    f_max:
+      - "100000000000000 $"
+    r_min:
+      - "`demand: demand_1_8_190__2_6_10"

@@ -1,0 +1,15 @@
+title: Bus_Route_1
+description: Query for the Bus Route Design DP.
+model: '`bus'
+query:
+  query_type: FixFunMinRes
+  min_f:
+    total_satisfied_od_pairs: '`demand: demand_1_8_190__2_6_10'
+  max_r:
+    total_cost: inf USD
+    emissions: inf kg/year
+    dissatisfaction_level: inf dimensionless
+  optimize_for:
+    - total_cost
+    - dissatisfaction_level
+    - emissions

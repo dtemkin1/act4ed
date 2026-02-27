@@ -1,0 +1,15 @@
+dp {
+    provides total_satisfied_od_pairs [`demand]
+
+    # requires fleet_composition [`fleet]
+    requires amount_fleet_1 [car]
+    requires amount_fleet_2  [car]
+
+    requires average_travel_time [s]
+    requires discomfort [Reals]
+    requires average_num_transfers [Reals]
+    requires average_num_hops [Reals]
+    requires emissions [kg/year]
+    
+    implemented-by yaml resource("demand.dpc.yaml")
+}

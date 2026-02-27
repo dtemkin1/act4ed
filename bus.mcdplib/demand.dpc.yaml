@@ -1,0 +1,341 @@
+F:
+- '`demand'
+R:
+- car
+- car
+- s
+- Reals
+- Reals
+- Reals
+- kg/year
+implementations:
+  model1:
+    f_max:
+    - '`demand: demand_1_8_190__2_6_10'
+    r_min:
+    - 1 car
+    - 1 car
+    - 366.0 s
+    - 0.4066666666666667 Reals
+    - 0 Reals
+    - 4.05 Reals
+    - 0.7200000000000002 kg/year
+  model10:
+    f_max:
+    - '`demand: demand_1_8_190__2_6_10'
+    r_min:
+    - 0 car
+    - 2 car
+    - 822.0 s
+    - 1.37 Reals
+    - 0 Reals
+    - 7.85 Reals
+    - 0.48 kg/year
+  model11:
+    f_max:
+    - '`demand: demand_1_8_190__2_6_10'
+    r_min:
+    - 2 car
+    - 1 car
+    - 822.0 s
+    - 0.548 Reals
+    - 0 Reals
+    - 7.85 Reals
+    - 1.2 kg/year
+  model12:
+    f_max:
+    - '`demand: demand_1_8_190__2_6_10'
+    r_min:
+    - 1 car
+    - 2 car
+    - 822.0 s
+    - 0.685 Reals
+    - 0 Reals
+    - 7.85 Reals
+    - 0.96 kg/year
+  model13:
+    f_max:
+    - '`demand: demand_1_8_190__2_6_10'
+    r_min:
+    - 0 car
+    - 3 car
+    - 822.0 s
+    - 0.9133333333333333 Reals
+    - 0 Reals
+    - 7.85 Reals
+    - 0.72 kg/year
+  model14:
+    f_max:
+    - '`demand: demand_1_8_190__2_6_10'
+    r_min:
+    - 3 car
+    - 0 car
+    - 822.0 s
+    - 0.45666666666666667 Reals
+    - 0 Reals
+    - 7.85 Reals
+    - 1.44 kg/year
+  model15:
+    f_max:
+    - '`demand: demand_1_8_190__2_6_10'
+    r_min:
+    - 1 car
+    - 1 car
+    - 366.0 s
+    - 1.6927272727272726 Reals
+    - 0 Reals
+    - 4.05 Reals
+    - 0.72 kg/year
+  model16:
+    f_max:
+    - '`demand: demand_1_8_190__2_6_10'
+    r_min:
+    - 1 car
+    - 1 car
+    - 366.0 s
+    - 1.8619999999999999 Reals
+    - 0 Reals
+    - 4.05 Reals
+    - 0.72 kg/year
+  model17:
+    f_max:
+    - '`demand: demand_1_8_190__2_6_10'
+    r_min:
+    - 2 car
+    - 0 car
+    - 366.0 s
+    - 1.33 Reals
+    - 0 Reals
+    - 4.05 Reals
+    - 0.96 kg/year
+  model18:
+    f_max:
+    - '`demand: demand_1_8_190__2_6_10'
+    r_min:
+    - 0 car
+    - 2 car
+    - 366.0 s
+    - 2.66 Reals
+    - 0 Reals
+    - 4.05 Reals
+    - 0.48 kg/year
+  model19:
+    f_max:
+    - '`demand: demand_1_8_190__2_6_10'
+    r_min:
+    - 2 car
+    - 1 car
+    - 366.0 s
+    - 0.98 Reals
+    - 0 Reals
+    - 4.05 Reals
+    - 1.2 kg/year
+  model2:
+    f_max:
+    - '`demand: demand_1_8_190__2_6_10'
+    r_min:
+    - 2 car
+    - 0 car
+    - 366.0 s
+    - 0.305 Reals
+    - 0 Reals
+    - 4.05 Reals
+    - 0.9600000000000002 kg/year
+  model20:
+    f_max:
+    - '`demand: demand_1_8_190__2_6_10'
+    r_min:
+    - 2 car
+    - 1 car
+    - 366.0 s
+    - 1.0344444444444445 Reals
+    - 0 Reals
+    - 4.05 Reals
+    - 1.2 kg/year
+  model21:
+    f_max:
+    - '`demand: demand_1_8_190__2_6_10'
+    r_min:
+    - 2 car
+    - 1 car
+    - 366.0 s
+    - 1.0952941176470588 Reals
+    - 0 Reals
+    - 4.05 Reals
+    - 1.2 kg/year
+  model22:
+    f_max:
+    - '`demand: demand_1_8_190__2_6_10'
+    r_min:
+    - 2 car
+    - 1 car
+    - 366.0 s
+    - 1.16375 Reals
+    - 0 Reals
+    - 4.05 Reals
+    - 1.2 kg/year
+  model23:
+    f_max:
+    - '`demand: demand_1_8_190__2_6_10'
+    r_min:
+    - 1 car
+    - 2 car
+    - 366.0 s
+    - 1.2413333333333334 Reals
+    - 0 Reals
+    - 4.05 Reals
+    - 0.96 kg/year
+  model24:
+    f_max:
+    - '`demand: demand_1_8_190__2_6_10'
+    r_min:
+    - 1 car
+    - 2 car
+    - 366.0 s
+    - 1.33 Reals
+    - 0 Reals
+    - 4.05 Reals
+    - 0.96 kg/year
+  model25:
+    f_max:
+    - '`demand: demand_1_8_190__2_6_10'
+    r_min:
+    - 1 car
+    - 2 car
+    - 366.0 s
+    - 1.33 Reals
+    - 0 Reals
+    - 4.05 Reals
+    - 0.96 kg/year
+  model26:
+    f_max:
+    - '`demand: demand_1_8_190__2_6_10'
+    r_min:
+    - 1 car
+    - 2 car
+    - 366.0 s
+    - 1.4323076923076925 Reals
+    - 0 Reals
+    - 4.05 Reals
+    - 0.96 kg/year
+  model27:
+    f_max:
+    - '`demand: demand_1_8_190__2_6_10'
+    r_min:
+    - 0 car
+    - 3 car
+    - 366.0 s
+    - 1.6927272727272726 Reals
+    - 0 Reals
+    - 4.05 Reals
+    - 0.72 kg/year
+  model28:
+    f_max:
+    - '`demand: demand_1_8_190__2_6_10'
+    r_min:
+    - 0 car
+    - 3 car
+    - 366.0 s
+    - 1.8619999999999999 Reals
+    - 0 Reals
+    - 4.05 Reals
+    - 0.72 kg/year
+  model29:
+    f_max:
+    - '`demand: demand_1_8_190__2_6_10'
+    r_min:
+    - 3 car
+    - 0 car
+    - 366.0 s
+    - 0.8463636363636363 Reals
+    - 0 Reals
+    - 4.05 Reals
+    - 1.44 kg/year
+  model3:
+    f_max:
+    - '`demand: demand_1_8_190__2_6_10'
+    r_min:
+    - 0 car
+    - 2 car
+    - 366.0 s
+    - 0.61 Reals
+    - 0 Reals
+    - 4.05 Reals
+    - 0.4800000000000001 kg/year
+  model30:
+    f_max:
+    - '`demand: demand_1_8_190__2_6_10'
+    r_min:
+    - 3 car
+    - 0 car
+    - 366.0 s
+    - 0.9309999999999999 Reals
+    - 0 Reals
+    - 4.05 Reals
+    - 1.44 kg/year
+  model4:
+    f_max:
+    - '`demand: demand_1_8_190__2_6_10'
+    r_min:
+    - 2 car
+    - 1 car
+    - 366.0 s
+    - 0.24400000000000002 Reals
+    - 0 Reals
+    - 4.05 Reals
+    - 1.2000000000000002 kg/year
+  model5:
+    f_max:
+    - '`demand: demand_1_8_190__2_6_10'
+    r_min:
+    - 1 car
+    - 2 car
+    - 366.0 s
+    - 0.305 Reals
+    - 0 Reals
+    - 4.05 Reals
+    - 0.9600000000000002 kg/year
+  model6:
+    f_max:
+    - '`demand: demand_1_8_190__2_6_10'
+    r_min:
+    - 0 car
+    - 3 car
+    - 366.0 s
+    - 0.4066666666666667 Reals
+    - 0 Reals
+    - 4.05 Reals
+    - 0.7200000000000002 kg/year
+  model7:
+    f_max:
+    - '`demand: demand_1_8_190__2_6_10'
+    r_min:
+    - 3 car
+    - 0 car
+    - 366.0 s
+    - 0.20333333333333334 Reals
+    - 0 Reals
+    - 4.05 Reals
+    - 1.4400000000000004 kg/year
+  model8:
+    f_max:
+    - '`demand: demand_1_8_190__2_6_10'
+    r_min:
+    - 1 car
+    - 1 car
+    - 822.0 s
+    - 0.9133333333333333 Reals
+    - 0 Reals
+    - 7.85 Reals
+    - 0.72 kg/year
+  model9:
+    f_max:
+    - '`demand: demand_1_8_190__2_6_10'
+    r_min:
+    - 2 car
+    - 0 car
+    - 822.0 s
+    - 0.685 Reals
+    - 0 Reals
+    - 7.85 Reals
+    - 0.96 kg/year

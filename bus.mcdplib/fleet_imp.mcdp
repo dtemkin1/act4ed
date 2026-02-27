@@ -1,0 +1,8 @@
+dp {
+    provides fleet_composition [`fleet]
+    
+    requires amount_fleet_1 [car]
+    requires amount_fleet_2 [car]
+    
+    implemented-by yaml resource("fleet_imp.dpc.yaml")
+}

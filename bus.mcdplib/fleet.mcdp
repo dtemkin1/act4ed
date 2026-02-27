@@ -1,0 +1,16 @@
+mcdp {
+    provides amount_fleet_1 [car]
+    provides amount_fleet_2 [car]
+
+    requires num_operators [ℕ]
+    requires capital_cost [$]
+
+    fleet_1 = instance `fleet_1
+    fleet_2 = instance `fleet_2
+
+    required capital_cost >= capital_cost required by fleet_1 + capital_cost required by fleet_2
+    required num_operators >= num_operators required by fleet_1 + num_operators required by fleet_2
+
+    provided amount_fleet_1 <= amount_fleet_1 provided by fleet_1
+    provided amount_fleet_2 <= amount_fleet_2 provided by fleet_2
+}

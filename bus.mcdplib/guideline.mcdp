@@ -1,0 +1,7 @@
+dp {
+    provides roi [$]
+
+    requires total_satisfied_od_pairs [`demand]
+
+    implemented-by yaml resource("guideline.dpc.yaml")
+}
