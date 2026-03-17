@@ -30,11 +30,6 @@ dependencies = [
     "osmnx>=2.1.0",
 ]
 
-[tool.uv.workspace]
-members = [
-    "act4brd",
-]
-
 [tool.uv.sources]
 act4brd = { workspace = true }
 
