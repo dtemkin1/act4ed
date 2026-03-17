@@ -29,7 +29,7 @@ from formulation.formulation_3.toy_network import (
 
 
 def build_model_from_definition(
-    problem: Formulation3, formulation_name: str
+    problem: Formulation3,
 ) -> tuple[cp.Problem, dict[str, cp.Variable]]:
     B = problem.B
     M = problem.M
@@ -105,16 +105,12 @@ def build_model_from_definition(
     objective = cp.Minimize(
         cp.sum(
             [
-                cp.sum(
-                    [
-                        cp.sum(d_ij(*path) * x_bqij[:, :, ij])
-                        for ij, path in enumerate(A.keys())
-                    ]
-                ),
-                cp.multiply(LAMBDA_ROUND, cp.sum(z_bq)),
-                cp.sum(r_bmon),
+                cp.sum(cp.multiply(d_ij(i, j), x_bqij[:, :, ij]))
+                for ij, (i, j) in enumerate(A.keys())
             ]
         )
+        + cp.multiply(LAMBDA_ROUND, cp.sum(z_bq))
+        + cp.sum(r_bmon),
     )
 
     constraints: list[cp.Constraint] = []
@@ -596,8 +592,12 @@ def make_report(
     # e_bqs = model_vars["e_bqs"]
     r_bmon = model_vars["r_bmon"]
 
+    result_string = ""
+
     if prob.status not in [cp.OPTIMAL, cp.OPTIMAL_INACCURATE]:
-        print(f"⚠️ Solver did not find a feasible solution (status={prob.status}).")
+        result_string += (
+            f"⚠️ Solver did not find a feasible solution (status={prob.status}).\n"
+        )
     else:
         assert (
             z_bq.value is not None
@@ -606,12 +606,10 @@ def make_report(
             and a_mbq.value is not None
         )
         for b, bus in enumerate(B):
-            print(
-                f"\{bus} (capacity {C_b(bus)}, range {R_b(bus)}, wheelchair access {Wh_b(bus) == 1}, monitor needed: {r_bmon[b].value > 0.5})"
-            )
+            result_string += f"{bus} (capacity {C_b(bus)}, range {R_b(bus)}, wheelchair access {Wh_b(bus) == 1}, monitor needed: {r_bmon[b].value > 0.5})\n"
             for q in range(len(Q)):
                 if z_bq[b, q].value > 0.5:
-                    print(f"  Round {q}:")
+                    result_string += f"  Round {q}:\n"
                     route = []
                     students_on_bus = []
                     schools_served = []
@@ -631,18 +629,10 @@ def make_report(
                     for m, student in enumerate(M):
                         if a_mbq[m, b, q].value > 0.5:
                             students_on_bus.append(student)
-                    print(
-                        f"    Total travel time (excluding dwell): {sum(formulation.d_ij(*path) for path in route):.2f} minutes"
-                    )
-                    print(
-                        f"    Bus type: {TAU[np.argmax(y_bqtau[b,q,:])].name if z_bq[b, q].value > 0.5 else 'N/A'}"
-                    )
-                    print(
-                        f"    Students on bus this round:\n      {'\n      '.join(str(student) for student in students_on_bus)}"
-                    )
-                    print(
-                        f"    Schools served:\n      {'\n      '.join(str(school) for school in schools_served)}"
-                    )
+                    result_string += f"    Total travel time (excluding dwell): {sum(formulation.d_ij(*path) for path in route):.2f} minutes\n"
+                    result_string += f"    Bus type: {TAU[np.argmax(y_bqtau[b,q,:])].name if z_bq[b, q].value > 0.5 else 'N/A'}\n"
+                    result_string += f"    Students on bus this round:\n      {'\n      '.join(str(student) for student in students_on_bus)}\n"
+                    result_string += f"    Schools served:\n      {'\n      '.join(str(school) for school in schools_served)}\n"
 
                     # Sort route by travel time from depot start
                     # depot_start = make_depot_start_copy(depot_b(bus))
@@ -657,12 +647,113 @@ def make_report(
                     #             current_node = path[1]
                     #             break
 
-                    print("    Route:")
+                    result_string += "    Route:\n"
                     for path in route:
-                        print(f"      {path[0]} -> {path[1]}")
+                        result_string += f"      {path[0]} -> {path[1]}\n"
+
+    return result_string
 
 
-if __name__ == "__main__":
+def plot_bus_routes(
+    prob: cp.Problem,
+    formulation: Formulation3,
+    model_vars: dict[str, cp.Variable],
+    save_path: str | None = None,
+):
+    # Extract and print the route
+
+    G = formulation.G
+    B = formulation.B
+    A = formulation.A
+    A_PATH = formulation.A_PATH
+    Q = formulation.Q
+
+    schools = formulation.schools
+    bus_stops = formulation.stops
+    depots = formulation.depots
+    school_colors = {
+        school.type: color for school, color in zip(schools, ["red", "orange", "blue"])
+    }
+
+    # z_b = model_vars["z_b"]
+    z_bq = model_vars["z_bq"]
+    # y_bqtau = model_vars["y_bqtau"]
+    x_bqij = model_vars["x_bqij"]
+    # v_bqi = model_vars["v_bqi"]
+    # a_mbq = model_vars["a_mbq"]
+    # T_bqi = model_vars["T_bqi"]
+    # L_bqi = model_vars["L_bqi"]
+    # e_bqs = model_vars["e_bqs"]
+    # r_bmon = model_vars["r_bmon"]
+
+    pos = {
+        node_id: (node_data["x"], node_data["y"])
+        for node_id, node_data in G.nodes().items()
+    }
+    weights = nx.get_edge_attributes(G, "length")
+
+    if prob.status not in [cp.OPTIMAL, cp.OPTIMAL_INACCURATE]:
+        print("No feasible solution to visualize.")
+    else:
+        # Visualize the routes on the graph
+        plt.figure(figsize=(10, 10))
+        nx.draw(G, pos, with_labels=False, node_size=5, node_color="lightgray")
+        # color edges by weight
+        nx.draw_networkx_edges(
+            G, pos, edge_color=list(weights.values()), edge_cmap=plt.colormaps["Grays"]
+        )
+        # plot schools, students, and bus stops
+        for school in schools:
+            plt.scatter(
+                pos[school.location][0],
+                pos[school.location][1],
+                c=school_colors[school.type],
+                marker="s",
+                label=f"{school.name } ({school.type.name})",
+            )
+        for bus_stop in bus_stops:
+            plt.scatter(
+                pos[bus_stop.location][0],
+                pos[bus_stop.location][1],
+                c="green",
+                marker="^",
+                label=bus_stop.name,
+            )
+        for depot in depots:
+            plt.scatter(
+                pos[depot.location][0],
+                pos[depot.location][1],
+                c="purple",
+                marker="X",
+                label=depot.name,
+            )
+        # plot routes
+        colors = plt.colormaps.get_cmap("tab10")
+        for b, bus in enumerate(B):
+            for q in range(len(Q)):
+                if z_bq[b, q].value > 0.5:
+                    for ij, path in enumerate(A.keys()):
+                        if x_bqij[b, q, ij].value > 0.5:
+                            path_nodes = A_PATH[path]
+                            path_edges = list(zip(path_nodes[:-1], path_nodes[1:]))
+                            nx.draw_networkx_edges(
+                                G,
+                                pos,
+                                edgelist=path_edges,
+                                edge_color=[colors(b)],
+                                width=5,
+                                alpha=0.7,
+                            )
+
+        plt.title("Optimized School Bus Routes")
+        plt.legend(loc="upper right", fontsize="small")
+
+        if save_path is not None:
+            plt.savefig(save_path)
+        # plt.show()
+
+
+def main() -> None:
     # Example usage
     # Create a sample problem definition (you can replace this with actual data)
 
@@ -686,9 +777,11 @@ if __name__ == "__main__":
     print(problem3)
 
     # Build the model from the problem definition
-    model, model_variables = build_model_from_definition(
-        problem3, formulation_name="Formulation 3"
-    )
+    model, model_variables = build_model_from_definition(problem3)
     # Generate a report by solving the model
     solve_problem(model)
     make_report(model, problem3, model_variables)
+
+
+if __name__ == "__main__":
+    main()
