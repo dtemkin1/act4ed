@@ -11,7 +11,6 @@ dependencies = [
     "pygris>=0.2.0",
     "python-dotenv>=1.1.1",
     "requests>=2.32.5",
-    "act4brd",
     "jupyter>=1.1.1",
     "jupyterlab>=4.4.10",
     "cvxpy>=1.7.3",
@@ -29,9 +28,6 @@ dependencies = [
     "r5py>=1.1.1",
     "osmnx>=2.1.0",
 ]
-
-[tool.uv.sources]
-act4brd = { workspace = true }
 
 [tool.uv]
 package = false
