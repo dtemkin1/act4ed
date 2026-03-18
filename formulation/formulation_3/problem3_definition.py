@@ -9,7 +9,8 @@ from formulation.common import (
     SchoolType,
     Student,
     Stop,
-    N_TYPE,
+    Node_Type,
+    ProblemData,
     l_s,
     make_depot_end_copy,
     make_depot_start_copy,
@@ -19,14 +20,17 @@ from formulation.common import (
 
 @dataclass(slots=True)
 class Formulation3:
+    """
+    formulation definition for the trip-chaining with multiple rounds formulation,
+    designed to be flexible enough to allow for easy experimentation with different
+    constraints and objective function terms.
+
+    see formulation_3.ipynb for details.
+    """
+
+    problem_data: ProblemData
     # vals
-    graph: nx.MultiDiGraph
     rounds: int
-    schools: list[School]
-    depots: list[Depot]
-    buses: list[Bus]
-    students: list[Student]
-    stops: list[Stop]
 
     # constants
     ALPHA = 0.3
@@ -59,7 +63,7 @@ class Formulation3:
     """depot start-copy nodes"""
     D_MINUS: list[Depot] = field(init=False, default_factory=list)
     """depot end-copy nodes"""
-    N: list[N_TYPE] = field(init=False, default_factory=list)
+    N: list[Node_Type] = field(init=False, default_factory=list)
     """all nodes"""
     B: list[Bus] = field(init=False, default_factory=list)
     """buses"""
@@ -71,9 +75,11 @@ class Formulation3:
     """students needing wheelchair access"""
 
     # utility
-    A: dict[tuple[N_TYPE, N_TYPE], float] = field(init=False, default_factory=dict)
+    A: dict[tuple[Node_Type, Node_Type], float] = field(
+        init=False, default_factory=dict
+    )
     """arc travel times in minutes"""
-    A_PATH: dict[tuple[N_TYPE, N_TYPE], list[list[N_TYPE]]] = field(
+    A_PATH: dict[tuple[Node_Type, Node_Type], list[list[Node_Type]]] = field(
         init=False, default_factory=dict
     )
     """arc shortest paths"""
@@ -95,88 +101,76 @@ class Formulation3:
     """time horizon in minutes, used to bound T_bqi and set big M for time constraints"""
 
     def __post_init__(self):
-        self.G = self.graph
-        self.P = self.stops
-        self.S = self.schools
-        self.S_PLUS = [make_school_copy(school) for school in self.schools]
-        self.D = self.depots
-        self.D_PLUS = [make_depot_start_copy(depot) for depot in self.depots]
-        self.D_MINUS = [make_depot_end_copy(depot) for depot in self.depots]
+        self.G = self.problem_data.service_graph
+        self.P = self.problem_data.stops
+        self.S = self.problem_data.schools
+        self.S_PLUS = [make_school_copy(school) for school in self.problem_data.schools]
+        self.D = self.problem_data.depots
+        self.D_PLUS = [
+            make_depot_start_copy(depot) for depot in self.problem_data.depots
+        ]
+        self.D_MINUS = [
+            make_depot_end_copy(depot) for depot in self.problem_data.depots
+        ]
         self.N = self.P + self.S + self.S_PLUS + self.D + self.D_PLUS + self.D_MINUS
-        self.B = self.buses
-        self.M = self.students
+        self.B = self.problem_data.buses
+        self.M = self.problem_data.students
         self.F = [
             student
-            for student in self.students
+            for student in self.problem_data.students
             if student.requires_monitor or student.requires_wheelchair
         ]
-        self.W = [student for student in self.students if student.requires_wheelchair]
+        self.W = [
+            student
+            for student in self.problem_data.students
+            if student.requires_wheelchair
+        ]
 
         self.Q = list(range(self.rounds))
         self.Q_MAX = self.rounds - 1
 
         self.A = {}
         self.A_PATH = {}
-        for start_node in self.N:
-            start_location = start_node.location
-            for end_node in self.N:
-                end_location = end_node.location
-                if not self.A.get((start_node, end_node)):
-                    shortest_path = nx.shortest_path(
-                        self.graph,
-                        source=start_location,
-                        target=end_location,
-                        weight="length",
-                    )
-                    shortest_path_length = nx.shortest_path_length(
-                        self.graph,
-                        source=start_location,
-                        target=end_location,
-                        # TODO: use r5py for more accurate travel time estimates
-                        weight="length",
-                    )
-                    # set to the weight of the shortest path
-                    self.A[(start_node, end_node)] = shortest_path_length
-                    self.A_PATH[(start_node, end_node)] = shortest_path
-                if not self.A.get((end_node, start_node)):
-                    shortest_path = nx.shortest_path(
-                        self.graph,
-                        source=end_location,
-                        target=start_location,
-                        weight="length",
-                    )
-                    shortest_path_length = nx.shortest_path_length(
-                        self.graph,
-                        source=end_location,
-                        target=start_location,
-                        weight="length",
-                    )
-                    # set to the weight of the shortest path
-                    self.A[(end_node, start_node)] = shortest_path_length
-                    self.A_PATH[(end_node, start_node)] = shortest_path
+        for i in self.N:
+            for j in self.N:
+                if i != j:
+                    self.A[(i, j)] = self.problem_data.service_graph[i.node_id][
+                        j.node_id
+                    ][0]["length"]
+                    self.A[(j, i)] = self.problem_data.service_graph[j.node_id][
+                        i.node_id
+                    ][0]["length"]
+                    self.A_PATH[(i, j)] = self.problem_data.service_graph[i.node_id][
+                        j.node_id
+                    ][0]["path"]
+                    self.A_PATH[(j, i)] = self.problem_data.service_graph[j.node_id][
+                        i.node_id
+                    ][0]["path"]
 
         self.T_horizon = self._T_horizon()
 
         self.M_TIME = self.T_horizon
-        self.M_CAPACITY = max(C_b(bus) for bus in self.buses)
+        self.M_CAPACITY = max(C_b(bus) for bus in self.problem_data.buses)
         self.M_TYPE = max(SchoolType)
 
-    def t_ij(self, i: N_TYPE, j: N_TYPE) -> float:
+    def t_ij(self, i: Node_Type, j: Node_Type) -> float:
         """travel time from node i to node j in minutes"""
         return self.A[(i, j)]
 
-    def d_ij(self, i: N_TYPE, j: N_TYPE) -> float:
+    def d_ij(self, i: Node_Type, j: Node_Type) -> float:
         """shortest distance from node i to node j in miles, for now same as above"""
         return self.t_ij(i, j)
 
     def _T_horizon(self):
         """a safe time-horizon upper bound used to bound T_bqi and set Big-M"""
-        max_arrival_time = max(l_s(school) for school in self.schools)
+        max_arrival_time = max(l_s(school) for school in self.problem_data.schools)
         return max_arrival_time + self.H_RIDE + 60  # add max ride time and some buffer
 
     def C_CAP_B(self, b: Bus):
         """capacity upper bound for bus b, used in big-M constraints"""
-        return C_b(b) * max(self.KAPPA[school.type] for school in self.schools)
+        return C_b(b) * max(
+            self.KAPPA[school.type] for school in self.problem_data.schools
+        )
 
 
 if __name__ == "__main__":

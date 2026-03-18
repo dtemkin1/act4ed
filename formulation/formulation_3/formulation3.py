@@ -18,14 +18,15 @@ from formulation.common import (
     tau_m,
 )
 from formulation.formulation_3.problem3_definition import Formulation3
-from formulation.formulation_3.toy_network import (
-    make_buses,
-    make_depots,
-    make_graph,
-    make_schools,
-    make_stops,
-    make_students,
-)
+
+# from formulation.formulation_3.toy_network import (
+#     make_buses,
+#     make_depots,
+#     make_graph,
+#     make_schools,
+#     make_stops,
+#     make_students,
+# )
 
 
 def build_model_from_definition(
@@ -599,15 +600,10 @@ def make_report(
             f"⚠️ Solver did not find a feasible solution (status={prob.status}).\n"
         )
     else:
-        assert (
-            z_bq.value is not None
-            and y_bqtau.value is not None
-            and x_bqij.value is not None
-            and a_mbq.value is not None
-        )
         for b, bus in enumerate(B):
             result_string += f"{bus} (capacity {C_b(bus)}, range {R_b(bus)}, wheelchair access {Wh_b(bus) == 1}, monitor needed: {r_bmon[b].value > 0.5})\n"
             for q in range(len(Q)):
+                assert z_bq[b, q].value is not None
                 if z_bq[b, q].value > 0.5:
                     result_string += f"  Round {q}:\n"
                     route = []
@@ -630,7 +626,7 @@ def make_report(
                         if a_mbq[m, b, q].value > 0.5:
                             students_on_bus.append(student)
                     result_string += f"    Total travel time (excluding dwell): {sum(formulation.d_ij(*path) for path in route):.2f} minutes\n"
-                    result_string += f"    Bus type: {TAU[np.argmax(y_bqtau[b,q,:])].name if z_bq[b, q].value > 0.5 else 'N/A'}\n"
+                    result_string += f"    Bus type: {TAU[np.argmax(y_bqtau[b, q, :])].name if z_bq[b, q].value > 0.5 else 'N/A'}\n"
                     result_string += f"    Students on bus this round:\n      {'\n      '.join(str(student) for student in students_on_bus)}\n"
                     result_string += f"    Schools served:\n      {'\n      '.join(str(school) for school in schools_served)}\n"
 
@@ -668,9 +664,9 @@ def plot_bus_routes(
     A_PATH = formulation.A_PATH
     Q = formulation.Q
 
-    schools = formulation.schools
-    bus_stops = formulation.stops
-    depots = formulation.depots
+    schools = formulation.problem_data.schools
+    bus_stops = formulation.problem_data.stops
+    depots = formulation.problem_data.depots
     school_colors = {
         school.type: color for school, color in zip(schools, ["red", "orange", "blue"])
     }
@@ -686,7 +682,7 @@ def plot_bus_routes(
     # e_bqs = model_vars["e_bqs"]
     # r_bmon = model_vars["r_bmon"]
 
-    pos = {
+    pos: dict[int, tuple[float, float]] = {
         node_id: (node_data["x"], node_data["y"])
         for node_id, node_data in G.nodes().items()
     }
@@ -705,31 +701,31 @@ def plot_bus_routes(
         # plot schools, students, and bus stops
         for school in schools:
             plt.scatter(
-                pos[school.location][0],
-                pos[school.location][1],
+                pos[school.node_id][0],
+                pos[school.node_id][1],
                 c=school_colors[school.type],
                 marker="s",
                 label=f"{school.name } ({school.type.name})",
             )
         for bus_stop in bus_stops:
             plt.scatter(
-                pos[bus_stop.location][0],
-                pos[bus_stop.location][1],
+                pos[bus_stop.node_id][0],
+                pos[bus_stop.node_id][1],
                 c="green",
                 marker="^",
                 label=bus_stop.name,
             )
         for depot in depots:
             plt.scatter(
-                pos[depot.location][0],
-                pos[depot.location][1],
+                pos[depot.node_id][0],
+                pos[depot.node_id][1],
                 c="purple",
                 marker="X",
                 label=depot.name,
             )
         # plot routes
         colors = plt.colormaps.get_cmap("tab10")
-        for b, bus in enumerate(B):
+        for b, _ in enumerate(B):
             for q in range(len(Q)):
                 if z_bq[b, q].value > 0.5:
                     for ij, path in enumerate(A.keys()):
@@ -754,33 +750,34 @@ def plot_bus_routes(
 
 
 def main() -> None:
+    pass
     # Example usage
     # Create a sample problem definition (you can replace this with actual data)
 
-    graph = make_graph(size=5)
-    schools = make_schools(graph, num_schools=2)
-    depots = make_depots(graph, num_depots=1)
-    stops = make_stops(graph, num_stops=5)
-    students = make_students(graph, num_students=10, schools=schools, stops=stops)
-    buses = make_buses(graph, num_buses=2)
+    # graph = make_graph(size=5)
+    # schools = make_schools(graph, num_schools=2)
+    # depots = make_depots(graph, num_depots=1)
+    # stops = make_stops(graph, num_stops=5)
+    # students = make_students(graph, num_students=10, schools=schools, stops=stops)
+    # buses = make_buses(graph, num_buses=2)
 
-    problem3 = Formulation3(
-        graph=graph,
-        rounds=1,
-        schools=schools,
-        depots=depots,
-        buses=buses,
-        students=students,
-        stops=stops,
-    )
-    print("Problem definition created.")
-    print(problem3)
+    # problem3 = Formulation3(
+    #     graph=graph,
+    #     rounds=1,
+    #     schools=schools,
+    #     depots=depots,
+    #     buses=buses,
+    #     students=students,
+    #     stops=stops,
+    # )
+    # print("Problem definition created.")
+    # print(problem3)
 
-    # Build the model from the problem definition
-    model, model_variables = build_model_from_definition(problem3)
-    # Generate a report by solving the model
-    solve_problem(model)
-    make_report(model, problem3, model_variables)
+    # # Build the model from the problem definition
+    # model, model_variables = build_model_from_definition(problem3)
+    # # Generate a report by solving the model
+    # solve_problem(model)
+    # make_report(model, problem3, model_variables)
 
 
 if __name__ == "__main__":
