@@ -221,3 +221,7 @@ __marimo__/
 
 # ORCD Logs
 logs/
+
+# Cache
+**/cache/
+**/outputs/
