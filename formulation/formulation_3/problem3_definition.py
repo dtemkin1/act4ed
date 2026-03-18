@@ -10,7 +10,6 @@ from formulation.common import (
     Student,
     Stop,
     N_TYPE,
-    get_accumulated_time,
     l_s,
     make_depot_end_copy,
     make_depot_start_copy,
@@ -21,7 +20,7 @@ from formulation.common import (
 @dataclass(slots=True)
 class Formulation3:
     # vals
-    graph: nx.DiGraph
+    graph: nx.MultiDiGraph
     rounds: int
     schools: list[School]
     depots: list[Depot]
@@ -42,11 +41,11 @@ class Formulation3:
     """non-negative time separation used for precedence"""
     LAMBDA_ROUND = 1.0
     """small nonnegative per-round tie-breaker penalty"""
-    KAPPA = {SchoolType.ELEMENTARY: 1.0, SchoolType.MIDDLE: 0.67, SchoolType.HIGH: 0.67}
+    KAPPA = {SchoolType.E: 1.0, SchoolType.MS: 0.67, SchoolType.HS: 0.67}
     """capacity multiplier for different school types"""
 
     # sets
-    G: nx.DiGraph = field(init=False)
+    G: nx.MultiDiGraph = field(init=False)
     """road network graph"""
     P: list[Stop] = field(init=False, default_factory=list)
     """pickup stop nodes"""
@@ -74,7 +73,7 @@ class Formulation3:
     # utility
     A: dict[tuple[N_TYPE, N_TYPE], float] = field(init=False, default_factory=dict)
     """arc travel times in minutes"""
-    A_PATHS: dict[tuple[N_TYPE, N_TYPE], list[list[N_TYPE]]] = field(
+    A_PATH: dict[tuple[N_TYPE, N_TYPE], list[list[N_TYPE]]] = field(
         init=False, default_factory=dict
     )
     """arc shortest paths"""
@@ -117,7 +116,7 @@ class Formulation3:
         self.Q_MAX = self.rounds - 1
 
         self.A = {}
-        self.A_PATHS = {}
+        self.A_PATH = {}
         for start_node in self.N:
             start_location = start_node.location
             for end_node in self.N:
@@ -127,25 +126,34 @@ class Formulation3:
                         self.graph,
                         source=start_location,
                         target=end_location,
-                        weight="weight",
+                        weight="length",
+                    )
+                    shortest_path_length = nx.shortest_path_length(
+                        self.graph,
+                        source=start_location,
+                        target=end_location,
+                        # TODO: use r5py for more accurate travel time estimates
+                        weight="length",
                     )
                     # set to the weight of the shortest path
-                    self.A[(start_node, end_node)] = get_accumulated_time(
-                        self.graph, shortest_path
-                    )
-                    self.A_PATHS[(start_node, end_node)] = shortest_path
+                    self.A[(start_node, end_node)] = shortest_path_length
+                    self.A_PATH[(start_node, end_node)] = shortest_path
                 if not self.A.get((end_node, start_node)):
                     shortest_path = nx.shortest_path(
                         self.graph,
                         source=end_location,
                         target=start_location,
-                        weight="weight",
+                        weight="length",
+                    )
+                    shortest_path_length = nx.shortest_path_length(
+                        self.graph,
+                        source=end_location,
+                        target=start_location,
+                        weight="length",
                     )
                     # set to the weight of the shortest path
-                    self.A[(end_node, start_node)] = get_accumulated_time(
-                        self.graph, shortest_path
-                    )
-                    self.A_PATHS[(end_node, start_node)] = shortest_path
+                    self.A[(end_node, start_node)] = shortest_path_length
+                    self.A_PATH[(end_node, start_node)] = shortest_path
 
         self.T_horizon = self._T_horizon()
 

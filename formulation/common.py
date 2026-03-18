@@ -5,15 +5,22 @@ from enum import IntEnum
 
 
 class SchoolType(IntEnum):
-    ELEMENTARY = 0
-    MIDDLE = 1
-    HIGH = 2
+    E = 0
+    """elementary"""
+    MS = 1
+    """middle school"""
+    HS = 2
+    """high school"""
+
+
+# node ID
+type Location = int
 
 
 @dataclass(frozen=True)
 class Stop:
     name: str
-    location: tuple[int, int]
+    location: Location
 
     def __str__(self):
         return self.name
@@ -22,7 +29,7 @@ class Stop:
 @dataclass(frozen=True)
 class Depot:
     name: str
-    location: tuple[int, int]
+    location: Location
 
     def __str__(self):
         return self.name
@@ -31,7 +38,7 @@ class Depot:
 @dataclass(frozen=True)
 class School:
     name: str
-    location: tuple[int, int]
+    location: Location
     type: SchoolType
     start_time: int  # in minutes from midnight
 
@@ -54,7 +61,7 @@ class Bus:
 @dataclass(frozen=True)
 class Student:
     name: str
-    location: tuple[int, int]
+    location: Location
     school: School
     stop: Stop
     requires_monitor: bool
@@ -93,18 +100,6 @@ def make_depot_start_copy(depot: Depot) -> Depot:
 @cache
 def make_depot_end_copy(depot: Depot) -> Depot:
     return make_depot_copy(depot, "end")
-
-
-def get_accumulated_time(
-    G: nx.DiGraph, path: list[tuple[int, int]], attr: str = "weight"
-) -> float:
-    total_time = 0.0
-    for i in range(len(path) - 1):
-        start_node = path[i]
-        end_node = path[i + 1]
-        edge_weight = G.edges[start_node, end_node][attr]
-        total_time += edge_weight
-    return total_time
 
 
 def p_m(m: Student):
