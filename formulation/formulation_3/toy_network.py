@@ -4,11 +4,11 @@ from formulation.common import Bus, Depot, School, SchoolType, Stop, Student
 
 
 def make_graph(size: int = 10) -> nx.DiGraph:
-    G = nx.grid_2d_graph(size, size, create_using=nx.DiGraph)
+    graph = nx.grid_2d_graph(size, size, create_using=nx.DiGraph)
     # Add weights to the edges
-    for u, v in G.edges():
-        G.edges[u, v]["weight"] = 1.0
-    return G
+    for u, v in graph.edges():
+        graph.edges[u, v]["weight"] = 1.0
+    return graph
 
 
 def make_schools(
@@ -16,31 +16,32 @@ def make_schools(
 ) -> list[School]:
     if types is None:
         types = list(SchoolType.__members__.values())
-    all_nodes = list(graph.nodes)
+    all_nodes = graph.nodes
     return [
-        School(
-            name=f"School {i}",
-            location=all_nodes[i % len(all_nodes)],
-            type=types[i % len(types)],
-            start_time=8 * 60 + i * 15,  # staggered start times
-        )
-        for i in range(num_schools)
+        # School(
+        #     name=f"School {i}",
+        #     geographic_location=all_nodes[i % len(all_nodes)],
+        #     node_id=all_nodes[i % len(all_nodes)],
+        #     type=types[i % len(types)],
+        #     start_time=8 * 60 + i * 15,  # staggered start times
+        # )
+        # for i in range(num_schools)
     ]
 
 
 def make_depots(graph: nx.DiGraph, num_depots: int = 1) -> list[Depot]:
     all_nodes = list(graph.nodes)
     return [
-        Depot(name=f"Depot {i}", location=all_nodes[i % len(all_nodes)])
-        for i in range(num_depots)
+        # Depot(name=f"Depot {i}", node_id=all_nodes[i % len(all_nodes)])
+        # for i in range(num_depots)
     ]
 
 
 def make_stops(graph: nx.DiGraph, num_stops: int = 5) -> list[Stop]:
     all_nodes = list(graph.nodes)
     return [
-        Stop(name=f"Stop {i}", location=all_nodes[i % len(all_nodes)])
-        for i in range(num_stops)
+        # Stop(name=f"Stop {i}", node_id=all_nodes[i % len(all_nodes)])
+        # for i in range(num_stops)
     ]
 
 
@@ -57,15 +58,15 @@ def make_students(
     num_schools = len(schools)
     all_nodes = list(graph.nodes)
     return [
-        Student(
-            name=f"Student {i}",
-            location=all_nodes[i % len(all_nodes)],
-            school=schools[i % num_schools],
-            stop=stops[i % len(stops)],
-            requires_monitor=(i % 4 == 0),  # every 4th student requires a monitor
-            requires_wheelchair=(i % 6 == 0),  # every 6th student requires a wheelchair
-        )
-        for i in range(num_students)
+        # Student(
+        #     name=f"Student {i}",
+        #     node_id=all_nodes[i % len(all_nodes)],
+        #     school=schools[i % num_schools],
+        #     stop=stops[i % len(stops)],
+        #     requires_monitor=(i % 4 == 0),  # every 4th student requires a monitor
+        #     requires_wheelchair=(i % 6 == 0),  # every 6th student requires a wheelchair
+        # )
+        # for i in range(num_students)
     ]
 
 

@@ -36,9 +36,6 @@ def build_model_from_definition(
     M = problem.M
     S = problem.S
     S_PLUS = problem.S_PLUS
-    D = problem.D
-    D_PLUS = problem.D_PLUS
-    D_MINUS = problem.D_MINUS
     P = problem.P
     A = problem.A
     N = problem.N
@@ -51,7 +48,6 @@ def build_model_from_definition(
     BETA = problem.BETA
     M_TIME = problem.M_TIME
     M_CAPACITY = problem.M_CAPACITY
-    M_TYPE = problem.M_TYPE
     ALPHA = problem.ALPHA
     t_ij = problem.t_ij
     d_ij = problem.d_ij

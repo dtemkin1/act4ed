@@ -23,7 +23,7 @@ except ImportError as exc:
     ) from exc
 
 
-type NodeID = int
+type NodeId = int
 """node id in OSM and service graph"""
 
 NETWORK_TYPE = "drive"
@@ -66,7 +66,7 @@ class NodeLocationData(LocationData):
     i.e. stops, schools, and depots
     """
 
-    node_id: NodeID
+    node_id: NodeId
     geographic_location: Point
 
 
@@ -239,7 +239,7 @@ class ProblemData:
 
     def _get_shortest_path_osm(
         self, start: Node_Type, end: Node_Type, weight: str = "length"
-    ) -> tuple[float, list[NodeID]]:
+    ) -> tuple[float, list[NodeId]]:
         return nx.bidirectional_dijkstra(
             self.osm_graph,
             source=start.node_id,
@@ -416,7 +416,7 @@ class ProblemData:
             return_buses.append(bus)
         return return_buses
 
-    def _get_nearest_node_id(self, geographic_location: Point) -> NodeID:
+    def _get_nearest_node_id(self, geographic_location: Point) -> NodeId:
         """Get the nearest node in the graph to a given point."""
         return ox.distance.nearest_nodes(
             self.osm_graph, geographic_location.x, geographic_location.y
@@ -452,7 +452,7 @@ class ProblemData:
         else:
             # Get nearest node in the OSM graph to the student's location
             nearest_node = self._get_nearest_node_id(geo_location)
-            distances: dict[NodeID, float] = nx.shortest_path_length(
+            distances: dict[NodeId, float] = nx.shortest_path_length(
                 self.osm_graph, source=nearest_node, target=None, weight="length"
             )
             all_stop_distances = {
