@@ -5,11 +5,12 @@ from formulation.common import (
     Bus,
     C_b,
     Depot,
+    NodeId,
     School,
     SchoolType,
     Student,
     Stop,
-    Node_Type,
+    Place,
     ProblemData,
     l_s,
     make_depot_end_copy,
@@ -49,7 +50,7 @@ class Formulation3:
     """capacity multiplier for different school types"""
 
     # sets
-    G: nx.MultiDiGraph = field(init=False)
+    G: "nx.MultiDiGraph[Place]" = field(init=False)
     """road network graph"""
     P: list[Stop] = field(init=False, default_factory=list)
     """pickup stop nodes"""
@@ -63,7 +64,7 @@ class Formulation3:
     """depot start-copy nodes"""
     D_MINUS: list[Depot] = field(init=False, default_factory=list)
     """depot end-copy nodes"""
-    N: list[Node_Type] = field(init=False, default_factory=list)
+    N: list[Place] = field(init=False, default_factory=list)
     """all nodes"""
     B: list[Bus] = field(init=False, default_factory=list)
     """buses"""
@@ -75,11 +76,9 @@ class Formulation3:
     """students needing wheelchair access"""
 
     # utility
-    A: dict[tuple[Node_Type, Node_Type], float] = field(
-        init=False, default_factory=dict
-    )
+    A: dict[tuple[Place, Place], float] = field(init=False, default_factory=dict)
     """arc travel times in minutes"""
-    A_PATH: dict[tuple[Node_Type, Node_Type], list[list[Node_Type]]] = field(
+    A_PATH: dict[tuple[Place, Place], list[list[NodeId]]] = field(
         init=False, default_factory=dict
     )
     """arc shortest paths"""
@@ -134,18 +133,43 @@ class Formulation3:
         for i in self.N:
             for j in self.N:
                 if i != j:
-                    self.A[(i, j)] = self.problem_data.service_graph[i.node_id][
-                        j.node_id
-                    ][0]["length"]
-                    self.A[(j, i)] = self.problem_data.service_graph[j.node_id][
-                        i.node_id
-                    ][0]["length"]
-                    self.A_PATH[(i, j)] = self.problem_data.service_graph[i.node_id][
-                        j.node_id
-                    ][0]["path"]
-                    self.A_PATH[(j, i)] = self.problem_data.service_graph[j.node_id][
-                        i.node_id
-                    ][0]["path"]
+                    if i.node_id == j.node_id:
+                        self.A[i, j] = 0
+                        self.A_PATH[i, j] = [[i.node_id, j.node_id]]
+                        continue
+
+                    # handle school and depot copies
+                    if "copy" in i.name:
+                        i_original = next(
+                            node
+                            for node in self.N
+                            if node.node_id == i.node_id and "copy" not in node.name
+                        )
+                    else:
+                        i_original = i
+
+                    if "copy" in j.name:
+                        j_original = next(
+                            node
+                            for node in self.N
+                            if node.node_id == j.node_id and "copy" not in node.name
+                        )
+                    else:
+                        j_original = j
+
+                    ij_edge_data = self.problem_data.service_graph.get_edge_data(
+                        i_original, j_original, key=0, default=None
+                    )
+                    if ij_edge_data is not None:
+                        self.A[i, j] = ij_edge_data["length"]
+                        self.A_PATH[i, j] = ij_edge_data["path"]
+
+                    ji_edge_data = self.problem_data.service_graph.get_edge_data(
+                        j_original, i_original, key=0, default=None
+                    )
+                    if ji_edge_data is not None:
+                        self.A[j, i] = ji_edge_data["length"]
+                        self.A_PATH[j, i] = ji_edge_data["path"]
 
         self.T_horizon = self._T_horizon()
 
@@ -153,11 +177,11 @@ class Formulation3:
         self.M_CAPACITY = max(C_b(bus) for bus in self.problem_data.buses)
         self.M_TYPE = max(SchoolType)
 
-    def t_ij(self, i: Node_Type, j: Node_Type) -> float:
+    def t_ij(self, i: Place, j: Place) -> float:
         """travel time from node i to node j in minutes"""
-        return self.A[(i, j)]
+        return self.A[i, j]
 
-    def d_ij(self, i: Node_Type, j: Node_Type) -> float:
+    def d_ij(self, i: Place, j: Place) -> float:
         """shortest distance from node i to node j in miles, for now same as above"""
         return self.t_ij(i, j)
 

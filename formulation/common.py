@@ -1,10 +1,12 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, replace
 from enum import IntEnum
 from functools import cache, cached_property
+import os
 from pathlib import Path
 
 import datetime as dt
 import pickle
+from collections.abc import Hashable
 
 import geopandas as gpd
 from matplotlib import pyplot as plt
@@ -22,9 +24,11 @@ except ImportError as exc:
         " and ensure Java is properly configured."
     ) from exc
 
+CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 
 type NodeId = int
 """node id in OSM and service graph"""
+
 
 NETWORK_TYPE = "drive"
 
@@ -94,7 +98,8 @@ class School(NodeLocationData):
     """
 
     type: SchoolType
-    start_time: int  # in minutes from midnight
+    start_time: int
+    """mins from midnight"""
 
     def __str__(self):
         return self.name
@@ -132,9 +137,10 @@ class Student(LocationData):
         return self.name
 
 
-type Node_Type = School | Depot | Stop
+type Place = School | Depot | Stop
 
 
+# @dataclass(frozen=True)
 @dataclass
 class ProblemData:
     """
@@ -165,25 +171,51 @@ class ProblemData:
     """flag to use r5py for more accurate travel time estimates, or networkx for faster shortest path calculations"""
 
     # post init data
-    service_graph: nx.MultiDiGraph = field(init=False)
-    """
-    network graph with edge weights corresponding to travel times in minutes, 
-    only containing nodes in N and edges corresponding to shortest paths between nodes in N. 
-    uses node_id from osm
-    """
-    osm_graph: nx.MultiDiGraph = field(init=False)
-    """road network graph without edge weights, used for shortest path calculations"""
-    stops: list[Stop] = field(default_factory=list, init=False)
-    """stops where students can be picked up"""
-    schools: list[School] = field(default_factory=list, init=False)
-    """schools students can be dropped off at"""
-    depots: list[Depot] = field(default_factory=list, init=False)
-    """depots where buses start and end their routes"""
-    students: list[Student] = field(default_factory=list, init=False)
-    """students to be picked up and dropped off"""
+    @cached_property
+    def service_graph(self) -> "nx.MultiDiGraph[Place]":
+        """
+        network graph with edge weights corresponding to travel times in minutes,
+        only containing nodes in N and edges corresponding to shortest paths between nodes in N.
+        uses node_id from osm
+        """
+        return self._make_service_graph()
 
     @cached_property
-    def all_nodes(self) -> list[Node_Type]:
+    def osm_graph(self) -> "nx.MultiDiGraph[NodeId]":
+        """road network graph without edge weights, used for shortest path calculations"""
+        return self._make_osm_graph()
+
+    @cached_property
+    def stops(self) -> list[Stop]:
+        """stops where students can be picked up"""
+        return self._make_stops()
+
+    @cached_property
+    def schools(self) -> list[School]:
+        """schools students can be dropped off at"""
+        return self._make_schools()
+
+    @cached_property
+    def depots(self) -> list[Depot]:
+        """depots where buses start and end their routes"""
+        return self._make_depots()
+
+    @cached_property
+    def students(self) -> list[Student]:
+        """students to be picked up and dropped off"""
+        return self._make_students()
+
+    @cached_property
+    def buses(self) -> list[Bus]:
+        """buses available for transportation"""
+        return self._make_buses()
+
+    def __post_init__(self):
+        # sanity checks
+        self.sanity_checks()
+
+    @cached_property
+    def all_nodes(self) -> list[Place]:
         """all nodes in the problem, including stops, schools, and depots"""
         return self.stops + self.schools + self.depots
 
@@ -192,18 +224,6 @@ class ProblemData:
         if not self.osm_pbf_path:
             raise ValueError("osm_pbf_path must be provided if use_r5 is True")
         return r5py.TransportNetwork(osm_pbf=self.osm_pbf_path)
-
-    def __post_init__(self):
-        self.osm_graph = self._make_osm_graph()
-
-        self.schools = self._get_schools()
-        self.depots = self._get_depots()
-        self.buses = self._create_buses()
-        self.stops = self._get_stops()
-
-        self.service_graph = self._make_service_graph()
-
-        self.students = self._create_students()
 
     def _make_osm_graph(self):
         # get boundary polygon (similar to analysis.ipynb)
@@ -238,21 +258,16 @@ class ProblemData:
         return graph
 
     def _get_shortest_path_osm(
-        self, start: Node_Type, end: Node_Type, weight: str = "length"
+        self, start: NodeId, end: NodeId, weight: str = "length"
     ) -> tuple[float, list[NodeId]]:
-        return nx.bidirectional_dijkstra(
-            self.osm_graph,
-            source=start.node_id,
-            target=end.node_id,
-            weight=weight,
-        )
+        return get_shortest_path(self.osm_graph, start, end, weight)
 
-    def _make_service_graph(self):
-        service_graph = nx.MultiDiGraph()
+    def _make_service_graph(self) -> "nx.MultiDiGraph[Place]":
+        service_graph: "nx.MultiDiGraph[Place]" = nx.MultiDiGraph()
 
-        def add_edge_if_path_exists(start: Node_Type, end: Node_Type):
+        def add_edge_if_path_exists(start: Place, end: Place):
             try:
-                length, path = self._get_shortest_path_osm(start, end)
+                length, path = self._get_shortest_path_osm(start.node_id, end.node_id)
                 service_graph.add_edge(start, end, length=length, path=path)
             except nx.NetworkXNoPath:
                 pass
@@ -321,18 +336,20 @@ class ProblemData:
 
     def save(self):
         """save problem data to disk for later loading and use in formulation"""
-        with open(f"cache/{self.name}_problem_data.pkl", "wb") as f:
+        with open(
+            CURRENT_FILE_DIR / "cache" / f"{self.name}_problem_data.pkl", "wb+"
+        ) as f:
             pickle.dump(self, f)
 
     @staticmethod
     def load(name: str) -> "ProblemData":
         """load problem data from disk"""
-        with open(f"cache/{name}_problem_data.pkl", "rb") as f:
+        with open(CURRENT_FILE_DIR / "cache" / f"{name}_problem_data.pkl", "rb") as f:
             return pickle.load(f)
 
-    def _get_schools(self) -> list[School]:
+    def _make_schools(self) -> list[School]:
         schools_df = pd.read_csv(self.schools_path)
-        return_schools = []
+        return_schools: list[School] = []
         for _, row in schools_df.iterrows():
             geographic_location = Point(row["lon"], row["lat"])
             nearest_node_id = self._get_nearest_node_id(geographic_location)
@@ -341,16 +358,15 @@ class ProblemData:
                 name=row["id"],
                 node_id=nearest_node_id,
                 geographic_location=geographic_location,
-                type=SchoolType[row["type"].upper()],
-                # mins from midnight
+                type=SchoolType[row["type"]],
                 start_time=start_time.hour * 60 + start_time.minute,
             )
             return_schools.append(school)
         return return_schools
 
-    def _get_depots(self) -> list[Depot]:
+    def _make_depots(self) -> list[Depot]:
         depots_df = pd.read_csv(self.depots_path)
-        return_depots = []
+        return_depots: list[Depot] = []
         for _, row in depots_df.iterrows():
             geographic_location = Point(row["lon"], row["lat"])
             nearest_node_id = self._get_nearest_node_id(geographic_location)
@@ -362,9 +378,9 @@ class ProblemData:
             return_depots.append(depot)
         return return_depots
 
-    def _get_stops(self) -> list[Stop]:
+    def _make_stops(self) -> list[Stop]:
         stops_df = pd.read_csv(self.stops_path)
-        return_stops = []
+        return_stops: list[Stop] = []
 
         for _, row in stops_df.iterrows():
             geographic_location = Point(row["lon"], row["lat"])
@@ -377,9 +393,9 @@ class ProblemData:
             return_stops.append(stop)
         return return_stops
 
-    def _create_students(self) -> list[Student]:
+    def _make_students(self) -> list[Student]:
         students_df = pd.read_csv(self.students_path)
-        return_students = []
+        return_students: list[Student] = []
 
         for _, row in students_df.iterrows():
             school = next(s for s in self.schools if s.name == row["school_id"])
@@ -399,11 +415,11 @@ class ProblemData:
             return_students.append(this_student)
         return return_students
 
-    def _create_buses(
+    def _make_buses(
         self,
     ) -> list[Bus]:
         buses_df = pd.read_csv(self.buses_path)
-        return_buses = []
+        return_buses: list[Bus] = []
         for _, row in buses_df.iterrows():
             depot = next(d for d in self.depots if d.name == row["depot_name"])
             bus = Bus(
@@ -452,8 +468,8 @@ class ProblemData:
         else:
             # Get nearest node in the OSM graph to the student's location
             nearest_node = self._get_nearest_node_id(geo_location)
-            distances: dict[NodeId, float] = nx.shortest_path_length(
-                self.osm_graph, source=nearest_node, target=None, weight="length"
+            distances = nx.single_source_dijkstra_path_length(
+                self.osm_graph, source=nearest_node, weight="length"
             )
             all_stop_distances = {
                 stop: distances.get(stop.node_id, float("inf")) for stop in self.stops
@@ -481,12 +497,24 @@ class ProblemData:
         # attributes
         print(
             "Node attributes:",
-            [node for n, node in enumerate(self.osm_graph.nodes(data=True)) if n < 1],
+            [data for n, (_, data) in enumerate(self.osm_graph.nodes.items()) if n < 1][
+                0
+            ],
         )
         print(
             "Edge attributes:",
-            [edge for e, edge in enumerate(self.osm_graph.edges(data=True)) if e < 1],
+            [
+                data
+                for e, (_, _, data) in enumerate(self.osm_graph.edges(data=True))
+                if e < 1
+            ][0],
         )
+
+        print("# of Stops:", len(self.stops))
+        print("# of Schools:", len(self.schools))
+        print("# of Depots:", len(self.depots))
+        print("# of Students:", len(self.students))
+        print("# of Buses:", len(self.buses))
 
         # plot map rq with outline of city boundary
         _, ax = ox.plot_graph(
@@ -502,8 +530,13 @@ class ProblemData:
         # plt.show()
 
         if save:
-            with open("outputs/sanity_checks.png", "wb+") as f:
+            with open(CURRENT_FILE_DIR / "outputs" / "sanity_checks.png", "wb+") as f:
                 plt.savefig(f, dpi=300)
+
+        # service graph checks
+        print("Total needed nodes (stops + schools + depots):", len(self.all_nodes))
+        print("Number of nodes in service graph:", len(self.service_graph.nodes))
+        print("Number of edges in service graph:", len(self.service_graph.edges))
 
         # note for self: make sure only one node per intersection/dead end,
         # and that there are no duplicate edges or goofy artifacts
@@ -513,42 +546,28 @@ TAU = list(SchoolType)
 """school types"""
 
 
-@cache
+def make_place_copy[T: Place](place: T, suffix: str = "copy") -> T:
+    return replace(place, name=place.name + f" ({suffix})")
+
+
 def make_school_copy(school: School) -> School:
-    return School(
-        name=school.name + " (copy)",
-        geographic_location=school.geographic_location,
-        node_id=school.node_id,
-        type=school.type,
-        start_time=school.start_time,
-    )
+    return make_place_copy(school)
 
 
-@cache
-def make_depot_copy(depot: Depot, suffix: str) -> Depot:
-    return Depot(
-        name=depot.name + f" ({suffix})",
-        geographic_location=depot.geographic_location,
-        node_id=depot.node_id,
-    )
-
-
-@cache
-def make_depot_start_copy(depot: Depot) -> Depot:
-    return make_depot_copy(depot, "start")
-
-
-@cache
 def make_depot_end_copy(depot: Depot) -> Depot:
-    return make_depot_copy(depot, "end")
+    return make_place_copy(depot, "end copy")
 
 
-# @cache
-# def get_shortest_path(
-#     graph: nx.MultiDiGraph, start: Location, end: Location, weight: str = "length"
-# ) -> tuple[float, list[Location]]:
-#     """returns the length and path of the shortest path between start and end"""
-#     return nx.bidirectional_dijkstra(graph, source=start, target=end, weight=weight)
+def make_depot_start_copy(depot: Depot) -> Depot:
+    return make_place_copy(depot, "start copy")
+
+
+@cache
+def get_shortest_path[T: Hashable](
+    graph: "nx.MultiDiGraph[T]", start: T, end: T, weight: str = "length"
+) -> tuple[float, list[T]]:
+    """returns the length and path of the shortest path between start and end"""
+    return nx.bidirectional_dijkstra(graph, source=start, target=end, weight=weight)
 
 
 def p_m(m: Student):

@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import networkx as nx
 import matplotlib.pyplot as plt
 import cvxpy as cp
@@ -6,6 +8,7 @@ import numpy as np
 from formulation.common import (
     TAU,
     C_b,
+    Place,
     R_b,
     Wh_b,
     depot_b,
@@ -650,7 +653,7 @@ def plot_bus_routes(
     prob: cp.Problem,
     formulation: Formulation3,
     model_vars: dict[str, cp.Variable],
-    save_path: str | None = None,
+    save_path: Path | None = None,
 ):
     # Extract and print the route
 
@@ -678,9 +681,14 @@ def plot_bus_routes(
     # e_bqs = model_vars["e_bqs"]
     # r_bmon = model_vars["r_bmon"]
 
-    pos: dict[int, tuple[float, float]] = {
-        node_id: (node_data["x"], node_data["y"])
-        for node_id, node_data in G.nodes().items()
+    osm_graph = formulation.problem_data.osm_graph
+
+    pos: dict[Place, tuple[float, float]] = {
+        node: (
+            osm_graph.nodes[node.node_id]["x"],
+            osm_graph.nodes[node.node_id]["y"],
+        )
+        for node in G.nodes()
     }
     weights = nx.get_edge_attributes(G, "length")
 
@@ -697,24 +705,24 @@ def plot_bus_routes(
         # plot schools, students, and bus stops
         for school in schools:
             plt.scatter(
-                pos[school.node_id][0],
-                pos[school.node_id][1],
+                pos[school][0],
+                pos[school][1],
                 c=school_colors[school.type],
                 marker="s",
                 label=f"{school.name } ({school.type.name})",
             )
         for bus_stop in bus_stops:
             plt.scatter(
-                pos[bus_stop.node_id][0],
-                pos[bus_stop.node_id][1],
+                pos[bus_stop][0],
+                pos[bus_stop][1],
                 c="green",
                 marker="^",
                 label=bus_stop.name,
             )
         for depot in depots:
             plt.scatter(
-                pos[depot.node_id][0],
-                pos[depot.node_id][1],
+                pos[depot][0],
+                pos[depot][1],
                 c="purple",
                 marker="X",
                 label=depot.name,
