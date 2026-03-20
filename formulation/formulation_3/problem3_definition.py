@@ -50,7 +50,7 @@ class Formulation3:
     """capacity multiplier for different school types"""
 
     # sets
-    G: "nx.MultiDiGraph[Place]" = field(init=False)
+    G: "nx.MultiDiGraph[NodeId]" = field(init=False)
     """road network graph"""
     P: list[Stop] = field(init=False, default_factory=list)
     """pickup stop nodes"""
@@ -78,7 +78,7 @@ class Formulation3:
     # utility
     A: dict[tuple[Place, Place], float] = field(init=False, default_factory=dict)
     """arc travel times in minutes"""
-    A_PATH: dict[tuple[Place, Place], list[list[NodeId]]] = field(
+    A_PATH: dict[tuple[Place, Place], list[NodeId]] = field(
         init=False, default_factory=dict
     )
     """arc shortest paths"""
@@ -111,6 +111,7 @@ class Formulation3:
         self.D_MINUS = [
             make_depot_end_copy(depot) for depot in self.problem_data.depots
         ]
+
         self.N = self.P + self.S + self.S_PLUS + self.D + self.D_PLUS + self.D_MINUS
         self.B = self.problem_data.buses
         self.M = self.problem_data.students
@@ -133,43 +134,35 @@ class Formulation3:
         for i in self.N:
             for j in self.N:
                 if i != j:
-                    if i.node_id == j.node_id:
+                    i_id = i.node_id
+                    j_id = j.node_id
+
+                    if i_id == j_id:
                         self.A[i, j] = 0
-                        self.A_PATH[i, j] = [[i.node_id, j.node_id]]
+                        self.A[j, i] = 0
+                        self.A_PATH[i, j] = []
+                        self.A_PATH[j, i] = []
                         continue
 
-                    # handle school and depot copies
-                    if "copy" in i.name:
-                        i_original = next(
-                            node
-                            for node in self.N
-                            if node.node_id == i.node_id and "copy" not in node.name
-                        )
-                    else:
-                        i_original = i
-
-                    if "copy" in j.name:
-                        j_original = next(
-                            node
-                            for node in self.N
-                            if node.node_id == j.node_id and "copy" not in node.name
-                        )
-                    else:
-                        j_original = j
-
                     ij_edge_data = self.problem_data.service_graph.get_edge_data(
-                        i_original, j_original, key=0, default=None
+                        i_id, j_id, key=0, default=None
                     )
                     if ij_edge_data is not None:
                         self.A[i, j] = ij_edge_data["length"]
                         self.A_PATH[i, j] = ij_edge_data["path"]
+                    else:
+                        # print(f"Warning: no edge data for nodes {i} to {j}")
+                        pass
 
                     ji_edge_data = self.problem_data.service_graph.get_edge_data(
-                        j_original, i_original, key=0, default=None
+                        j_id, i_id, key=0, default=None
                     )
                     if ji_edge_data is not None:
                         self.A[j, i] = ji_edge_data["length"]
                         self.A_PATH[j, i] = ji_edge_data["path"]
+                    else:
+                        # print(f"Warning: no edge data for nodes {j} to {i}")
+                        pass
 
         self.T_horizon = self._T_horizon()
 
@@ -179,11 +172,17 @@ class Formulation3:
 
     def t_ij(self, i: Place, j: Place) -> float:
         """travel time from node i to node j in minutes"""
-        return self.A[i, j]
+        speed_mph = 25  # assume average speed of 25 mph for conversion
+        speed_meter_per_minute = (
+            speed_mph * 26.8224
+        )  # 1 mph = 26.8224 meters per minute
+
+        return self.d_ij(i, j) / speed_meter_per_minute
 
     def d_ij(self, i: Place, j: Place) -> float:
-        """shortest distance from node i to node j in miles, for now same as above"""
-        return self.t_ij(i, j)
+        """shortest distance from node i to node j in meters"""
+
+        return self.A[i, j]
 
     def _T_horizon(self):
         """a safe time-horizon upper bound used to bound T_bqi and set Big-M"""

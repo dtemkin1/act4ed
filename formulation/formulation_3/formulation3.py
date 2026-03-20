@@ -4,11 +4,12 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import cvxpy as cp
 import numpy as np
+import osmnx as ox
 
 from formulation.common import (
     TAU,
     C_b,
-    Place,
+    NodeId,
     R_b,
     Wh_b,
     depot_b,
@@ -333,7 +334,7 @@ def build_model_from_definition(
             for s, school in enumerate(S):
                 constraints.append(
                     T_bqi[b, q, N.index(S_PLUS[s])]
-                    >= T_bqi[b, q - 1, N.index(S[s])]
+                    >= T_bqi[b, q - 1, N.index(school)]
                     + BETA
                     * cp.sum(
                         [
@@ -553,13 +554,14 @@ def solve_problem(prob: cp.Problem):
         prob.solve(
             solver=cp.GLPK_MI,
             verbose=True,
+            warm_start=True,
             glpk={"msg_lev": "GLP_MSG_ON", "tm_lim": 2 * 60 * 1000},
         )  # 2-min limit
     except Exception as e:
         print(f"⚠️  GLPK_MI failed or unavailable: {e}")
         print("Trying CBC as fallback...")
         try:
-            prob.solve(solver=cp.CBC, verbose=True, maximumSeconds=120)
+            prob.solve(solver=cp.CBC, verbose=True, warm_start=True, maximumSeconds=120)
         except Exception as e2:
             print(f"⚠️  CBC also failed: {e2}")
             print("Trying default solver...")
@@ -667,89 +669,75 @@ def plot_bus_routes(
     bus_stops = formulation.problem_data.stops
     depots = formulation.problem_data.depots
     school_colors = {
-        school.type: color for school, color in zip(schools, ["red", "orange", "blue"])
+        school.type: color for school, color in zip(schools, ["green", "blue", "red"])
     }
 
-    # z_b = model_vars["z_b"]
     z_bq = model_vars["z_bq"]
-    # y_bqtau = model_vars["y_bqtau"]
     x_bqij = model_vars["x_bqij"]
-    # v_bqi = model_vars["v_bqi"]
-    # a_mbq = model_vars["a_mbq"]
-    # T_bqi = model_vars["T_bqi"]
-    # L_bqi = model_vars["L_bqi"]
-    # e_bqs = model_vars["e_bqs"]
-    # r_bmon = model_vars["r_bmon"]
 
     osm_graph = formulation.problem_data.osm_graph
 
-    pos: dict[Place, tuple[float, float]] = {
+    pos: dict[NodeId, tuple[float, float]] = {
         node: (
-            osm_graph.nodes[node.node_id]["x"],
-            osm_graph.nodes[node.node_id]["y"],
+            osm_graph.nodes[node]["x"],
+            osm_graph.nodes[node]["y"],
         )
         for node in G.nodes()
     }
-    weights = nx.get_edge_attributes(G, "length")
 
     if prob.status not in [cp.OPTIMAL, cp.OPTIMAL_INACCURATE]:
         print("No feasible solution to visualize.")
     else:
         # Visualize the routes on the graph
-        plt.figure(figsize=(10, 10))
-        nx.draw(G, pos, with_labels=False, node_size=5, node_color="lightgray")
-        # color edges by weight
-        nx.draw_networkx_edges(
-            G, pos, edge_color=list(weights.values()), edge_cmap=plt.colormaps["Grays"]
-        )
-        # plot schools, students, and bus stops
-        for school in schools:
-            plt.scatter(
-                pos[school][0],
-                pos[school][1],
-                c=school_colors[school.type],
-                marker="s",
-                label=f"{school.name } ({school.type.name})",
-            )
-        for bus_stop in bus_stops:
-            plt.scatter(
-                pos[bus_stop][0],
-                pos[bus_stop][1],
-                c="green",
-                marker="^",
-                label=bus_stop.name,
-            )
-        for depot in depots:
-            plt.scatter(
-                pos[depot][0],
-                pos[depot][1],
-                c="purple",
-                marker="X",
-                label=depot.name,
-            )
-        # plot routes
-        colors = plt.colormaps.get_cmap("tab10")
+
+        fig, ax = ox.plot_graph(osm_graph, show=False)
         for b, _ in enumerate(B):
             for q in range(len(Q)):
                 if z_bq[b, q].value > 0.5:
                     for ij, path in enumerate(A.keys()):
                         if x_bqij[b, q, ij].value > 0.5:
-                            path_nodes = A_PATH[path]
-                            path_edges = list(zip(path_nodes[:-1], path_nodes[1:]))
-                            nx.draw_networkx_edges(
-                                G,
-                                pos,
-                                edgelist=path_edges,
-                                edge_color=[colors(b)],
-                                width=5,
-                                alpha=0.7,
-                            )
+                            path_edges = A_PATH[path]
+                            if path_edges:
+                                ox.plot_graph_route(
+                                    osm_graph,
+                                    path_edges,
+                                    ax=ax,
+                                    orig_dest_size=0,
+                                    show=False,
+                                    # route_color="r"
+                                )
 
-        plt.title("Optimized School Bus Routes")
-        plt.legend(loc="upper right", fontsize="small")
+        # plot schools, students, and bus stops
+        for school in schools:
+            ax.scatter(
+                pos[school.node_id][0],
+                pos[school.node_id][1],
+                c=school_colors[school.type],
+                marker="s",
+                label=f"{school.name} ({school.type.name})",
+            )
+        for bus_stop in bus_stops:
+            ax.scatter(
+                pos[bus_stop.node_id][0],
+                pos[bus_stop.node_id][1],
+                c="yellow",
+                marker="^",
+                label=bus_stop.name,
+            )
+        for depot in depots:
+            ax.scatter(
+                pos[depot.node_id][0],
+                pos[depot.node_id][1],
+                c="purple",
+                marker="X",
+                label=depot.name,
+            )
+
+        ax.title.set_text("Optimized School Bus Routes")
+        ax.legend(loc="upper right", fontsize="small")
 
         if save_path is not None:
-            plt.savefig(save_path)
+            fig.savefig(save_path)
         # plt.show()
 
 

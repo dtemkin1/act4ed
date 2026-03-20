@@ -137,7 +137,7 @@ class Student(LocationData):
         return self.name
 
 
-type Place = School | Depot | Stop
+Place = School | Depot | Stop
 
 
 # @dataclass(frozen=True)
@@ -172,7 +172,7 @@ class ProblemData:
 
     # post init data
     @cached_property
-    def service_graph(self) -> "nx.MultiDiGraph[Place]":
+    def service_graph(self) -> "nx.MultiDiGraph[NodeId]":
         """
         network graph with edge weights corresponding to travel times in minutes,
         only containing nodes in N and edges corresponding to shortest paths between nodes in N.
@@ -210,9 +210,8 @@ class ProblemData:
         """buses available for transportation"""
         return self._make_buses()
 
-    def __post_init__(self):
-        # sanity checks
-        self.sanity_checks()
+    # def __post_init__(self):
+    #     self.sanity_checks()
 
     @cached_property
     def all_nodes(self) -> list[Place]:
@@ -262,15 +261,28 @@ class ProblemData:
     ) -> tuple[float, list[NodeId]]:
         return get_shortest_path(self.osm_graph, start, end, weight)
 
-    def _make_service_graph(self) -> "nx.MultiDiGraph[Place]":
-        service_graph: "nx.MultiDiGraph[Place]" = nx.MultiDiGraph()
+    def _make_service_graph(self) -> "nx.MultiDiGraph[NodeId]":
+        service_graph: "nx.MultiDiGraph[NodeId]" = nx.MultiDiGraph()
 
         def add_edge_if_path_exists(start: Place, end: Place):
+            # check if edge in graph already, if so skip
+            start_id = start.node_id
+            end_id = end.node_id
+
+            if service_graph.has_edge(start_id, end_id):
+                return
+
+            if start_id == end_id:
+                service_graph.add_edge(
+                    start_id, end_id, length=0, path=[start_id, end_id]
+                )
+                return
+
             try:
-                length, path = self._get_shortest_path_osm(start.node_id, end.node_id)
-                service_graph.add_edge(start, end, length=length, path=path)
+                length, path = self._get_shortest_path_osm(start_id, end_id)
+                service_graph.add_edge(start_id, end_id, length=length, path=path)
             except nx.NetworkXNoPath:
-                pass
+                print(f"Warning: no path between {start} and {end} in the graph")
 
         if not self.use_r5:
             # Depots -> Stops
@@ -295,6 +307,11 @@ class ProblemData:
                     add_edge_if_path_exists(school, stop)
                 for depot in self.depots:
                     add_edge_if_path_exists(school, depot)
+
+            # for place1 in self.all_nodes:
+            #     for place2 in self.all_nodes:
+            #         if place1 != place2:
+            #             add_edge_if_path_exists(place1, place2)
 
         else:
             if not self.osm_pbf_path:
@@ -326,8 +343,8 @@ class ProblemData:
                             detailed_itineraries["from_id"] == start_node.node_id
                         ][detailed_itineraries["to_id"] == end_node.node_id]
                         service_graph.add_edge(
-                            start_node,
-                            end_node,
+                            start_node.node_id,
+                            end_node.node_id,
                             length=entry["distance"].iloc[0],
                             path=entry["geometry"].iloc[0],
                         )
@@ -348,7 +365,16 @@ class ProblemData:
             return pickle.load(f)
 
     def _make_schools(self) -> list[School]:
-        schools_df = pd.read_csv(self.schools_path)
+        schools_df = pd.read_csv(
+            self.schools_path,
+            dtype={
+                "id": str,
+                "lon": float,
+                "lat": float,
+                "type": str,
+                "start_time": str,
+            },
+        )
         return_schools: list[School] = []
         for _, row in schools_df.iterrows():
             geographic_location = Point(row["lon"], row["lat"])
@@ -365,7 +391,9 @@ class ProblemData:
         return return_schools
 
     def _make_depots(self) -> list[Depot]:
-        depots_df = pd.read_csv(self.depots_path)
+        depots_df = pd.read_csv(
+            self.depots_path, dtype={"id": str, "lon": float, "lat": float}
+        )
         return_depots: list[Depot] = []
         for _, row in depots_df.iterrows():
             geographic_location = Point(row["lon"], row["lat"])
@@ -379,7 +407,9 @@ class ProblemData:
         return return_depots
 
     def _make_stops(self) -> list[Stop]:
-        stops_df = pd.read_csv(self.stops_path)
+        stops_df = pd.read_csv(
+            self.stops_path, dtype={"id": str, "lon": float, "lat": float}
+        )
         return_stops: list[Stop] = []
 
         for _, row in stops_df.iterrows():
@@ -394,7 +424,17 @@ class ProblemData:
         return return_stops
 
     def _make_students(self) -> list[Student]:
-        students_df = pd.read_csv(self.students_path)
+        students_df = pd.read_csv(
+            self.students_path,
+            dtype={
+                "id": str,
+                "lon": float,
+                "lat": float,
+                "school_id": str,
+                "is_sp_ed": bool,
+                "is_wheelchair_user": bool,
+            },
+        )
         return_students: list[Student] = []
 
         for _, row in students_df.iterrows():
@@ -418,7 +458,16 @@ class ProblemData:
     def _make_buses(
         self,
     ) -> list[Bus]:
-        buses_df = pd.read_csv(self.buses_path)
+        buses_df = pd.read_csv(
+            self.buses_path,
+            dtype={
+                "id": str,
+                "depot_name": str,
+                "capacity": int,
+                "range": int,
+                "has_wheelchair_access": bool,
+            },
+        )
         return_buses: list[Bus] = []
         for _, row in buses_df.iterrows():
             depot = next(d for d in self.depots if d.name == row["depot_name"])

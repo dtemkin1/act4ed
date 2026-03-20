@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from formulation.common import ProblemData, Student, Stop
+from formulation.common import ProblemData, Student
 
 from formulation.formulation_3.problem3_definition import Formulation3
 from formulation.formulation_3.formulation3 import (
@@ -62,36 +62,33 @@ def main() -> None:
     problem_data = setup()
     print("Problem data loaded!")
 
-    problem_data.sanity_checks()
-
     # pick a random school
-    random_school = problem_data.schools[0]
+    random_school = problem_data.schools[1]
     print(f"Random school: {random_school}")
 
     # only kids living relatively close
     nearby_students: list[Student] = []
     for student in problem_data.students:
-        distance = problem_data.service_graph.edges[student.stop, random_school, 0][
-            "length"
-        ]
+        distance = problem_data.service_graph.edges[
+            student.stop.node_id, random_school.node_id, 0
+        ]["length"]
 
-        if (
-            distance <= 1500 and student.school == random_school
-        ):  # convert lat/long distance to miles
+        # within 1 mile of school
+        if distance <= 1609.34 and student.school == random_school:
             nearby_students.append(student)
     print(f"Number of nearby students: {len(nearby_students)}")
 
-    stops_with_students: list[Stop] = []
+    stops_with_students = list(set(student.stop for student in nearby_students))
 
-    # only stops with nearby students
-    for stop in problem_data.stops:
-        if any(student.stop == stop for student in nearby_students):
-            stops_with_students.append(stop)
-    print(f"Number of stops with nearby students: {len(stops_with_students)}")
+    # only use 2 buses total, all wheelchair accessible
+    buses_to_use = list(filter(lambda b: b.has_wheelchair_access, problem_data.buses))[
+        :2
+    ]
 
     problem_data.students = nearby_students
     problem_data.stops = stops_with_students
     problem_data.schools = [random_school]
+    problem_data.buses = buses_to_use
 
     # formulation time baby
     no_chaining = Formulation3(
@@ -114,12 +111,15 @@ def main() -> None:
         CURRENT_FILE_DIR / "outputs" / "report_no_chaining.txt", "w+", encoding="utf-8"
     ) as f:
         f.write(report_no_chaining)
+    print("No-chaining report written")
+
     plot_bus_routes(
         no_chaining_model[0],
         no_chaining,
         no_chaining_model[1],
         CURRENT_FILE_DIR / "outputs" / "no_chaining_routes.png",
     )
+    print("No-chaining routes plotted")
 
     chaining = Formulation3(
         problem_data=problem_data,
