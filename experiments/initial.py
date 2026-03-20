@@ -62,32 +62,31 @@ def main() -> None:
     problem_data = setup()
     print("Problem data loaded!")
 
-    # pick a random school
-    random_school = problem_data.schools[1]
-    print(f"Random school: {random_school}")
+    # pick fuller at first since mcc is right next to it
+    fuller = next(school for school in problem_data.schools if school.id == "FUL")
 
     # only kids living relatively close
     nearby_students: list[Student] = []
     for student in problem_data.students:
         distance = problem_data.service_graph.edges[
-            student.stop.node_id, random_school.node_id, 0
+            student.stop.node_id, fuller.node_id, 0
         ]["length"]
 
-        # within 1 mile of school
-        if distance <= 1609.34 and student.school == random_school:
+        # within 1 km of school
+        if distance <= 1000 and student.school == fuller:
             nearby_students.append(student)
     print(f"Number of nearby students: {len(nearby_students)}")
 
     stops_with_students = list(set(student.stop for student in nearby_students))
 
-    # only use 2 buses total, all wheelchair accessible
+    # only use 1 buses total, wheelchair accessible
     buses_to_use = list(filter(lambda b: b.has_wheelchair_access, problem_data.buses))[
-        :2
+        :1
     ]
 
     problem_data.students = nearby_students
     problem_data.stops = stops_with_students
-    problem_data.schools = [random_school]
+    problem_data.schools = [fuller]
     problem_data.buses = buses_to_use
 
     # formulation time baby
@@ -121,6 +120,31 @@ def main() -> None:
     )
     print("No-chaining routes plotted")
 
+    print("Now doing chaining formulation...")
+    problem_data = setup()
+    mcc = next(school for school in problem_data.schools if school.id == "MCC")
+
+    # only kids living relatively close
+    both_nearby_students: list[Student] = []
+    for student in problem_data.students:
+        distance = problem_data.service_graph.edges[
+            student.stop.node_id, fuller.node_id, 0
+        ]["length"]
+
+        # within 1 km of school
+        if distance <= 1000 and student.school == fuller:
+            both_nearby_students.append(student)
+        if distance <= 1000 and student.school == mcc:
+            both_nearby_students.append(student)
+
+    print(f"Number of both nearby students: {len(both_nearby_students)}")
+
+    stops_with_students = list(set(student.stop for student in both_nearby_students))
+
+    problem_data.students = both_nearby_students
+    problem_data.stops = stops_with_students
+    problem_data.schools = [fuller, mcc]
+    problem_data.buses = buses_to_use
     chaining = Formulation3(
         problem_data=problem_data,
         rounds=3,

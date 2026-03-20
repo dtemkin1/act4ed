@@ -97,6 +97,7 @@ class School(NodeLocationData):
     corresponds to a node in the graph
     """
 
+    id: str
     type: SchoolType
     start_time: int
     """mins from midnight"""
@@ -224,9 +225,13 @@ class ProblemData:
             raise ValueError("osm_pbf_path must be provided if use_r5 is True")
         return r5py.TransportNetwork(osm_pbf=self.osm_pbf_path)
 
+    @cached_property
+    def gdf(self) -> gpd.GeoDataFrame:
+        return ox.geocode_to_gdf(self.place_name)
+
     def _make_osm_graph(self):
         # get boundary polygon (similar to analysis.ipynb)
-        framingham_gdf = ox.geocode_to_gdf(self.place_name)
+        framingham_gdf = self.gdf
 
         # project to utm for meters-based buffering
         framingham_projected = framingham_gdf.to_crs(framingham_gdf.estimate_utm_crs())
@@ -373,6 +378,7 @@ class ProblemData:
                 "lat": float,
                 "type": str,
                 "start_time": str,
+                "name": str,
             },
         )
         return_schools: list[School] = []
@@ -381,7 +387,8 @@ class ProblemData:
             nearest_node_id = self._get_nearest_node_id(geographic_location)
             start_time = dt.datetime.strptime(row["start_time"], "%H:%M").time()
             school = School(
-                name=row["id"],
+                id=row["id"],
+                name=row["name"],
                 node_id=nearest_node_id,
                 geographic_location=geographic_location,
                 type=SchoolType[row["type"]],
@@ -438,7 +445,7 @@ class ProblemData:
         return_students: list[Student] = []
 
         for _, row in students_df.iterrows():
-            school = next(s for s in self.schools if s.name == row["school_id"])
+            school = next(s for s in self.schools if s.id == row["school_id"])
             geographic_location = Point(row["lon"], row["lat"])
 
             # find nearest stop to student

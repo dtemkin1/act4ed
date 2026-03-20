@@ -627,7 +627,17 @@ def make_report(
                         if a_mbq[m, b, q].value > 0.5:
                             students_on_bus.append(student)
                     result_string += f"    Total travel time (excluding dwell): {sum(formulation.d_ij(*path) for path in route):.2f} minutes\n"
-                    result_string += f"    Bus type: {TAU[np.argmax(y_bqtau[b, q, :])].name if z_bq[b, q].value > 0.5 else 'N/A'}\n"
+                    school_type = TAU[
+                        max(
+                            (tau for tau in range(len(TAU))),
+                            key=lambda tau: (
+                                y_bqtau[b, q, tau].value
+                                if y_bqtau[b, q, tau].value is not None
+                                else 0
+                            ),
+                        )
+                    ]
+                    result_string += f"    Bus type: {school_type.name}\n"
                     result_string += f"    Students on bus this round:\n      {'\n      '.join(str(student) for student in students_on_bus)}\n"
                     result_string += f"    Schools served:\n      {'\n      '.join(str(school) for school in schools_served)}\n"
 
@@ -714,7 +724,7 @@ def plot_bus_routes(
                 pos[school.node_id][1],
                 c=school_colors[school.type],
                 marker="s",
-                label=f"{school.name} ({school.type.name})",
+                label={school.name},
             )
         for bus_stop in bus_stops:
             ax.scatter(
@@ -737,7 +747,7 @@ def plot_bus_routes(
         ax.legend(loc="upper right", fontsize="small")
 
         if save_path is not None:
-            fig.savefig(save_path)
+            fig.savefig(save_path, bbox_inches="tight")
         # plt.show()
 
 
