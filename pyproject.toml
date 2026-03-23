@@ -30,6 +30,7 @@ dependencies = [
     "types-geopandas>=1.1.3.20260311",
     "types-networkx>=3.6.1.20260303",
     "pandas-stubs>=3.0.0.260204",
+    "ipykernel>=7.2.0",
 ]
 
 [tool.uv]
