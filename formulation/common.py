@@ -17,7 +17,7 @@ import pandas as pd
 
 try:
     import r5py
-except ImportError as exc:
+except Exception as exc:
     # cant use r5py but let run
     warnings.warn(
         "Warning: r5py not found. Please install it with 'pip install r5py'"
@@ -28,7 +28,7 @@ except ImportError as exc:
 
 try:
     from shapely.geometry import Point
-except ImportError as exc:
+except Exception as exc:
     raise ImportError(
         "Shapely not found. Please install it with 'pip install shapely'"
         " and ensure Java is properly configured."
