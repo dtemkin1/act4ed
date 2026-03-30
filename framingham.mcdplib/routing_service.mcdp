@@ -1,0 +1,9 @@
+dp {
+  provides students_served [`students_served]
+  requires distance [km]
+  requires rounds_used [ℕ]
+  requires monitor_buses [ℕ]
+  requires fleet_composition [`fleet_composition]
+
+  implemented-by yaml resource("routing_service.dpc.yaml")
+}

@@ -1,0 +1,7 @@
+dp {
+  provides roi_budget [USD]
+
+  requires students_served [`students_served]
+
+  implemented-by yaml resource("guidelines.dpc.yaml")
+}

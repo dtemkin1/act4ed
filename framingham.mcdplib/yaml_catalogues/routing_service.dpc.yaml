@@ -1,0 +1,25 @@
+F:
+  - "`students_served"
+R:
+  - "km"
+  - "Nat"
+  - "Nat"
+  - "`fleet_composition"
+
+implementations:
+  service_200_standard:
+    f_max:
+      - "`students_served: served_200"
+    r_min:
+      - "100 km"
+      - "8"
+      - "1"
+      - "<5, 0, 0, 0>"
+  service_200_mixed:
+    f_max:
+      - "`students_served: served_200"
+    r_min:
+      - "95 km"
+      - "7"
+      - "1"
+      - "<4, 1, 0, 0>"

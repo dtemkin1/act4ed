@@ -1,0 +1,25 @@
+mcdp {
+  implements `fleet_interface
+
+  constant available_dp_c = 45
+  constant available_dp_b = 17
+  constant available_dp_wc = 1
+  constant available_dp_bwc = 9
+
+  constant capital_cost_dp_c = 50000 USD
+  constant capital_cost_dp_b = 70000 USD
+  constant capital_cost_dp_wc = 80000 USD
+  constant capital_cost_dp_bwc = 90000 USD
+
+  (provided fleet_composition).dp_c ≤ available_dp_c
+  (provided fleet_composition).dp_b ≤ available_dp_b
+  (provided fleet_composition).dp_wc ≤ available_dp_wc
+  (provided fleet_composition).dp_bwc ≤ available_dp_bwc
+
+  required capital_cost ≥ (
+    capital_cost_dp_c * (provided fleet_composition).dp_c +
+    capital_cost_dp_b * (provided fleet_composition).dp_b +
+    capital_cost_dp_wc * (provided fleet_composition).dp_wc +
+    capital_cost_dp_bwc * (provided fleet_composition).dp_bwc
+  )
+}

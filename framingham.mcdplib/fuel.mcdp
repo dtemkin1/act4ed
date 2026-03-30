@@ -1,0 +1,13 @@
+mcdp {
+  implements `fuel_interface
+
+  constant fuel_cost_per_km = 0.60 USD / km
+  constant emissions_per_km = 1.20 kg / km
+
+  required fuel_cost ≥ (
+    fuel_cost_per_km * provided distance
+  )
+  required emissions ≥ (
+    emissions_per_km * provided distance
+  )
+}

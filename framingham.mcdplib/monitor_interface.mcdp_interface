@@ -1,0 +1,4 @@
+interface {
+  provides monitor_buses [Nat]
+  requires monitor_cost [USD]
+}

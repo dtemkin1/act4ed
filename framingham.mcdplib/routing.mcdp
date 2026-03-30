@@ -1,0 +1,39 @@
+mcdp {
+  provides students_served [`students_served]
+
+  requires total_cost [USD]
+  requires emissions [kg]
+
+  dp_guidelines = instance `guidelines
+  dp_routing_service = instance `routing_service
+  sub fuel = instance `fuel
+  sub driver = instance `driver
+  sub monitor = instance `monitor
+  sub maintenance = instance `maintenance
+  sub fleet = instance `fleet
+  sub fleet_bus_count = instance `fleet_bus_count
+
+  service_cost = (
+    fuel_cost required by fuel +
+    driver_cost required by driver +
+    monitor_cost required by monitor +
+    maintenance_cost required by maintenance +
+    capital_cost required by fleet
+  )
+
+  service_cost ≤ roi_budget provided by dp_guidelines
+  students_served provided by dp_routing_service ≥ students_served required by dp_guidelines
+
+  distance required by dp_routing_service ≤ distance provided by fuel
+  distance required by dp_routing_service ≤ distance provided by maintenance
+  rounds_used required by dp_routing_service ≤ rounds_used provided by maintenance
+  monitor_buses required by dp_routing_service ≤ monitor_buses provided by monitor
+
+  fleet_composition required by dp_routing_service ≤ fleet_composition provided by fleet
+  fleet_composition required by dp_routing_service ≤ fleet_composition provided by fleet_bus_count
+  buses_used provided by driver ≥ buses_used required by fleet_bus_count
+
+  required total_cost ≥ service_cost
+  required emissions ≥ emissions required by fuel
+  provided students_served ≤ students_served provided by dp_routing_service
+}

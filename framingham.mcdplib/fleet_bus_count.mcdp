@@ -1,0 +1,10 @@
+mcdp {
+  implements `fleet_bus_count_interface
+
+  required buses_used ≥ (
+    (provided fleet_composition).dp_c +
+    (provided fleet_composition).dp_b +
+    (provided fleet_composition).dp_wc +
+    (provided fleet_composition).dp_bwc
+  )
+}

@@ -1,0 +1,5 @@
+interface {
+  provides distance [km]
+  provides rounds_used [Nat]
+  requires maintenance_cost [USD]
+}

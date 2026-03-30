@@ -1,0 +1,11 @@
+title: Simple Routing Query
+description: Basic example query for the full routing design problem.
+model: "`routing"
+query:
+  query_type: FixFunMinRes
+  min_f:
+    students_served: "`students_served: served_200"
+  max_r:
+    total_cost: "700000 USD"
+    emissions: "500 kg"
+  optimize_for: [total_cost]

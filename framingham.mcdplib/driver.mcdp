@@ -1,0 +1,9 @@
+mcdp {
+  implements `driver_interface
+
+  constant driver_cost_per_bus = 50000 USD
+
+  required driver_cost ≥ (
+    driver_cost_per_bus * provided buses_used
+  )
+}
