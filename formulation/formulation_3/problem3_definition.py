@@ -18,6 +18,12 @@ from formulation.common import (
     make_school_copy,
 )
 
+# TODO: school buses in MA max go 40 mph (except on highways), and 20 mph in school zones
+# https://malegislature.gov/Laws/GeneralLaws/PartI/TitleXIV/Chapter90/Section17
+CAR_SPEED = 25  # assume average speed of 25 mph for conversion
+
+CAR_SPEED_METER_PER_MIN = CAR_SPEED * 26.8224  # 1 mph = 26.8224 meters per minute
+
 
 @dataclass(slots=True)
 class Formulation3:
@@ -131,6 +137,7 @@ class Formulation3:
 
         self.A = {}
         self.A_PATH = {}
+
         for i in self.N:
             for j in self.N:
                 if i != j:
@@ -164,27 +171,26 @@ class Formulation3:
                         # print(f"Warning: no edge data for nodes {j} to {i}")
                         pass
 
-        self.T_horizon = self._T_horizon()
+        self.T_horizon = self._time_horizon()
 
         self.M_TIME = self.T_horizon
-        self.M_CAPACITY = max(C_b(bus) for bus in self.problem_data.buses)
+        self.M_CAPACITY = self._max_capacity()
         self.M_TYPE = max(SchoolType)
 
     def t_ij(self, i: Place, j: Place) -> float:
         """travel time from node i to node j in minutes"""
-        speed_mph = 25  # assume average speed of 25 mph for conversion
-        speed_meter_per_minute = (
-            speed_mph * 26.8224
-        )  # 1 mph = 26.8224 meters per minute
 
-        return self.d_ij(i, j) / speed_meter_per_minute
+        return self.d_ij(i, j) / CAR_SPEED_METER_PER_MIN
 
     def d_ij(self, i: Place, j: Place) -> float:
         """shortest distance from node i to node j in meters"""
 
         return self.A[i, j]
 
-    def _T_horizon(self):
+    def _max_capacity(self):
+        return max(C_b(bus) for bus in self.problem_data.buses)
+
+    def _time_horizon(self):
         """a safe time-horizon upper bound used to bound T_bqi and set Big-M"""
         max_arrival_time = max(l_s(school) for school in self.problem_data.schools)
         return max_arrival_time + self.H_RIDE + 60  # add max ride time and some buffer
