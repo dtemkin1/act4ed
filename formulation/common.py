@@ -231,22 +231,18 @@ class ProblemData:
 
     def _make_osm_graph(self):
         # get boundary polygon (similar to analysis.ipynb)
-        framingham_gdf = self.gdf
+        gdf = self.gdf
 
         # project to utm for meters-based buffering
-        framingham_projected = framingham_gdf.to_crs(framingham_gdf.estimate_utm_crs())
-        framingham_projected["geometry"] = framingham_projected.buffer(
-            self.boundary_buffer_m
-        )
+        projected = gdf.to_crs(gdf.estimate_utm_crs())
+        projected["geometry"] = projected.buffer(self.boundary_buffer_m)
 
         # project back to original crs for osmnx
-        framingham_buffered = framingham_projected.to_crs(framingham_gdf.crs)
-        framingham_buffered_poly = framingham_buffered.geometry.iloc[0]
+        buffered = projected.to_crs(gdf.crs)
+        buffered_poly = buffered.geometry.iloc[0]
 
         # download street network
-        graph = ox.graph_from_polygon(
-            framingham_buffered_poly, network_type=NETWORK_TYPE
-        )
+        graph = ox.graph_from_polygon(buffered_poly, network_type=NETWORK_TYPE)
 
         # simplify
         graph = ox.truncate.largest_component(graph, strongly=False)

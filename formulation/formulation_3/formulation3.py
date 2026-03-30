@@ -552,20 +552,24 @@ def solve_problem(prob: cp.Problem):
     try:
         # Try with verbose to see progress; set a reasonable time limit
         prob.solve(
-            solver=cp.GLPK_MI,
+            solver=cp.GUROBI,
             verbose=True,
             warm_start=True,
-            glpk={"msg_lev": "GLP_MSG_ON", "tm_lim": 2 * 60 * 1000},
-        )  # 2-min limit
+        )
     except Exception as e:
-        print(f"⚠️  GLPK_MI failed or unavailable: {e}")
-        print("Trying CBC as fallback...")
+        print(f"⚠️  GUROBI failed or unavailable: {e}")
+        print("Trying GLPK_MI as fallback...")
         try:
-            prob.solve(solver=cp.CBC, verbose=True, warm_start=True, maximumSeconds=120)
+            prob.solve(
+                solver=cp.GLPK_MI,
+                verbose=True,
+                warm_start=True,
+                glpk={"msg_lev": "GLP_MSG_ON", "tm_lim": 2 * 60 * 1000},
+            )
         except Exception as e2:
-            print(f"⚠️  CBC also failed: {e2}")
-            print("Trying default solver...")
-            prob.solve(verbose=True)
+            print(f"⚠️  GLPK_MI also failed: {e2}")
+        print("Trying default solver...")
+        prob.solve(verbose=True)
 
     print()
     print("Status:", prob.status)

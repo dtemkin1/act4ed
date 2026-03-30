@@ -510,6 +510,9 @@ wheels = [
 ]
 
 [package.optional-dependencies]
+glpk = [
+    { name = "cvxopt" },
+]
 gurobi = [
     { name = "gurobipy" },
 ]
@@ -521,33 +524,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/a9/95/a3dbbb5028f35eafb79008e7522a75244477d2838f38cbb722248dabc2a8/cycler-0.12.1.tar.gz", hash = "sha256:88bb128f02ba341da8ef447245a9e138fae777f6a23943da4540077d3601eb1c", size = 7615, upload-time = "2023-10-07T05:32:18.335Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e7/05/c19819d5e3d95294a6f5947fb9b9629efb316b96de511b418c53d245aae6/cycler-0.12.1-py3-none-any.whl", hash = "sha256:85cef7cff222d8644161529808465972e51340599459b8ac3ccbac5a854e0d30", size = 8321, upload-time = "2023-10-07T05:32:16.783Z" },
-]
-
-[[package]]
-name = "cylp"
-version = "0.94.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "numpy" },
-    { name = "scipy" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/5a/10/2bb2c5ee8eaa60cd27b5191d6f79f78adfb373d9fd79c5563d6549e0de8a/cylp-0.94.0.tar.gz", hash = "sha256:7f23283bd831e72ee5413cf10f063bc93c738b35809fdfcce0d942005761a606", size = 171106, upload-time = "2025-12-03T15:00:01.874Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/23/1e/ec56faf608ee1e79fb8cd97f90cea9028a9bb7f4870c98e2b25d1e685f85/cylp-0.94.0-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:053655c3318a5b2afd591455ea9cb9efa0df2766fa61cf86d2b6c32da1c7e2ad", size = 4498164, upload-time = "2025-12-03T14:59:20.542Z" },
-    { url = "https://files.pythonhosted.org/packages/b9/cb/e54ee6219cde642ee279d9496898092cf2f1c999846639640fc6603e0206/cylp-0.94.0-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:16a6d893007ca751b4a4053a8e2783226371019226593a96d7f0ea873a5a0719", size = 4054799, upload-time = "2025-12-03T14:59:22.359Z" },
-    { url = "https://files.pythonhosted.org/packages/1e/59/283e43e3a6cad37a3630cd014e6720375071f43dca414823289929ad3ac3/cylp-0.94.0-cp313-cp313-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:aabf13d026aab7ff0647131643b9cb6e6ad67f1b5e35eba873e47846d6c28730", size = 10843790, upload-time = "2025-12-03T14:59:24.383Z" },
-    { url = "https://files.pythonhosted.org/packages/2a/b8/88351cddb20bd6d2dd058b5ff14b95763921908b2da0118cf720bbc0d879/cylp-0.94.0-cp313-cp313-manylinux_2_24_i686.manylinux_2_28_i686.whl", hash = "sha256:2c2cba6c85a7da37a491cd94df3ef56bb3f3e0ae1c6de1ce2a7ff35e7e40a04e", size = 11152862, upload-time = "2025-12-03T14:59:26.827Z" },
-    { url = "https://files.pythonhosted.org/packages/e5/81/d88252ae7a54954b827caaae7344998be99d1b96bcb0e57ede9d4781977c/cylp-0.94.0-cp313-cp313-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:1afbcf58981aa3ea1fb8b43107c028723361d39d52deb18c6c61ddd83d42852c", size = 11283364, upload-time = "2025-12-03T14:59:28.919Z" },
-    { url = "https://files.pythonhosted.org/packages/30/93/701a68c06334e6d9614498ac836927edd2779378b369cf9fe2eb25efe98e/cylp-0.94.0-cp314-cp314-macosx_10_15_x86_64.whl", hash = "sha256:a271c0dfb8bb22a06a58a31d938a6fb7a01007dc999462b05473ea988ad768c1", size = 4501778, upload-time = "2025-12-03T14:59:30.931Z" },
-    { url = "https://files.pythonhosted.org/packages/28/d4/eca6c7334e27fe134e0f9ddfa56b7574bbb841288a364cfd67ce2c62688d/cylp-0.94.0-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:1beaa9e06f10190fa12c4ee650376d036b2521a45344d089a9831544dd00790c", size = 4062699, upload-time = "2025-12-03T14:59:32.445Z" },
-    { url = "https://files.pythonhosted.org/packages/27/b3/bfd26ce4d8f9bf0d29b77a736e2d941c6f15713f707c91c111bbccb7cabf/cylp-0.94.0-cp314-cp314-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:498b2ef94af4aa2cd7ec717703e7de0e134d1ac4d03c01b795207cad9df0ee49", size = 10843262, upload-time = "2025-12-03T14:59:34.052Z" },
-    { url = "https://files.pythonhosted.org/packages/28/66/8e7f52b04e00f98943ba128f54bd0ef9017d2d570f0d72bd15f660e9dcee/cylp-0.94.0-cp314-cp314-manylinux_2_24_i686.manylinux_2_28_i686.whl", hash = "sha256:b0d725571d8ed6593ed11a367e7d5ac1c2ef88e3cb55eff9487f6ed9f5b8e56b", size = 11143862, upload-time = "2025-12-03T14:59:36.179Z" },
-    { url = "https://files.pythonhosted.org/packages/62/ea/219a1abf0e2952426cc717d77713027537ec9017e4c221bcd847c31442f0/cylp-0.94.0-cp314-cp314-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:d1c4f1ac01d8c7dceb9179054db89813aac3d3281b3bdb5924c510a9feeda345", size = 11239315, upload-time = "2025-12-03T14:59:38.215Z" },
-    { url = "https://files.pythonhosted.org/packages/0a/f3/d60d98f354570a6a452a865f51b7cc1cdbe4f9165178cbe48596184aa246/cylp-0.94.0-cp314-cp314t-macosx_10_15_x86_64.whl", hash = "sha256:808c4187aa7a51f9e4430d2ff68ee557f5d9b86fee8b09dbd883665ea06a4538", size = 4558092, upload-time = "2025-12-03T14:59:40.391Z" },
-    { url = "https://files.pythonhosted.org/packages/de/ef/c132e37a1b484eaef88419818eff980d786f38aab1cf2a6836b5bd155e57/cylp-0.94.0-cp314-cp314t-macosx_11_0_arm64.whl", hash = "sha256:5e37766a6a86a6cda60ed1fc4ec4ab3e38f9269ba917f4d3c895e18a466f7db7", size = 4130972, upload-time = "2025-12-03T14:59:42.49Z" },
-    { url = "https://files.pythonhosted.org/packages/6e/ed/1478db6f904a7f820a2253f3186bcff8843d4ca7a77cda05fef262dde100/cylp-0.94.0-cp314-cp314t-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:7e9e85e18f5d75a6edad7e9e062df0bb815cf3d144933a7e8e25e6e9990d8c76", size = 11680803, upload-time = "2025-12-03T14:59:44.725Z" },
-    { url = "https://files.pythonhosted.org/packages/47/a8/dd4eb8117ecba7b5fbf072b8633dd245d40e8dcafc798fc9f815c7ac8f7b/cylp-0.94.0-cp314-cp314t-manylinux_2_24_i686.manylinux_2_28_i686.whl", hash = "sha256:8e62029bc54ed06781d7dfa56087ce18c849ab1db2d359cac90b0b646f963a66", size = 11795708, upload-time = "2025-12-03T14:59:47.062Z" },
-    { url = "https://files.pythonhosted.org/packages/26/2f/dd39c55905be996e9bd1285f9075c65214a232759a8fc37da96cef90e522/cylp-0.94.0-cp314-cp314t-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:cd309cc5980fdf42fc6178095524f31ac923e2e9c791973bf90b3beabf747230", size = 11900376, upload-time = "2025-12-03T14:59:49.28Z" },
 ]
 
 [[package]]
@@ -2592,11 +2568,11 @@ dependencies = [
     { name = "branca" },
     { name = "contextily" },
     { name = "cvxopt" },
-    { name = "cvxpy", extra = ["gurobi"] },
-    { name = "cylp" },
+    { name = "cvxpy", extra = ["glpk", "gurobi"] },
     { name = "folium" },
     { name = "geopandas" },
     { name = "geopy" },
+    { name = "gurobipy" },
     { name = "ipykernel" },
     { name = "jupyter" },
     { name = "jupyterlab" },
@@ -2622,11 +2598,11 @@ requires-dist = [
     { name = "branca", specifier = ">=0.8.2" },
     { name = "contextily", specifier = ">=1.7.0" },
     { name = "cvxopt", specifier = ">=1.3.2" },
-    { name = "cvxpy", extras = ["gurobi"], specifier = ">=1.7.3" },
-    { name = "cylp", specifier = ">=0.93.1" },
+    { name = "cvxpy", extras = ["glpk", "gurobi"], specifier = ">=1.7.3" },
     { name = "folium", specifier = ">=0.20.0" },
     { name = "geopandas", specifier = ">=1.1.1" },
     { name = "geopy", specifier = ">=2.4.1" },
+    { name = "gurobipy", specifier = ">=13.0.1" },
     { name = "ipykernel", specifier = ">=7.2.0" },
     { name = "jupyter", specifier = ">=1.1.1" },
     { name = "jupyterlab", specifier = ">=4.4.10" },
