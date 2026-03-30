@@ -1,9 +1,6 @@
 from pathlib import Path
 
-import networkx as nx
-import matplotlib.pyplot as plt
 import cvxpy as cp
-import numpy as np
 import osmnx as ox
 
 from formulation.common import (

@@ -9,6 +9,48 @@ from formulation.common import ProblemData, Student
 
 CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 
+# where
+BOUNDARY_BUFFER_M = 1000
+
+# data files
+DEPOT_CSV = CURRENT_FILE_DIR / "data" / "depot.csv"
+SCHOOLS_CSV = CURRENT_FILE_DIR / "data" / "schools.csv"
+STOPS_CSV = CURRENT_FILE_DIR / "data" / "stops.csv"
+STUDENTS_CSV = CURRENT_FILE_DIR / "data" / "students.csv"
+BUSES_CSV = CURRENT_FILE_DIR / "data" / "buses.csv"
+
+# thresholds
+MAX_WALK_TIME_S = 15 * 60  # 15 mins
+MAX_WALK_DIST_M = 1000  # 1 km (should we do miles? idk)
+
+# base street network
+NETWORK_TYPE = "drive"
+
+# outputs
+GRAPHML_FILE = CURRENT_FILE_DIR / "outputs" / "framingham_graph.graphml"
+PAIRWISE_CSV = CURRENT_FILE_DIR / "outputs" / "depot_schools_stops_pairwise.csv"
+STUDENT_ASSIGN_CSV = CURRENT_FILE_DIR / "outputs" / "student_to_stop_or_school.csv"
+
+
+def setup(problem_name: str, place_name: str) -> ProblemData:
+    try:
+        problem_data = ProblemData.load(problem_name)
+    except FileNotFoundError:
+        problem_data = ProblemData(
+            name=problem_name,
+            schools_path=SCHOOLS_CSV,
+            stops_path=STOPS_CSV,
+            students_path=STUDENTS_CSV,
+            depots_path=DEPOT_CSV,
+            buses_path=BUSES_CSV,
+            place_name=place_name,
+            boundary_buffer_m=BOUNDARY_BUFFER_M,
+        )
+
+        problem_data.save()
+
+    return problem_data
+
 
 def get_assigned_students(problem_data: ProblemData) -> list[Student]:
     """

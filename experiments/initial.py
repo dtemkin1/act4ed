@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from formulation.common import ProblemData, Student
+from formulation.common import Student
 
 from formulation.formulation_3.problem3_definition import Formulation3
 from formulation.formulation_3.formulation3 import (
@@ -10,56 +10,17 @@ from formulation.formulation_3.formulation3 import (
     plot_bus_routes,
     solve_problem,
 )
+from experiments.helpers import setup
 
 
 CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 
 # where
 PLACE_NAME = "Framingham, Massachusetts, USA"
-BOUNDARY_BUFFER_M = 1000
-
-# data files
-DEPOT_CSV = CURRENT_FILE_DIR / "data" / "depot.csv"
-SCHOOLS_CSV = CURRENT_FILE_DIR / "data" / "schools.csv"
-STOPS_CSV = CURRENT_FILE_DIR / "data" / "stops.csv"
-STUDENTS_CSV = CURRENT_FILE_DIR / "data" / "students.csv"
-BUSES_CSV = CURRENT_FILE_DIR / "data" / "buses.csv"
-
-# thresholds
-MAX_WALK_TIME_S = 15 * 60  # 15 mins
-MAX_WALK_DIST_M = 1000  # 1 km (should we do miles? idk)
-
-# base street network
-NETWORK_TYPE = "drive"
-
-# outputs
-GRAPHML_FILE = CURRENT_FILE_DIR / "outputs" / "framingham_graph.graphml"
-PAIRWISE_CSV = CURRENT_FILE_DIR / "outputs" / "depot_schools_stops_pairwise.csv"
-STUDENT_ASSIGN_CSV = CURRENT_FILE_DIR / "outputs" / "student_to_stop_or_school.csv"
-
-
-def setup() -> ProblemData:
-    try:
-        problem_data = ProblemData.load("framingham")
-    except FileNotFoundError:
-        problem_data = ProblemData(
-            name="framingham",
-            schools_path=SCHOOLS_CSV,
-            stops_path=STOPS_CSV,
-            students_path=STUDENTS_CSV,
-            depots_path=DEPOT_CSV,
-            buses_path=BUSES_CSV,
-            place_name=PLACE_NAME,
-            boundary_buffer_m=BOUNDARY_BUFFER_M,
-        )
-
-        problem_data.save()
-
-    return problem_data
 
 
 def main() -> None:
-    problem_data = setup()
+    problem_data = setup("framingham", PLACE_NAME)
     print("Problem data loaded!")
 
     # pick fuller at first since mcc is right next to it
@@ -121,7 +82,7 @@ def main() -> None:
     print("No-chaining routes plotted")
 
     print("Now doing chaining formulation...")
-    problem_data = setup()
+    problem_data = setup("framingham", PLACE_NAME)
     mcc = next(school for school in problem_data.schools if school.id == "MCC")
 
     # only kids living relatively close
