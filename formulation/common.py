@@ -3,6 +3,7 @@ from enum import IntEnum
 from functools import cache, cached_property
 import os
 from pathlib import Path
+import warnings
 
 import datetime as dt
 import pickle
@@ -13,7 +14,16 @@ from matplotlib import pyplot as plt
 import networkx as nx
 import osmnx as ox
 import pandas as pd
-import r5py
+
+try:
+    import r5py
+except ImportError as exc:
+    # cant use r5py but let run
+    warnings.warn(
+        "Warning: r5py not found. Please install it with 'pip install r5py'"
+        " and ensure Java is properly configured.",
+        exc,
+    )
 
 
 try:
@@ -220,7 +230,10 @@ class ProblemData:
         return self.stops + self.schools + self.depots
 
     @cached_property
-    def _transportation_network(self) -> r5py.TransportNetwork:
+    def _transportation_network(self) -> "r5py.TransportNetwork":
+        assert (
+            r5py is not None
+        ), "r5py must be installed to use r5 for service graph construction"
         if not self.osm_pbf_path:
             raise ValueError("osm_pbf_path must be provided if use_r5 is True")
         return r5py.TransportNetwork(osm_pbf=self.osm_pbf_path)
@@ -315,6 +328,9 @@ class ProblemData:
             #             add_edge_if_path_exists(place1, place2)
 
         else:
+            assert (
+                r5py is not None
+            ), "r5py must be installed to use r5 for service graph construction"
             if not self.osm_pbf_path:
                 raise ValueError("osm_pbf_path must be provided if use_r5 is True")
 
@@ -492,6 +508,9 @@ class ProblemData:
 
     def _get_nearest_stop(self, geo_location: Point) -> Stop:
         if self.use_r5:
+            assert (
+                r5py is not None
+            ), "r5py must be installed to use r5 for nearest stop calculation"
             nearest_stop_id = (
                 r5py.DetailedItineraries(
                     self._transportation_network,
