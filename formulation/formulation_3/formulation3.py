@@ -2,6 +2,7 @@ from pathlib import Path
 
 import cvxpy as cp
 import osmnx as ox
+import numpy as np
 
 from formulation.common import (
     TAU,
@@ -98,15 +99,47 @@ def build_model_from_definition(
         (len(B)), boolean=True
     )  # 1 if bus b as a monitor (ie serves a flagged student)
 
+    # Precompute some index structures
+    A_list = list(A.keys())  # ordered arcs
+    num_A = len(A_list)
+
+    # adjacency from N to arcs (boolean masks)
+    # starts_at = {
+    #     i: np.array([int(path[0] == node) for path in A_list])
+    #     for i, node in enumerate(N)
+    # }
+    # ends_at = {
+    #     i: np.array([int(path[1] == node) for path in A_list])
+    #     for i, node in enumerate(N)
+    # }
+
+    P_set = set(P)
+    # S_set = set(S)
+
+    pickup_idx = [i for i, n in enumerate(N) if n in P_set]
+    # school_idx = [i for i, n in enumerate(N) if n in S_set]
+
+    # student -> pickup/school node index in N
+    p_idx = np.array([N.index(p_m(st)) for st in M])
+    s_idx = np.array([N.index(s_m(st)) for st in M])
+
+    # for each node, which students pick up / drop off there
+    M_p = {i: np.where(p_idx == i)[0] for i in range(len(N))}
+    # M_s = {i: np.where(s_idx == i)[0] for i in range(len(N))}
+
+    M_idx = np.arange(len(M))
+    B_idx = np.arange(len(B))
+    Q_idx = np.arange(len(Q))
+
+    # broadcast to grids of indices (M,B,Q)
+    M_grid, B_grid, Q_grid = np.meshgrid(M_idx, B_idx, Q_idx, indexing="ij")
+
     # HEAD HONCHO OBJECTIVE AND CONSTRAINTS
 
+    distance_array = np.array([d_ij(i, j) for (i, j) in A.keys()])
+
     objective = cp.Minimize(
-        cp.sum(
-            [
-                cp.sum(cp.multiply(d_ij(i, j), x_bqij[:, :, ij]))
-                for ij, (i, j) in enumerate(A.keys())
-            ]
-        )
+        cp.sum(cp.sum(cp.multiply(x_bqij, distance_array), axis=2))
         + cp.multiply(LAMBDA_ROUND, cp.sum(z_bq))
         + cp.sum(r_bmon),
     )
@@ -119,26 +152,19 @@ def build_model_from_definition(
     # STUDENT ASSIGNMENT
 
     # Each student is served by at most one (bus, round)
-    for m in range(len(M)):
-        constraints.append(cp.sum(a_mbq[m, :, :]) <= 1)
+    constraints.append(cp.sum(a_mbq, axis=(1, 2)) <= 1)
 
     # Minimum pickup / coverage requirement
-    constraints.append(cp.sum(a_mbq[:, :, :]) >= PHI * len(M))
+    constraints.append(cp.sum(a_mbq) >= PHI * len(M))
 
     # If student assigned to (b,q), that bus-round is used
-    for m in range(len(M)):
-        for b in range(len(B)):
-            for q in range(len(Q)):
-                constraints.append(a_mbq[m, b, q] <= z_bq[b, q])
+    constraints.append(a_mbq <= cp.reshape(z_bq, (1, len(B), len(Q))))
 
     # Round must carry at least one student
-    for b in range(len(B)):
-        for q in range(len(Q)):
-            constraints.append(z_bq[b, q] <= cp.sum(a_mbq[:, b, q]))
+    constraints.append(z_bq <= cp.sum(a_mbq, axis=0))
 
     # If bus is used, it must carry at least one student (in some round)
-    for b in range(len(B)):
-        constraints.append(z_b[b] <= cp.sum(a_mbq[:, b, :]))
+    constraints.append(z_b <= cp.sum(a_mbq, axis=(0, 2)))
 
     # ROUTING / TOUR STRUCTURE
 
@@ -177,12 +203,13 @@ def build_model_from_definition(
     for b in range(len(B)):
         for s in range(len(S)):
             # don't use school copy nodes for round 0
+            s_plus_set = set(S_PLUS)
             constraints.append(
                 cp.sum(
                     [
                         x_bqij[b, 0, ij]
                         for ij, path in enumerate(A.keys())
-                        if path[0] in S_PLUS
+                        if path[0] in s_plus_set
                     ]
                 )
                 == 0
@@ -263,20 +290,14 @@ def build_model_from_definition(
                     )
 
     # Stop visit only if someone is assigned from that stop in that round
-    for b in range(len(B)):
-        for q in range(len(Q)):
-            for i, node in enumerate(N):
-                if node in P:
-                    constraints.append(
-                        v_bqi[b, q, i]
-                        <= cp.sum(
-                            [
-                                a_mbq[m, b, q]
-                                for m, student in enumerate(M)
-                                if p_m(student) == node
-                            ]
-                        )
-                    )
+    for i in pickup_idx:
+        m_idx = M_p[i]  # all students whose pickup is N[i]
+        if len(m_idx) == 0:
+            # then v_bqi[..., i] must be zero
+            constraints.append(v_bqi[:, :, i] <= 0)
+            continue
+        # a_mbq[m_idx, :, :] has shape (|M_i|, B, Q)
+        constraints.append(v_bqi[:, :, i] <= cp.sum(a_mbq[m_idx, :, :], axis=0))
 
     # flow conservation at schools (allow school to be end of a non-last round via e_{b,q,s})
     for b in range(len(B)):
@@ -312,11 +333,8 @@ def build_model_from_definition(
                     constraints.append(v_bqi[b, q, i] <= z_bq[b, q])
 
     # Each assigned student forces visiting their pickup and their school (in the same round)
-    for m, student in enumerate(M):
-        for b in range(len(B)):
-            for q in range(len(Q)):
-                constraints.append(a_mbq[m, b, q] <= v_bqi[b, q, N.index(p_m(student))])
-                constraints.append(a_mbq[m, b, q] <= v_bqi[b, q, N.index(s_m(student))])
+    constraints.append(a_mbq <= v_bqi[B_grid, Q_grid, p_idx[M_grid]])
+    constraints.append(a_mbq <= v_bqi[B_grid, Q_grid, s_idx[M_grid]])
 
     # TIME ANCHORING
     for b, bus in enumerate(B):

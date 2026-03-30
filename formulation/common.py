@@ -616,18 +616,22 @@ TAU = list(SchoolType)
 """school types"""
 
 
+@cache
 def make_place_copy[T: Place](place: T, suffix: str = "copy") -> T:
     return replace(place, name=place.name + f" ({suffix})")
 
 
+@cache
 def make_school_copy(school: School) -> School:
     return make_place_copy(school)
 
 
+@cache
 def make_depot_end_copy(depot: Depot) -> Depot:
     return make_place_copy(depot, "end copy")
 
 
+@cache
 def make_depot_start_copy(depot: Depot) -> Depot:
     return make_place_copy(depot, "start copy")
 
