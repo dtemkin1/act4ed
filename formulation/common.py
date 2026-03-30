@@ -17,12 +17,11 @@ import pandas as pd
 
 try:
     import r5py
-except Exception as exc:
+except Exception:
     # cant use r5py but let run
     warnings.warn(
         "Warning: r5py not found. Please install it with 'pip install r5py'"
         " and ensure Java is properly configured.",
-        exc,
     )
 
 
