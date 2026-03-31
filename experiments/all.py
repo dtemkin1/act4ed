@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from formulation.formulation_3.problem3_definition import Formulation3
+from formulation.formulation_3.problem3_definition import ExperimentConfig, Formulation3
 from formulation.formulation_3.formulation3 import (
     build_model_from_definition,
     make_report,
@@ -15,6 +15,23 @@ CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 
 # where
 PLACE_NAME = "Framingham, Massachusetts, USA"
+
+
+def experimental_config():
+    no_chaining = ExperimentConfig(
+        problem_data_pkl=str(
+            CURRENT_FILE_DIR
+            / ".."
+            / "formulation"
+            / "cache"
+            / "framingham_problem_data.pkl"
+        ),
+        rounds=1,
+    )
+
+    print(no_chaining.to_json())
+
+    return
 
 
 def main() -> None:

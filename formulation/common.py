@@ -374,10 +374,14 @@ class ProblemData:
         ) as f:
             pickle.dump(self, f)
 
-    @staticmethod
-    def load(name: str) -> "ProblemData":
+    @classmethod
+    def load(cls, name: str) -> "ProblemData":
         """load problem data from disk"""
-        with open(CURRENT_FILE_DIR / "cache" / f"{name}_problem_data.pkl", "rb") as f:
+        return cls.load_path(CURRENT_FILE_DIR / "cache" / f"{name}_problem_data.pkl")
+
+    @classmethod
+    def load_path(cls, path: Path) -> "ProblemData":
+        with open(path, "rb") as f:
             return pickle.load(f)
 
     def _make_schools(self) -> list[School]:

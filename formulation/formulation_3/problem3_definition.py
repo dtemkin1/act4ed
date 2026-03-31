@@ -1,5 +1,7 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+from functools import cached_property
 import networkx as nx
+from dataclasses_json import dataclass_json
 
 from formulation.common import (
     Bus,
@@ -18,13 +20,108 @@ from formulation.common import (
     make_school_copy,
 )
 
-# TODO: school buses in MA max go 40 mph (except on highways), and 20 mph in school zones
-# https://malegislature.gov/Laws/GeneralLaws/PartI/TitleXIV/Chapter90/Section17
-CAR_SPEED = 25  # assume average speed of 25 mph for conversion
-
-CAR_SPEED_METER_PER_MIN = CAR_SPEED * 26.8224  # 1 mph = 26.8224 meters per minute
+MILES_TO_METERS = 26.8224
 
 
+@dataclass_json
+@dataclass(frozen=True)
+class ExperimentConfig:
+    problem_data_pkl: str
+    # vals
+    rounds: int
+
+    # constants
+    ALPHA: float = 0.3
+    """boarding dwell time per student"""
+    BETA: float = 0.5
+    """alighting dwell time per student"""
+    H_RIDE: float = 120
+    """max ride time in minutes"""
+    PHI: float = 1.0
+    """ratio of students served"""
+    EPSILON: float = 1e-5
+    """non-negative time separation used for precedence"""
+    LAMBDA_ROUND: float = 1.0
+    """small nonnegative per-round tie-breaker penalty"""
+    KAPPA: dict[SchoolType, float] = field(
+        default_factory=lambda: {
+            SchoolType.E: 1.0,
+            SchoolType.MS: 0.67,
+            SchoolType.HS: 0.67,
+        },
+    )
+    """capacity multiplier for different school types"""
+
+    # FILTERS
+    consider_wheelchair_students: bool = True
+    consider_monitor_students: bool = True
+    schools_to_consider: list[str] = field(default_factory=list)
+    students_to_consider: list[str] = field(default_factory=list)
+    buses_to_consider: list[str] = field(default_factory=list)
+
+    @cached_property
+    def filtered_problem_data(self):
+        # filter problem data according to config
+        problem_data = ProblemData.load_path(self.problem_data_pkl)
+        filtered_students = problem_data.students
+        if self.students_to_consider:
+            filtered_students = [
+                student
+                for student in filtered_students
+                if student.id in self.students_to_consider
+            ]
+
+        if not self.consider_wheelchair_students:
+            filtered_students = [
+                student
+                for student in filtered_students
+                if not student.requires_wheelchair
+            ]
+
+        if not self.consider_monitor_students:
+            filtered_students = [
+                student for student in filtered_students if not student.requires_monitor
+            ]
+
+        filtered_schools = problem_data.schools
+        if self.schools_to_consider:
+            filtered_schools = [
+                school
+                for school in filtered_schools
+                if school.id in self.schools_to_consider
+            ]
+
+        filtered_buses = problem_data.buses
+        if self.buses_to_consider:
+            filtered_buses = [
+                bus for bus in filtered_buses if bus.id in self.buses_to_consider
+            ]
+
+        # create new problem data with filters applied
+        new_problem_data = replace(
+            problem_data,
+            students=filtered_students,
+            schools=filtered_schools,
+            buses=filtered_buses,
+        )
+        new_problem_data.service_graph = new_problem_data._make_service_graph()
+        return new_problem_data
+
+    def make_formulation(self):
+        return Formulation3(
+            problem_data=self.filtered_problem_data,
+            rounds=self.rounds,
+            ALPHA=self.ALPHA,
+            BETA=self.BETA,
+            H_RIDE=self.H_RIDE,
+            PHI=self.PHI,
+            EPSILON=self.EPSILON,
+            LAMBDA_ROUND=self.LAMBDA_ROUND,
+            KAPPA=self.KAPPA,
+        )
+
+
+@dataclass_json
 @dataclass(slots=True)
 class Formulation3:
     """
@@ -40,20 +137,30 @@ class Formulation3:
     rounds: int
 
     # constants
-    ALPHA = 0.3
+    ALPHA: float = 0.3
     """boarding dwell time per student"""
-    BETA = 0.5
+    BETA: float = 0.5
     """alighting dwell time per student"""
-    H_RIDE = 120
+    H_RIDE: float = 120
     """max ride time in minutes"""
-    PHI = 1.0
+    PHI: float = 1.0
     """ratio of students served"""
-    EPSILON = 1e-5
+    EPSILON: float = 1e-5
     """non-negative time separation used for precedence"""
-    LAMBDA_ROUND = 1.0
+    LAMBDA_ROUND: float = 1.0
     """small nonnegative per-round tie-breaker penalty"""
-    KAPPA = {SchoolType.E: 1.0, SchoolType.MS: 0.67, SchoolType.HS: 0.67}
+    KAPPA: dict[SchoolType, float] = field(
+        default_factory=lambda: {
+            SchoolType.E: 1.0,
+            SchoolType.MS: 0.67,
+            SchoolType.HS: 0.67,
+        },
+    )
     """capacity multiplier for different school types"""
+
+    # https://malegislature.gov/Laws/GeneralLaws/PartI/TitleXIV/Chapter90/Section17
+    BUS_SPEED_NOT_HIGHWAY: float = 40 * MILES_TO_METERS
+    BUS_SPEED_SCHOOL_ZONE: float = 20 * MILES_TO_METERS
 
     # sets
     G: "nx.MultiDiGraph[NodeId]" = field(init=False)
@@ -180,7 +287,7 @@ class Formulation3:
     def t_ij(self, i: Place, j: Place) -> float:
         """travel time from node i to node j in minutes"""
 
-        return self.d_ij(i, j) / CAR_SPEED_METER_PER_MIN
+        return self.d_ij(i, j) / self.BUS_SPEED_NOT_HIGHWAY
 
     def d_ij(self, i: Place, j: Place) -> float:
         """shortest distance from node i to node j in meters"""
