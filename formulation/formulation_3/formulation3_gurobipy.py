@@ -135,11 +135,17 @@ def build_model_from_definition(
     logger.info("model initialized :3")
 
     z_b = model.addVars(B_idx, vtype=GRB.BINARY, name="z_b")
+    logger.info("z_b vars added")
     z_bq = model.addVars(B_idx, Q_idx, vtype=GRB.BINARY, name="z_bq")
+    logger.info("z_bq vars added")
     y_bqtau = model.addVars(B_idx, Q_idx, TAU_idx, vtype=GRB.BINARY, name="y_bqtau")
+    logger.info("y_bqtau vars added")
     x_bqij = model.addVars(B_idx, Q_idx, A_idx, vtype=GRB.BINARY, name="x_bqij")
+    logger.info("x_bqij vars added")
     v_bqi = model.addVars(B_idx, Q_idx, N_idx, vtype=GRB.BINARY, name="v_bqi")
+    logger.info("v_bqi vars added")
     a_mbq = model.addVars(M_idx, B_idx, Q_idx, vtype=GRB.BINARY, name="a_mbq")
+    logger.info("a_mbq vars added")
     T_bqi = model.addVars(
         B_idx,
         Q_idx,
@@ -149,6 +155,7 @@ def build_model_from_definition(
         ub=T_horizon,
         name="T_bqi",
     )
+    logger.info("T_bqi vars added")
     L_bqi = model.addVars(
         B_idx,
         Q_idx,
@@ -157,8 +164,12 @@ def build_model_from_definition(
         lb=0.0,
         name="L_bqi",
     )
+    logger.info("L_bqi vars added")
     e_bqs = model.addVars(B_idx, Q_idx, S_idx, vtype=GRB.BINARY, name="e_bqs")
+    logger.info("e_bqs vars added")
     r_bmon = model.addVars(B_idx, vtype=GRB.BINARY, name="r_bmon")
+    logger.info("r_bmon vars added")
+
     logger.info("vars added to model")
 
     students_per_bus_round = {
