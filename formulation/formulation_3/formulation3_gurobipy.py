@@ -167,6 +167,7 @@ def build_model_from_definition(
     logger.info("e_bqs vars added")
     r_bmon = model.addVars(B_idx, vtype=GRB.BINARY, name="r_bmon")
     logger.info("r_bmon vars added")
+    logger.info(f"vars we need to make: {len(B_idx) * len(Q_idx) * len(A_idx)} :(")
     x_bqij = model.addVars(B_idx, Q_idx, A_idx, vtype=GRB.BINARY, name="x_bqij")
     logger.info("x_bqij vars added")
 
