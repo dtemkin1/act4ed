@@ -225,3 +225,6 @@ logs/
 # Cache
 **/cache/
 **/outputs/
+
+# Local data file
+rico_data
