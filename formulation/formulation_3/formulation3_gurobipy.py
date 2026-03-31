@@ -168,8 +168,11 @@ def build_model_from_definition(
     r_bmon = model.addVars(B_idx, vtype=GRB.BINARY, name="r_bmon")
     logger.info("r_bmon vars added")
     logger.info(f"vars we need to make: {len(B_idx) * len(Q_idx) * len(A_idx)} :(")
-    x_bqij = model.addVars(B_idx, Q_idx, A_idx, vtype=GRB.BINARY, name="x_bqij")
-    logger.info("x_bqij vars added")
+    try:
+        x_bqij = model.addVars(B_idx, Q_idx, A_idx, vtype=GRB.BINARY, name="x_bqij")
+        logger.info("x_bqij vars added")
+    except Exception as exc:
+        raise Exception("var x_bqij failed </3") from exc
 
     logger.info("vars added to model")
 
