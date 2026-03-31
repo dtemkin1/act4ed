@@ -3,6 +3,8 @@ from typing import Any
 import gurobipy as gp
 from gurobipy import GRB
 
+from loguru import logger
+
 from formulation.common import (
     TAU,
     C_b,
@@ -121,13 +123,12 @@ def build_model_from_definition(
     }
     arc_end_idx = {arc_idx: node_to_idx[path[1]] for arc_idx, path in enumerate(A_list)}
     service_node_indices = pickup_node_indices + school_node_indices
-    range_limit_by_bus = {
-        b: R_b(bus) * METERS_PER_MILE for b, bus in enumerate(B)
-    }
+    range_limit_by_bus = {b: R_b(bus) * METERS_PER_MILE for b, bus in enumerate(B)}
     capacity_by_bus = {b: C_b(bus) for b, bus in enumerate(B)}
     cap_upper_by_bus = {b: C_CAP_B(bus) for b, bus in enumerate(B)}
 
     model = gp.Model("formulation3_gurobi")
+    logger.info("model initialized :3")
 
     z_b = model.addVars(B_idx, vtype=GRB.BINARY, name="z_b")
     z_bq = model.addVars(B_idx, Q_idx, vtype=GRB.BINARY, name="z_bq")
@@ -154,6 +155,7 @@ def build_model_from_definition(
     )
     e_bqs = model.addVars(B_idx, Q_idx, S_idx, vtype=GRB.BINARY, name="e_bqs")
     r_bmon = model.addVars(B_idx, vtype=GRB.BINARY, name="r_bmon")
+    logger.info("vars added to model")
 
     students_per_bus_round = {
         (b, q): a_mbq.sum("*", b, q) for b in B_idx for q in Q_idx
@@ -188,6 +190,7 @@ def build_model_from_definition(
         for b in B_idx
         for q in Q_idx
     }
+    logger.info("helpers made to help")
 
     model.setObjective(
         gp.quicksum(
@@ -200,6 +203,7 @@ def build_model_from_definition(
         + gp.quicksum(r_bmon[b] for b in B_idx),
         GRB.MINIMIZE,
     )
+    logger.info("objective set")
 
     # STUDENT ASSIGNMENT
     model.addConstrs((a_mbq.sum(m, "*", "*") <= 1 for m in M_idx))
@@ -215,6 +219,7 @@ def build_model_from_definition(
     )
 
     model.addConstrs((z_b[b] <= students_per_bus[b] for b in B_idx))
+    logger.info("main constraints added")
 
     # ROUTING / TOUR STRUCTURE
     for b in B_idx:
@@ -234,7 +239,9 @@ def build_model_from_definition(
 
     for b in B_idx:
         for q in range(len(Q) - 1):
-            model.addConstr(gp.quicksum(e_bqs[b, q, s] for s in S_idx) == z_bq[b, q + 1])
+            model.addConstr(
+                gp.quicksum(e_bqs[b, q, s] for s in S_idx) == z_bq[b, q + 1]
+            )
         model.addConstr(gp.quicksum(e_bqs[b, Q_MAX, s] for s in S_idx) == 0)
 
     for b in B_idx:
@@ -265,7 +272,9 @@ def build_model_from_definition(
     for b in B_idx:
         for q in range(len(Q) - 1):
             model.addConstr(
-                gp.quicksum(x_bqij[b, q, arc_idx] for arc_idx in depot_end_arcs_by_bus[b])
+                gp.quicksum(
+                    x_bqij[b, q, arc_idx] for arc_idx in depot_end_arcs_by_bus[b]
+                )
                 == z_bq[b, q] - z_bq[b, q + 1]
             )
         model.addConstr(
@@ -304,7 +313,8 @@ def build_model_from_definition(
                 school_node_idx = school_node_indices[s]
                 model.addConstr(
                     gp.quicksum(
-                        x_bqij[b, q, arc_idx] for arc_idx in arcs_to_node[school_node_idx]
+                        x_bqij[b, q, arc_idx]
+                        for arc_idx in arcs_to_node[school_node_idx]
                     )
                     == v_bqi[b, q, school_node_idx]
                 )
@@ -329,6 +339,8 @@ def build_model_from_definition(
                 model.addConstr(a_mbq[m, b, q] <= v_bqi[b, q, pickup_node_idx])
                 model.addConstr(a_mbq[m, b, q] <= v_bqi[b, q, school_node_idx])
 
+    logger.info("routing/tour structure constraints made")
+
     # TIME ANCHORING
     for b, bus in enumerate(B):
         start_depot_idx = node_to_idx[make_depot_start_copy(depot_b(bus))]
@@ -343,6 +355,7 @@ def build_model_from_definition(
                     + BETA * school_assignments[b, q - 1, s]
                     - M_TIME * (1 - e_bqs[b, q - 1, s])
                 )
+    logger.info("time anchoring constraints")
 
     # TIME PROPAGATION
     for b in B_idx:
@@ -358,6 +371,7 @@ def build_model_from_definition(
                     + BETA * dropoff_assignments.get((b, q, start_idx), 0)
                     - M_TIME * (1 - x_bqij[b, q, arc_idx])
                 )
+    logger.info("time propogation constraints")
 
     # SCHOOL LATEST ARRIVAL
     for b in B_idx:
@@ -365,10 +379,10 @@ def build_model_from_definition(
             for s, school in enumerate(S):
                 school_node_idx = school_node_indices[s]
                 model.addConstr(
-                    T_bqi[b, q, school_node_idx]
-                    + BETA * school_assignments[b, q, s]
+                    T_bqi[b, q, school_node_idx] + BETA * school_assignments[b, q, s]
                     <= l_s(school) + M_TIME * (1 - v_bqi[b, q, school_node_idx])
                 )
+    logger.info("school latest arrival constraints")
 
     # PICKUP BEFORE DROPOFF AND MAX RIDE TIME
     for m in M_idx:
@@ -386,6 +400,7 @@ def build_model_from_definition(
                     T_bqi[b, q, school_node_idx] - T_bqi[b, q, pickup_node_idx]
                     <= H_RIDE + M_TIME * (1 - a_mbq[m, b, q])
                 )
+    logger.info("add pickup before dropoff constraints")
 
     # DISTANCE RANGE CONSTRAINTS
     for b, bus in enumerate(B):
@@ -397,6 +412,7 @@ def build_model_from_definition(
             )
             <= range_limit_by_bus[b] * z_b[b]
         )
+    logger.info("distance range constraints")
 
     # LOAD / CAPACITY CONSTRAINTS PER ROUND
     for b, bus in enumerate(B):
@@ -415,9 +431,9 @@ def build_model_from_definition(
             for arc_idx in A_idx:
                 start_idx = arc_start_idx[arc_idx]
                 end_idx = arc_end_idx[arc_idx]
-                load_change = pickup_assignments.get((b, q, end_idx), 0) - dropoff_assignments.get(
+                load_change = pickup_assignments.get(
                     (b, q, end_idx), 0
-                )
+                ) - dropoff_assignments.get((b, q, end_idx), 0)
                 model.addConstr(
                     L_bqi[b, q, end_idx]
                     >= L_bqi[b, q, start_idx]
@@ -444,6 +460,7 @@ def build_model_from_definition(
                     L_bqi[b, q, school_node_indices[s]]
                     <= cap_upper_by_bus[b] * (1 - e_bqs[b, q, s])
                 )
+    logger.info("load/capacity constraints")
 
     # MONITOR FEASIBILITY PER BUS
     for b in B_idx:
@@ -456,21 +473,22 @@ def build_model_from_definition(
         for m in flagged_student_indices:
             for q in Q_idx:
                 model.addConstr(r_bmon[b] >= a_mbq[m, b, q])
+    logger.info("monitor constraints")
 
     # WHEELCHAIR CONSTRAINTS
     for m in wheelchair_student_indices:
         for b, bus in enumerate(B):
             for q in Q_idx:
                 model.addConstr(a_mbq[m, b, q] <= Wh_b(bus))
+    logger.info("wheelchair constraints")
 
     # SCHOOL LEVEL
     for b in B_idx:
         for q in Q_idx:
             model.addConstr(y_bqtau.sum(b, q, "*") == z_bq[b, q])
             for m in M_idx:
-                model.addConstr(
-                    a_mbq[m, b, q] <= y_bqtau[b, q, tau_idx_for_student[m]]
-                )
+                model.addConstr(a_mbq[m, b, q] <= y_bqtau[b, q, tau_idx_for_student[m]])
+    logger.info("school level constraints")
 
     meta = {
         "A_list": A_list,
@@ -501,8 +519,12 @@ def build_model_from_definition(
 
 
 def solve_problem(model: gp.Model) -> None:
+    import datetime as dt
+
     print("Solving MILP")
     model.Params.OutputFlag = 1
+    model.Params.LogToConsole = 1
+    model.Params.LogFile = f"gurobi-{dt.datetime.now()}.log"
     model.optimize()
 
     print()
