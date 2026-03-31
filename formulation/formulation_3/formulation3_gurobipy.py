@@ -1,4 +1,5 @@
 from typing import Any
+import datetime as dt
 
 import gurobipy as gp
 from gurobipy import GRB
@@ -128,6 +129,9 @@ def build_model_from_definition(
     cap_upper_by_bus = {b: C_CAP_B(bus) for b, bus in enumerate(B)}
 
     model = gp.Model("formulation3_gurobi")
+    model.Params.OutputFlag = 1
+    model.Params.LogToConsole = 1
+    model.Params.LogFile = f"gurobi-{dt.datetime.now()}.log"
     logger.info("model initialized :3")
 
     z_b = model.addVars(B_idx, vtype=GRB.BINARY, name="z_b")
@@ -519,12 +523,7 @@ def build_model_from_definition(
 
 
 def solve_problem(model: gp.Model) -> None:
-    import datetime as dt
-
     print("Solving MILP")
-    model.Params.OutputFlag = 1
-    model.Params.LogToConsole = 1
-    model.Params.LogFile = f"gurobi-{dt.datetime.now()}.log"
     model.optimize()
 
     print()
