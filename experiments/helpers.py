@@ -32,9 +32,9 @@ PAIRWISE_CSV = CURRENT_FILE_DIR / "outputs" / "depot_schools_stops_pairwise.csv"
 STUDENT_ASSIGN_CSV = CURRENT_FILE_DIR / "outputs" / "student_to_stop_or_school.csv"
 
 
-def setup(problem_name: str, place_name: str) -> ProblemData:
+def setup(problem_name: str, place_name: str, prune: int | None = None) -> ProblemData:
     try:
-        problem_data = ProblemData.load(problem_name)
+        problem_data = ProblemData.load(problem_name, prune)
     except FileNotFoundError:
         problem_data = ProblemData(
             name=problem_name,
@@ -45,6 +45,7 @@ def setup(problem_name: str, place_name: str) -> ProblemData:
             buses_path=BUSES_CSV,
             place_name=place_name,
             boundary_buffer_m=BOUNDARY_BUFFER_M,
+            prune=prune,
         )
 
         problem_data.save()

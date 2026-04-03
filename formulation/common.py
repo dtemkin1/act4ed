@@ -179,6 +179,8 @@ class ProblemData:
     """path to osm pbf file, required if use_r5 is True"""
     use_r5: bool = False
     """flag to use r5py for more accurate travel time estimates, or networkx for faster shortest path calculations"""
+    prune: int | None = None
+    """flag for whether to prune the service graph based on stop distance (in meters)."""
 
     # post init data
     @cached_property
@@ -220,8 +222,8 @@ class ProblemData:
         """buses available for transportation"""
         return self._make_buses()
 
-    # def __post_init__(self):
-    #     self.sanity_checks()
+    def __post_init__(self):
+        self.sanity_checks()
 
     @cached_property
     def all_nodes(self) -> list[Place]:
@@ -293,6 +295,11 @@ class ProblemData:
 
             try:
                 length, path = self._get_shortest_path_osm(start_id, end_id)
+
+                if self.prune and isinstance(start, Stop) and isinstance(end, Stop):
+                    if length > self.prune:
+                        return
+
                 service_graph.add_edge(start_id, end_id, length=length, path=path)
             except nx.NetworkXNoPath:
                 print(f"Warning: no path between {start} and {end} in the graph")
@@ -375,9 +382,10 @@ class ProblemData:
             pickle.dump(self, f)
 
     @classmethod
-    def load(cls, name: str) -> "ProblemData":
+    def load(cls, name: str, prune: int | None = None) -> "ProblemData":
         """load problem data from disk"""
-        return cls.load_path(CURRENT_FILE_DIR / "cache" / f"{name}_problem_data.pkl")
+        prob_name = f"{name}{'_' + str(prune) if prune else ''}_problem_data"
+        return cls.load_path(CURRENT_FILE_DIR / "cache" / f"{prob_name}.pkl")
 
     @classmethod
     def load_path(cls, path: Path) -> "ProblemData":
