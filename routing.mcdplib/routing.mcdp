@@ -15,7 +15,7 @@ mcdp {
 
     # route plan must serve at least the requested students
     students_served provided by rs >= students_served required by g
-    provides students_served <= students_served provided by rs
+    provides students_served = students_served provided by rs
 
     # budget cap from guidelines
     (

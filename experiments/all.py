@@ -29,9 +29,7 @@ def experimental_config():
         rounds=1,
     )
 
-    print(no_chaining.to_json())
-
-    return
+    return no_chaining
 
 
 def main() -> None:

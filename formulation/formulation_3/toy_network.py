@@ -1,13 +1,22 @@
 import networkx as nx
 
-from formulation.common import Bus, Depot, School, SchoolType, Stop, Student
+from formulation.common import (
+    Bus,
+    Depot,
+    School,
+    SchoolType,
+    Stop,
+    Student,
+    ProblemDataToy,
+)
+from shapely import Point
 
 
 def make_graph(size: int = 10) -> nx.DiGraph:
     graph = nx.grid_2d_graph(size, size, create_using=nx.DiGraph)
     # Add weights to the edges
     for u, v in graph.edges():
-        graph.edges[u, v]["weight"] = 1.0
+        graph.edges[u, v]["distance"] = 1.0
     return graph
 
 
@@ -16,33 +25,48 @@ def make_schools(
 ) -> list[School]:
     if types is None:
         types = list(SchoolType.__members__.values())
-    all_nodes = graph.nodes
-    return [
-        # School(
-        #     name=f"School {i}",
-        #     geographic_location=all_nodes[i % len(all_nodes)],
-        #     node_id=all_nodes[i % len(all_nodes)],
-        #     type=types[i % len(types)],
-        #     start_time=8 * 60 + i * 15,  # staggered start times
-        # )
-        # for i in range(num_schools)
-    ]
+    all_nodes = list(graph.nodes)
+    schools: list[School] = []
+    for i in range(num_schools):
+        point = Point(all_nodes[i % len(all_nodes)])
+        school = School(
+            name=f"School {i}",
+            geographic_location=point,
+            node_id=all_nodes[i % len(all_nodes)],
+            type=types[i % len(types)],
+            start_time=8 * 60 + i * 15,  # staggered start times
+            id=str(i),
+        )
+        schools.append(school)
+    return schools
 
 
 def make_depots(graph: nx.DiGraph, num_depots: int = 1) -> list[Depot]:
     all_nodes = list(graph.nodes)
-    return [
-        # Depot(name=f"Depot {i}", node_id=all_nodes[i % len(all_nodes)])
-        # for i in range(num_depots)
-    ]
+    depots: list[Depot] = []
+    for i in range(num_depots):
+        point = Point(all_nodes[i % len(all_nodes)])
+        depot = Depot(
+            name=f"Depot {i}",
+            geographic_location=point,
+            node_id=all_nodes[i % len(all_nodes)],
+        )
+        depots.append(depot)
+    return depots
 
 
 def make_stops(graph: nx.DiGraph, num_stops: int = 5) -> list[Stop]:
     all_nodes = list(graph.nodes)
-    return [
-        # Stop(name=f"Stop {i}", node_id=all_nodes[i % len(all_nodes)])
-        # for i in range(num_stops)
-    ]
+    stops: list[Stop] = []
+    for i in range(num_stops):
+        point = Point(all_nodes[i % len(all_nodes)])
+        stop = Stop(
+            name=f"Stop {i}",
+            geographic_location=point,
+            node_id=all_nodes[i % len(all_nodes)],
+        )
+        stops.append(stop)
+    return stops
 
 
 def make_students(
@@ -57,17 +81,19 @@ def make_students(
         stops = make_stops(graph)
     num_schools = len(schools)
     all_nodes = list(graph.nodes)
-    return [
-        # Student(
-        #     name=f"Student {i}",
-        #     node_id=all_nodes[i % len(all_nodes)],
-        #     school=schools[i % num_schools],
-        #     stop=stops[i % len(stops)],
-        #     requires_monitor=(i % 4 == 0),  # every 4th student requires a monitor
-        #     requires_wheelchair=(i % 6 == 0),  # every 6th student requires a wheelchair
-        # )
-        # for i in range(num_students)
-    ]
+    students: list[Student] = []
+    for i in range(num_students):
+        home_location = Point(all_nodes[i % len(all_nodes)])
+        student = Student(
+            name=f"Student {i}",
+            geographic_location=home_location,
+            school=schools[i % num_schools],
+            stop=stops[i % len(stops)],
+            requires_wheelchair=(i % 5 == 0),
+            requires_monitor=(i % 4 == 0),
+        )
+        students.append(student)
+    return students
 
 
 def make_buses(
@@ -83,13 +109,33 @@ def make_buses(
         depots = make_depots(graph)
     if ranges is None:
         ranges = [10] * num_buses
-    return [
-        Bus(
+    buses: list[Bus] = []
+    for i in range(num_buses):
+        bus = Bus(
             name=f"Bus {i}",
             capacity=capacities[i % len(capacities)],
             range=ranges[i % len(ranges)],
             depot=depots[i % len(depots)],
             has_wheelchair_access=(i % 2 == 0),  # every other bus has wheelchair access
         )
-        for i in range(num_buses)
-    ]
+        buses.append(bus)
+    return buses
+
+
+def make_toy_problem_data() -> ProblemDataToy:
+    graph = make_graph()
+    schools = make_schools(graph)
+    depots = make_depots(graph)
+    stops = make_stops(graph)
+    students = make_students(graph, schools=schools, stops=stops)
+    buses = make_buses(graph, depots=depots)
+
+    return ProblemDataToy(
+        "toy_network",
+        base_graph=graph,
+        schools=schools,
+        depots=depots,
+        stops=stops,
+        students=students,
+        buses=buses,
+    )

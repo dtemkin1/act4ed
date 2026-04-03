@@ -14,6 +14,7 @@ from formulation.common import (
     Stop,
     Place,
     ProblemData,
+    ProblemDataReal,
     l_s,
     make_depot_end_copy,
     make_depot_start_copy,
@@ -62,7 +63,7 @@ class ExperimentConfig:
     @cached_property
     def filtered_problem_data(self):
         # filter problem data according to config
-        problem_data = ProblemData.load_path(self.problem_data_pkl)
+        problem_data = ProblemDataReal.load_path(self.problem_data_pkl)
         filtered_students = problem_data.students
         if self.students_to_consider:
             filtered_students = [
@@ -104,7 +105,7 @@ class ExperimentConfig:
             schools=filtered_schools,
             buses=filtered_buses,
         )
-        new_problem_data.service_graph = new_problem_data._make_service_graph()
+        del new_problem_data.service_graph
         return new_problem_data
 
     def make_formulation(self):

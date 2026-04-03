@@ -4,7 +4,7 @@ from pathlib import Path
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from formulation.common import ProblemData, Student
+from formulation.common import ProblemDataReal, Student
 
 
 CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
@@ -32,11 +32,13 @@ PAIRWISE_CSV = CURRENT_FILE_DIR / "outputs" / "depot_schools_stops_pairwise.csv"
 STUDENT_ASSIGN_CSV = CURRENT_FILE_DIR / "outputs" / "student_to_stop_or_school.csv"
 
 
-def setup(problem_name: str, place_name: str, prune: int | None = None) -> ProblemData:
+def setup(
+    problem_name: str, place_name: str, prune: int | None = None
+) -> ProblemDataReal:
     try:
-        problem_data = ProblemData.load(problem_name, prune)
+        problem_data = ProblemDataReal.load(problem_name, prune)
     except FileNotFoundError:
-        problem_data = ProblemData(
+        problem_data = ProblemDataReal(
             name=problem_name,
             schools_path=SCHOOLS_CSV,
             stops_path=STOPS_CSV,
@@ -53,7 +55,7 @@ def setup(problem_name: str, place_name: str, prune: int | None = None) -> Probl
     return problem_data
 
 
-def get_assigned_students(problem_data: ProblemData) -> list[Student]:
+def get_assigned_students(problem_data: ProblemDataReal) -> list[Student]:
     """
     Uses the assigned_students.csv file to get a list of students
     with their assigned bus stops and schools. This is used for plotting the
@@ -125,7 +127,7 @@ def get_assigned_students(problem_data: ProblemData) -> list[Student]:
     return students
 
 
-def plot_special_education_students(problem_data: ProblemData) -> None:
+def plot_special_education_students(problem_data: ProblemDataReal) -> None:
     """
     Plots the location of special education students,
     colored by how far they are from their school.

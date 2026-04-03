@@ -1,4 +1,5 @@
 from dataclasses import dataclass, replace
+from abc import ABC, abstractmethod
 from enum import IntEnum
 from functools import cache, cached_property
 import os
@@ -150,17 +151,84 @@ class Student(LocationData):
 Place = School | Depot | Stop
 
 
-# @dataclass(frozen=True)
 @dataclass
-class ProblemData:
+class ProblemData(ABC):
     """
     class to hold all problem data and perform necessary preprocessing,
     including graph construction and shortest path calculations
     """
 
-    # inputs
     name: str
     """name of the problem instance, used for saving results and loading data"""
+
+    @property
+    @abstractmethod
+    def service_graph(self) -> nx.MultiDiGraph[NodeId]:
+        """
+        network graph with edge weights corresponding to travel times in minutes,
+        only containing nodes in N and edges corresponding to shortest paths between nodes in N.
+        uses integer node_id
+        """
+
+    @property
+    @abstractmethod
+    def stops(self) -> list[Stop]:
+        """stops where students can be picked up"""
+
+    @property
+    @abstractmethod
+    def schools(self) -> list[School]:
+        """schools students can be dropped off at"""
+
+    @property
+    @abstractmethod
+    def depots(self) -> list[Depot]:
+        """depots where buses start and end their routes"""
+
+    @property
+    @abstractmethod
+    def students(self) -> list[Student]:
+        """students to be picked up and dropped off"""
+
+    @property
+    @abstractmethod
+    def buses(self) -> list[Bus]:
+        """buses available for transportation"""
+
+    @property
+    def all_nodes(self) -> list[Place]:
+        """all nodes in the problem, including stops, schools, and depots"""
+        return self.stops + self.schools + self.depots
+
+
+@dataclass
+class ProblemDataToy(ProblemData):
+    """
+    class to hold (provided) toy problem data and perform necessary preprocessing,
+    including graph construction and shortest path calculations
+    """
+
+    base_graph: nx.MultiDiGraph
+
+    stops: list[Stop]
+    schools: list[School]
+    depots: list[Depot]
+    students: list[Student]
+    buses: list[Bus]
+
+    @cached_property
+    def service_graph(self):
+        raise NotImplementedError
+
+
+@dataclass
+class ProblemDataReal(ProblemData):
+    """
+    class to hold all real-world problem data and perform necessary preprocessing,
+    including graph construction and shortest path calculations
+    """
+
+    # inputs
     schools_path: Path
     """path to schools csv file"""
     stops_path: Path
@@ -184,12 +252,7 @@ class ProblemData:
 
     # post init data
     @cached_property
-    def service_graph(self) -> "nx.MultiDiGraph[NodeId]":
-        """
-        network graph with edge weights corresponding to travel times in minutes,
-        only containing nodes in N and edges corresponding to shortest paths between nodes in N.
-        uses node_id from osm
-        """
+    def service_graph(self):
         return self._make_service_graph()
 
     @cached_property
@@ -199,36 +262,26 @@ class ProblemData:
 
     @cached_property
     def stops(self) -> list[Stop]:
-        """stops where students can be picked up"""
         return self._make_stops()
 
     @cached_property
     def schools(self) -> list[School]:
-        """schools students can be dropped off at"""
         return self._make_schools()
 
     @cached_property
     def depots(self) -> list[Depot]:
-        """depots where buses start and end their routes"""
         return self._make_depots()
 
     @cached_property
     def students(self) -> list[Student]:
-        """students to be picked up and dropped off"""
         return self._make_students()
 
     @cached_property
     def buses(self) -> list[Bus]:
-        """buses available for transportation"""
         return self._make_buses()
 
-    def __post_init__(self):
-        self.sanity_checks()
-
-    @cached_property
-    def all_nodes(self) -> list[Place]:
-        """all nodes in the problem, including stops, schools, and depots"""
-        return self.stops + self.schools + self.depots
+    # def __post_init__(self):
+    #     self.sanity_checks()
 
     @cached_property
     def _transportation_network(self) -> "r5py.TransportNetwork":
@@ -382,13 +435,13 @@ class ProblemData:
             pickle.dump(self, f)
 
     @classmethod
-    def load(cls, name: str, prune: int | None = None) -> "ProblemData":
+    def load(cls, name: str, prune: int | None = None) -> "ProblemDataReal":
         """load problem data from disk"""
         prob_name = f"{name}{'_' + str(prune) if prune else ''}_problem_data"
         return cls.load_path(CURRENT_FILE_DIR / "cache" / f"{prob_name}.pkl")
 
     @classmethod
-    def load_path(cls, path: Path) -> "ProblemData":
+    def load_path(cls, path: Path) -> "ProblemDataReal":
         with open(path, "rb") as f:
             return pickle.load(f)
 
