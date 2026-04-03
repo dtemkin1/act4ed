@@ -7,7 +7,5 @@ mcdp {
     constant cost_per_km = 0.15 USD / km
     constant cost_per_round = 5 USD
 
-    required maintenance_cost ≥
-        provided distance * cost_per_km +
-        provided rounds_used * cost_per_round
+    required maintenance_cost ≥ provided distance * cost_per_km + provided rounds_used * cost_per_round
 }
