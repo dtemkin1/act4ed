@@ -1,9 +1,11 @@
 mcdp {
-  implements `monitor_interface
+  # buses with monitors on them
+  provides monitor_buses [Nat]
 
-  constant monitor_cost_per_bus = 20000 USD
+  # how much each monitor costs
+  requires monitor_cost [USD]
 
-  required monitor_cost ≥ (
-    monitor_cost_per_bus * provided monitor_buses
-  )
+  constant cost_per_bus = 20000 USD
+
+  required monitor_cost ≥ provided monitor_buses * cost_per_bus
 }

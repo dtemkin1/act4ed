@@ -1,9 +1,8 @@
 mcdp {
-  implements `driver_interface
+  provides fleet_size [Nat]
+  requires driver_cost [USD]
 
-  constant driver_cost_per_bus = 50000 USD
+  constant cost_per_bus = 50000 USD
 
-  required driver_cost ≥ (
-    driver_cost_per_bus * provided buses_used
-  )
+  required driver_cost >= provided fleet_size * cost_per_bus
 }

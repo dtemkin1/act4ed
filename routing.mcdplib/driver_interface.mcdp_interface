@@ -1,4 +1,0 @@
-interface {
-  provides buses_used [Nat]
-  requires driver_cost [USD]
-}

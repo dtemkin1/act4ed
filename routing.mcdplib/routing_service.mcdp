@@ -1,9 +1,24 @@
 dp {
-  provides students_served [`students_served]
+  # total number of students the plan can serve
+  provides students_served [Nat]
+
+  # distance required by the plan
   requires distance [km]
-  requires rounds_used [ℕ]
-  requires monitor_buses [ℕ]
-  requires fleet_composition [`fleet_composition]
+
+  # number of rounds required
+  requires rounds_used [Nat]
+
+  # number of buses that need monitors
+  requires monitor_buses [Nat]
+
+  # number of buses required
+  requires fleet_size [Nat]
+
+  # total seating capacity required
+  requires student_capacity [Nat]
+
+  # number of wheelchair-accessible buses required
+  requires wheelchair_buses [Nat]
 
   implemented-by yaml resource("routing_service.dpc.yaml")
 }

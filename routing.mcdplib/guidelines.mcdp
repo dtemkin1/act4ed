@@ -1,7 +1,9 @@
 dp {
+  # Budget cap available from policy/planning
   provides roi_budget [USD]
 
-  requires students_served [`students_served]
+  # Minimum service level required by policy/planning
+  requires students_served [Nat]
 
   implemented-by yaml resource("guidelines.dpc.yaml")
 }

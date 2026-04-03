@@ -1,11 +1,11 @@
 F:
   - "USD"
 R:
-  - "`students_served"
+  - "Nat"
 
 implementations:
   guideline_200:
     f_max:
       - "550000 USD"
     r_min:
-      - "`students_served: served_200"
+      - "8000"

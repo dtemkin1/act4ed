@@ -1,10 +1,9 @@
-mcdp {
-  implements `fleet_bus_count_interface
+dp {
+    provides fleet_size [Nat]
+    provides student_capacity [Nat]
+    provides wheelchair_buses [Nat]
 
-  required buses_used ≥ (
-    (provided fleet_composition).dp_c +
-    (provided fleet_composition).dp_b +
-    (provided fleet_composition).dp_wc +
-    (provided fleet_composition).dp_bwc
-  )
+    requires capital_cost [USD]
+
+    implemented-by yaml resource("fleet_bus_count.dpc.yaml")
 }

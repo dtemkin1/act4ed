@@ -1,5 +1,0 @@
-interface {
-  provides distance [km]
-  requires fuel_cost [USD]
-  requires emissions [kg]
-}

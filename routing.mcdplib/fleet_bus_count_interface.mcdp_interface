@@ -1,4 +1,0 @@
-interface {
-  provides fleet_composition [`fleet_composition]
-  requires buses_used [Nat]
-}
