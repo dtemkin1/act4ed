@@ -8,8 +8,8 @@ R:
 implementations:
   guideline_200:
     f_max:
-      - "6"
-      - "240"
-      - "0"
+      - "50"
+      - "8000"
+      - "20"
     r_min:
       - "540000 USD"
