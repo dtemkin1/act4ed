@@ -114,8 +114,16 @@ def build_model_from_definition(
         b: arcs_from_node[node_to_idx[make_depot_start_copy(depot_b(bus))]]
         for b, bus in enumerate(B)
     }
+    depot_start_in_arcs_by_bus = {
+        b: arcs_to_node[node_to_idx[make_depot_start_copy(depot_b(bus))]]
+        for b, bus in enumerate(B)
+    }
     depot_end_arcs_by_bus = {
         b: arcs_to_node[node_to_idx[make_depot_end_copy(depot_b(bus))]]
+        for b, bus in enumerate(B)
+    }
+    depot_end_out_arcs_by_bus = {
+        b: arcs_from_node[node_to_idx[make_depot_end_copy(depot_b(bus))]]
         for b, bus in enumerate(B)
     }
     school_copy_out_arcs = {
@@ -263,6 +271,20 @@ def build_model_from_definition(
             model.addConstr(
                 gp.quicksum(
                     x_bqij[b, q, arc_idx] for arc_idx in depot_start_arcs_by_bus[b]
+                )
+                == 0
+            )
+    for b in B_idx:
+        for q in Q_idx:
+            model.addConstr(
+                gp.quicksum(
+                    x_bqij[b, q, arc_idx] for arc_idx in depot_start_in_arcs_by_bus[b]
+                )
+                == 0
+            )
+            model.addConstr(
+                gp.quicksum(
+                    x_bqij[b, q, arc_idx] for arc_idx in depot_end_out_arcs_by_bus[b]
                 )
                 == 0
             )
@@ -629,10 +651,27 @@ def make_report(prob: gp.Model, formulation: Formulation3, model_vars: dict[str,
                                     )
                                 ):
                                     schools_served.append(node)
+                    route_by_start = {path[0]: path for path in route}
+                    route_destinations = {path[1] for path in route}
+                    route_start = next(
+                        (
+                            path[0]
+                            for path in route
+                            if path[0] not in route_destinations
+                        ),
+                        route[0][0] if route else None,
+                    )
+                    ordered_route = []
+                    current_node = route_start
+                    while current_node in route_by_start:
+                        next_path = route_by_start[current_node]
+                        ordered_route.append(next_path)
+                        current_node = next_path[1]
+
                     for m, student in enumerate(M):
                         if a_mbq[m, b, q].X > 0.5:
                             students_on_bus.append(student)
-                    result_string += f"    Total travel time (excluding dwell): {sum(formulation.d_ij(*path) for path in route):.2f} minutes\n"
+                    result_string += f"    Total travel distance: {sum(formulation.d_ij(*path) for path in ordered_route):.2f} meters\n"
                     school_type = TAU[
                         max(
                             (tau for tau in range(len(TAU))),
@@ -661,7 +700,7 @@ def make_report(prob: gp.Model, formulation: Formulation3, model_vars: dict[str,
                     #             break
 
                     result_string += "    Route:\n"
-                    for path in route:
+                    for path in ordered_route:
                         result_string += f"      {path[0]} -> {path[1]}\n"
 
     return result_string
@@ -724,6 +763,8 @@ def plot_bus_routes(
         # Visualize the routes on the graph
         if per_round:
             fig, axes = plt.subplots(nrows=1, ncols=len(Q), figsize=(12, 8))
+            if len(Q) == 1:
+                axes = [axes]
         else:
             fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(12, 8))
             axes = [ax]
