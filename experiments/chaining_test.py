@@ -1,6 +1,8 @@
 import os
 from pathlib import Path
 
+from gurobipy import GRB
+
 from formulation.common import (
     Depot,
     Bus,
@@ -23,7 +25,10 @@ CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 
 
 def main() -> None:
-    graph = make_graph(size=(4, 1))
+    output_dir = CURRENT_FILE_DIR / "outputs"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    graph = make_graph(size=(4, 2))
 
     depot_point = 0
     depot = Depot(
@@ -108,33 +113,36 @@ def main() -> None:
     solve_problem(model)
     print(f"Problem solved: {toy_data.problem_data.name}")
 
+    objective_value = model.ObjVal if model.SolCount > 0 else None
+
     print(
         {
             "problem_name": toy_data.problem_data.name,
             "rounds": toy_data.rounds,
-            "objective_value": model.ObjVal,
+            "objective_value": objective_value,
             "runtime_seconds": model.Runtime,
             # TODO: ask riccardo about gurobi vars/values and how to extract them
             # "results": vals,
         }
     )
 
+    if model.Status == GRB.INFEASIBLE:
+        iis_path = output_dir / f"{toy_data.problem_data.name}_rounds_{toy_data.rounds}.ilp"
+        model.computeIIS()
+        model.write(str(iis_path))
+        print(f"Wrote IIS to {iis_path}")
+        return
+
     plot_bus_routes(
         prob=model,
         formulation=toy_data,
         model_vars=vals,
-        save_path=CURRENT_FILE_DIR
-        / "outputs"
-        / f"{toy_data.problem_data.name}_rounds_{toy_data.rounds}_routes.png",
+        save_path=output_dir / f"{toy_data.problem_data.name}_rounds_{toy_data.rounds}_routes.png",
         per_round=True,
     )
 
     report = make_report(model, toy_data, vals)
-    report_file = (
-        CURRENT_FILE_DIR
-        / "outputs"
-        / f"{toy_data.problem_data.name}_rounds_{toy_data.rounds}.txt"
-    )
+    report_file = output_dir / f"{toy_data.problem_data.name}_rounds_{toy_data.rounds}.txt"
     with open(report_file, "w+", encoding="utf-8") as f:
         f.write(report)
 
