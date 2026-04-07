@@ -8,6 +8,8 @@ from formulation.common import (
     TAU,
     C_b,
     NodeId,
+    ProblemDataReal,
+    ProblemDataToy,
     R_b,
     Wh_b,
     depot_b,
@@ -704,22 +706,37 @@ def plot_bus_routes(
     z_bq = model_vars["z_bq"]
     x_bqij = model_vars["x_bqij"]
 
-    osm_graph = formulation.problem_data.osm_graph
+    problem_data = formulation.problem_data
 
-    pos: dict[NodeId, tuple[float, float]] = {
-        node: (
-            osm_graph.nodes[node]["x"],
-            osm_graph.nodes[node]["y"],
+    if isinstance(problem_data, ProblemDataReal):
+        graph = problem_data.osm_graph
+        pos: dict[NodeId, tuple[float, float]] = {
+            node: (
+                graph.nodes[node]["x"],
+                graph.nodes[node]["y"],
+            )
+            for node in G.nodes()
+        }
+    elif isinstance(problem_data, ProblemDataToy):
+        graph = problem_data.base_graph
+        pos = {
+            node: (
+                graph.nodes[node]["location"].x,
+                graph.nodes[node]["location"].y,
+            )
+            for node in graph.nodes()
+        }
+    else:
+        raise NotImplementedError(
+            "Plotting only implemented for ProblemDataReal and ProblemDataToy currently"
         )
-        for node in G.nodes()
-    }
 
     if prob.status not in [cp.OPTIMAL, cp.OPTIMAL_INACCURATE]:
         print("No feasible solution to visualize.")
     else:
         # Visualize the routes on the graph
 
-        fig, ax = ox.plot_graph(osm_graph, show=False)
+        fig, ax = ox.plot_graph(graph, show=False)
         for b, _ in enumerate(B):
             for q in range(len(Q)):
                 if z_bq[b, q].value > 0.5:
@@ -728,7 +745,7 @@ def plot_bus_routes(
                             path_edges = A_PATH[path]
                             if path_edges:
                                 ox.plot_graph_route(
-                                    osm_graph,
+                                    graph,
                                     path_edges,
                                     ax=ax,
                                     orig_dest_size=0,

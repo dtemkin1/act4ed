@@ -1,14 +1,19 @@
 from typing import Any
 import datetime as dt
+from pathlib import Path
 
 import gurobipy as gp
-from gurobipy import GRB
+from gurobipy import GRB, GurobiError, tupledict, Var
+import osmnx as ox
 
 from loguru import logger
 
 from formulation.common import (
     TAU,
     C_b,
+    NodeId,
+    ProblemDataReal,
+    ProblemDataToy,
     R_b,
     Wh_b,
     depot_b,
@@ -131,7 +136,12 @@ def build_model_from_definition(
     model = gp.Model("formulation3_gurobi")
     model.Params.OutputFlag = 1
     model.Params.LogToConsole = 1
-    model.Params.LogFile = f"gurobi-{dt.datetime.now()}.log"
+
+    try:
+        model.Params.LogFile = f"gurobi-{dt.datetime.now()}.log"
+    except GurobiError:
+        logger.warning("could not set gurobi log file")
+
     logger.info("model initialized :3")
 
     z_b = model.addVars(B_idx, vtype=GRB.BINARY, name="z_b")
@@ -567,3 +577,109 @@ def _gurobi_status_name(status: int) -> str:
         GRB.USER_OBJ_LIMIT: "USER_OBJ_LIMIT",
     }
     return status_names.get(status, str(status))
+
+
+def plot_bus_routes(
+    prob: gp.Model,
+    formulation: Formulation3,
+    model_vars: dict[str, Any],
+    save_path: Path | None = None,
+):
+    # raise NotImplementedError("plotting not implemented yet :(")
+
+    G = formulation.G
+    B = formulation.B
+    A = formulation.A
+    A_PATH = formulation.A_PATH
+    Q = formulation.Q
+
+    schools = formulation.problem_data.schools
+    bus_stops = formulation.problem_data.stops
+    depots = formulation.problem_data.depots
+    school_colors = {
+        school.type: color for school, color in zip(schools, ["green", "blue", "red"])
+    }
+
+    z_bq: tupledict[tuple[Any, ...], Var] = model_vars["z_bq"]
+    x_bqij: tupledict[tuple[Any, ...], Var] = model_vars["x_bqij"]
+
+    problem_data = formulation.problem_data
+
+    if isinstance(problem_data, ProblemDataReal):
+        graph = problem_data.osm_graph
+        pos: dict[NodeId, tuple[float, float]] = {
+            node: (
+                graph.nodes[node]["x"],
+                graph.nodes[node]["y"],
+            )
+            for node in G.nodes()
+        }
+    elif isinstance(problem_data, ProblemDataToy):
+        graph = problem_data.base_graph
+        graph.graph["crs"] = "EPSG:3857"  # uses meters
+        pos = {
+            node: (
+                graph.nodes[node]["location"][0],
+                graph.nodes[node]["location"][1],
+            )
+            for node in graph.nodes()
+        }
+    else:
+        raise NotImplementedError(
+            "Plotting only implemented for ProblemDataReal and ProblemDataToy currently"
+        )
+
+    if prob.status not in [GRB.OPTIMAL]:
+        print("No feasible solution to visualize.")
+    else:
+        # Visualize the routes on the graph
+
+        fig, ax = ox.plot_graph(graph, show=False)
+        for b, _ in enumerate(B):
+            for q in range(len(Q)):
+                if z_bq[b, q].X > 0.5:
+                    for ij, path in enumerate(A.keys()):
+                        if x_bqij[b, q, ij].X > 0.5:
+                            path_edges = A_PATH[path]
+                            if path_edges:
+                                ox.plot_graph_route(
+                                    graph,
+                                    path_edges,
+                                    ax=ax,
+                                    orig_dest_size=0,
+                                    show=False,
+                                    # route_color="r"
+                                )
+
+        # plot schools, students, and bus stops
+        for school in schools:
+            ax.scatter(
+                pos[school.node_id][0],
+                pos[school.node_id][1],
+                c=school_colors[school.type],
+                marker="s",
+                label={school.name},
+            )
+        for bus_stop in bus_stops:
+            ax.scatter(
+                pos[bus_stop.node_id][0],
+                pos[bus_stop.node_id][1],
+                c="yellow",
+                marker="^",
+                label=bus_stop.name,
+            )
+        for depot in depots:
+            ax.scatter(
+                pos[depot.node_id][0],
+                pos[depot.node_id][1],
+                c="purple",
+                marker="X",
+                label=depot.name,
+            )
+
+        ax.title.set_text("Optimized School Bus Routes")
+        ax.legend(loc="upper right", fontsize="small")
+
+        if save_path is not None:
+            fig.savefig(save_path, bbox_inches="tight")
+        # plt.show()

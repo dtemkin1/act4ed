@@ -151,7 +151,7 @@ class Student(LocationData):
 Place = School | Depot | Stop
 
 
-@dataclass
+@dataclass(frozen=True)
 class ProblemData(ABC):
     """
     class to hold all problem data and perform necessary preprocessing,
@@ -163,7 +163,7 @@ class ProblemData(ABC):
 
     @property
     @abstractmethod
-    def service_graph(self) -> nx.MultiDiGraph[NodeId]:
+    def service_graph(self) -> "nx.MultiDiGraph[NodeId]":
         """
         network graph with edge weights corresponding to travel times in minutes,
         only containing nodes in N and edges corresponding to shortest paths between nodes in N.
@@ -201,20 +201,40 @@ class ProblemData(ABC):
         return self.stops + self.schools + self.depots
 
 
-@dataclass
+@dataclass(frozen=True)
 class ProblemDataToy(ProblemData):
     """
     class to hold (provided) toy problem data and perform necessary preprocessing,
     including graph construction and shortest path calculations
     """
 
-    base_graph: nx.MultiDiGraph[NodeId]
+    base_graph: "nx.MultiDiGraph[NodeId]"
 
-    stops: list[Stop]
-    schools: list[School]
-    depots: list[Depot]
-    students: list[Student]
-    buses: list[Bus]
+    _stops: list[Stop]
+    _schools: list[School]
+    _depots: list[Depot]
+    _students: list[Student]
+    _buses: list[Bus]
+
+    @property
+    def stops(self) -> list[Stop]:
+        return self._stops
+
+    @property
+    def schools(self) -> list[School]:
+        return self._schools
+
+    @property
+    def depots(self) -> list[Depot]:
+        return self._depots
+
+    @property
+    def students(self) -> list[Student]:
+        return self._students
+
+    @property
+    def buses(self) -> list[Bus]:
+        return self._buses
 
     def _get_shortest_path_base(
         self, start: NodeId, end: NodeId, weight: str = "length"
@@ -271,7 +291,7 @@ class ProblemDataToy(ProblemData):
         return service_graph
 
 
-@dataclass
+@dataclass(frozen=True)
 class ProblemDataReal(ProblemData):
     """
     class to hold all real-world problem data and perform necessary preprocessing,
@@ -329,9 +349,6 @@ class ProblemDataReal(ProblemData):
     @cached_property
     def buses(self) -> list[Bus]:
         return self._make_buses()
-
-    # def __post_init__(self):
-    #     self.sanity_checks()
 
     @cached_property
     def _transportation_network(self) -> "r5py.TransportNetwork":

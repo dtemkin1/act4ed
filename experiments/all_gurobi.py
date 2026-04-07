@@ -16,7 +16,7 @@ PLACE_NAME = "Framingham, Massachusetts, USA"
 
 
 def main() -> None:
-    problem_data = setup("framingham", PLACE_NAME, 2000)
+    problem_data = setup("framingham", PLACE_NAME, 1000)
 
     # formulation time baby
     no_chaining = Formulation3(
@@ -53,7 +53,7 @@ def main() -> None:
     # print("No-chaining routes plotted")
 
     print("Now doing chaining formulation...")
-    problem_data = setup("framingham", PLACE_NAME, 2000)
+    problem_data = setup("framingham", PLACE_NAME, 1000)
     chaining = Formulation3(
         problem_data=problem_data,
         rounds=3,

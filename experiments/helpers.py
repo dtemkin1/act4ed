@@ -49,6 +49,7 @@ def setup(
             boundary_buffer_m=BOUNDARY_BUFFER_M,
             prune=prune,
         )
+        problem_data.sanity_checks()
 
         problem_data.save()
 

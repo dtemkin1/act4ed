@@ -1,1 +1,19 @@
-{}
+[
+    {
+        "name": "toy_network",
+        "size": [
+            20,
+            20
+        ],
+        "num_schools": 2,
+        "num_depots": 1,
+        "num_stops": 5,
+        "num_students": 20,
+        "num_buses": 3,
+        "formulation_3": [
+            {
+                "rounds": 1
+            }
+        ]
+    }
+]
