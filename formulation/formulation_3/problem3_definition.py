@@ -226,7 +226,7 @@ class Formulation3:
             make_depot_end_copy(depot) for depot in self.problem_data.depots
         ]
 
-        self.N = self.P + self.S + self.S_PLUS + self.D + self.D_PLUS + self.D_MINUS
+        self.N = self.P + self.S + self.S_PLUS + self.D_PLUS + self.D_MINUS
         self.B = self.problem_data.buses
         self.M = self.problem_data.students
         self.F = [
@@ -248,36 +248,15 @@ class Formulation3:
 
         for i in self.N:
             for j in self.N:
-                if i != j:
-                    i_id = i.node_id
-                    j_id = j.node_id
+                if i == j or i.node_id == j.node_id:
+                    continue
 
-                    if i_id == j_id:
-                        self.A[i, j] = 0
-                        self.A[j, i] = 0
-                        self.A_PATH[i, j] = []
-                        self.A_PATH[j, i] = []
-                        continue
-
-                    ij_edge_data = self.problem_data.service_graph.get_edge_data(
-                        i_id, j_id, key=0, default=None
-                    )
-                    if ij_edge_data is not None:
-                        self.A[i, j] = ij_edge_data["length"]
-                        self.A_PATH[i, j] = ij_edge_data["path"]
-                    else:
-                        # print(f"Warning: no edge data for nodes {i} to {j}")
-                        pass
-
-                    ji_edge_data = self.problem_data.service_graph.get_edge_data(
-                        j_id, i_id, key=0, default=None
-                    )
-                    if ji_edge_data is not None:
-                        self.A[j, i] = ji_edge_data["length"]
-                        self.A_PATH[j, i] = ji_edge_data["path"]
-                    else:
-                        # print(f"Warning: no edge data for nodes {j} to {i}")
-                        pass
+                ij_edge_data = self.problem_data.service_graph.get_edge_data(
+                    i.node_id, j.node_id, key=0, default=None
+                )
+                if ij_edge_data is not None:
+                    self.A[i, j] = ij_edge_data["length"]
+                    self.A_PATH[i, j] = ij_edge_data["path"]
 
         self.T_horizon = self._time_horizon()
 
