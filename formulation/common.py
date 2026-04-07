@@ -208,7 +208,7 @@ class ProblemDataToy(ProblemData):
     including graph construction and shortest path calculations
     """
 
-    base_graph: nx.MultiDiGraph
+    base_graph: nx.MultiDiGraph[NodeId]
 
     stops: list[Stop]
     schools: list[School]
@@ -216,9 +216,59 @@ class ProblemDataToy(ProblemData):
     students: list[Student]
     buses: list[Bus]
 
+    def _get_shortest_path_base(
+        self, start: NodeId, end: NodeId, weight: str = "length"
+    ) -> tuple[float, list[NodeId]]:
+        return get_shortest_path(self.base_graph, start, end, weight)
+
     @cached_property
     def service_graph(self):
-        raise NotImplementedError
+        service_graph: "nx.MultiDiGraph[NodeId]" = nx.MultiDiGraph()
+
+        def add_edge_if_path_exists(start: Place, end: Place):
+            # check if edge in graph already, if so skip
+            start_id = start.node_id
+            end_id = end.node_id
+
+            if service_graph.has_edge(start_id, end_id):
+                return
+
+            if start_id == end_id:
+                service_graph.add_edge(
+                    start_id, end_id, length=0, path=[start_id, end_id]
+                )
+                return
+
+            try:
+                length, path = self._get_shortest_path_base(start_id, end_id)
+                service_graph.add_edge(start_id, end_id, length=length, path=path)
+            except nx.NetworkXNoPath:
+                print(f"Warning: no path between {start} and {end} in the graph")
+
+        # Depots -> Stops
+        for depot in self.depots:
+            for stop in self.stops:
+                add_edge_if_path_exists(depot, stop)
+
+        # Stops -> Stops
+        # Stops -> Schools
+        for stop1 in self.stops:
+            for stop2 in self.stops:
+                if stop1 != stop2:
+                    add_edge_if_path_exists(stop1, stop2)
+
+            for school in self.schools:
+                add_edge_if_path_exists(stop1, school)
+
+        # Schools -> Stops
+        # Schools -> Depot
+        for school in self.schools:
+            for stop in self.stops:
+                add_edge_if_path_exists(school, stop)
+            for depot in self.depots:
+                add_edge_if_path_exists(school, depot)
+
+        return service_graph
 
 
 @dataclass
@@ -380,11 +430,6 @@ class ProblemDataReal(ProblemData):
                     add_edge_if_path_exists(school, stop)
                 for depot in self.depots:
                     add_edge_if_path_exists(school, depot)
-
-            # for place1 in self.all_nodes:
-            #     for place2 in self.all_nodes:
-            #         if place1 != place2:
-            #             add_edge_if_path_exists(place1, place2)
 
         else:
             assert (

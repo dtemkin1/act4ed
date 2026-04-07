@@ -12,16 +12,16 @@ from formulation.common import (
 from shapely import Point
 
 
-def make_graph(size: int = 10) -> nx.DiGraph:
-    graph = nx.grid_2d_graph(size, size, create_using=nx.DiGraph)
+def make_graph(size: int = 10) -> nx.MultiDiGraph:
+    graph = nx.grid_2d_graph(size, size, create_using=nx.MultiDiGraph)
     # Add weights to the edges
     for u, v in graph.edges():
-        graph.edges[u, v]["distance"] = 1.0
+        graph.edges[u, v]["length"] = 1000.0  # 1 km between adjacent nodes
     return graph
 
 
 def make_schools(
-    graph: nx.DiGraph, num_schools: int = 3, types: list[SchoolType] | None = None
+    graph: nx.MultiDiGraph, num_schools: int = 3, types: list[SchoolType] | None = None
 ) -> list[School]:
     if types is None:
         types = list(SchoolType.__members__.values())
@@ -41,7 +41,7 @@ def make_schools(
     return schools
 
 
-def make_depots(graph: nx.DiGraph, num_depots: int = 1) -> list[Depot]:
+def make_depots(graph: nx.MultiDiGraph, num_depots: int = 1) -> list[Depot]:
     all_nodes = list(graph.nodes)
     depots: list[Depot] = []
     for i in range(num_depots):
@@ -55,7 +55,7 @@ def make_depots(graph: nx.DiGraph, num_depots: int = 1) -> list[Depot]:
     return depots
 
 
-def make_stops(graph: nx.DiGraph, num_stops: int = 5) -> list[Stop]:
+def make_stops(graph: nx.MultiDiGraph, num_stops: int = 5) -> list[Stop]:
     all_nodes = list(graph.nodes)
     stops: list[Stop] = []
     for i in range(num_stops):
@@ -70,7 +70,7 @@ def make_stops(graph: nx.DiGraph, num_stops: int = 5) -> list[Stop]:
 
 
 def make_students(
-    graph: nx.DiGraph,
+    graph: nx.MultiDiGraph,
     num_students: int = 20,
     schools: list[School] | None = None,
     stops: list[Stop] | None = None,
@@ -97,7 +97,7 @@ def make_students(
 
 
 def make_buses(
-    graph: nx.DiGraph,
+    graph: nx.MultiDiGraph,
     num_buses: int = 3,
     capacities: list[int] | None = None,
     ranges: list[int] | None = None,
