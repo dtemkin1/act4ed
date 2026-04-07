@@ -281,10 +281,14 @@ class ProblemDataToy(ProblemData):
                 add_edge_if_path_exists(stop1, school)
 
         # Schools -> Stops
+        # Schools -> Schools
         # Schools -> Depot
         for school in self.schools:
             for stop in self.stops:
                 add_edge_if_path_exists(school, stop)
+            for other_school in self.schools:
+                if school != other_school:
+                    add_edge_if_path_exists(school, other_school)
             for depot in self.depots:
                 add_edge_if_path_exists(school, depot)
 
@@ -441,10 +445,14 @@ class ProblemDataReal(ProblemData):
                     add_edge_if_path_exists(stop1, school)
 
             # Schools -> Stops
+            # Schools -> Schools
             # Schools -> Depot
             for school in self.schools:
                 for stop in self.stops:
                     add_edge_if_path_exists(school, stop)
+                for other_school in self.schools:
+                    if school != other_school:
+                        add_edge_if_path_exists(school, other_school)
                 for depot in self.depots:
                     add_edge_if_path_exists(school, depot)
 
