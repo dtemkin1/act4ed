@@ -10,15 +10,21 @@
 
 set -euo pipefail
 
-BASEDIR=$(cd "$(dirname "$0")" && pwd)
+if [[ -n "${PROJECT_ROOT:-}" ]]; then
+  BASEDIR="${PROJECT_ROOT}"
+elif [[ -n "${SLURM_SUBMIT_DIR:-}" ]]; then
+  BASEDIR="${SLURM_SUBMIT_DIR}"
+else
+  BASEDIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+fi
 
 cd "${BASEDIR}"
 
-module load julia/1.9.1
+module load julia/1.10.4
 
 export JULIA_NUM_THREADS="${SLURM_CPUS_PER_TASK:-1}"
 export JULIA_PROJECT="${BASEDIR}/julia"
-export JULIA_DEPOT_PATH="${JULIA_DEPOT_PATH:-${BASEDIR}/.julia_depot}"
+export JULIA_DEPOT_PATH="${JULIA_DEPOT_PATH:-$HOME/.julia_depot}"
 
 mkdir -p "${JULIA_DEPOT_PATH}"
 
