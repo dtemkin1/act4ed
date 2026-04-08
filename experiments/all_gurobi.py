@@ -16,6 +16,9 @@ PLACE_NAME = "Framingham, Massachusetts, USA"
 
 
 def main() -> None:
+    output_dir = CURRENT_FILE_DIR / "outputs"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
     problem_data = setup("framingham", PLACE_NAME, 1000)
 
     # formulation time baby
@@ -29,8 +32,10 @@ def main() -> None:
     no_chaining_model = build_model_from_definition(no_chaining)
     print("No-chaining model built")
 
-    solve_problem(no_chaining_model[0])
+    no_chaining_solution = solve_problem(no_chaining_model)
     print("No-chaining problem solved!")
+    if no_chaining_solution is not None:
+        no_chaining_solution.save(output_dir / "no_chaining_all.pkl")
 
     # report_no_chaining = make_report(
     #     no_chaining_model[0], no_chaining, no_chaining_model[1]
@@ -63,8 +68,10 @@ def main() -> None:
     chaining_model = build_model_from_definition(chaining)
     print("Chaining model built")
 
-    solve_problem(chaining_model[0])
+    chaining_solution = solve_problem(chaining_model)
     print("Chaining problem solved!")
+    if chaining_solution is not None:
+        chaining_solution.save(output_dir / "chaining_all.pkl")
 
     # report_chaining = make_report(chaining_model[0], chaining, chaining_model[1])
 

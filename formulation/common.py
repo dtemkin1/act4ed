@@ -107,7 +107,7 @@ class School(NodeLocationData):
     corresponds to a node in the graph
     """
 
-    id: str
+    id: str | int
     type: SchoolType
     start_time: int
     """mins from midnight"""

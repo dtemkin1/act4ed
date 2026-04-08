@@ -594,7 +594,10 @@ def solve_problem(prob: cp.Problem):
 
 
 def make_report(
-    prob: cp.Problem, formulation: Formulation3, model_vars: dict[str, cp.Variable]
+    prob: cp.Problem,
+    formulation: Formulation3,
+    model_vars: dict[str, cp.Variable],
+    rounds: int | None = None,
 ):
     # Extract and print the route
 
@@ -624,7 +627,8 @@ def make_report(
     else:
         for b, bus in enumerate(B):
             result_string += f"{bus} (capacity {C_b(bus)}, range {R_b(bus)}, wheelchair access {Wh_b(bus) == 1}, monitor needed: {r_bmon[b].value > 0.5})\n"
-            for q in range(len(Q)):
+            total_rounds = len(Q) if rounds is None else min(rounds, len(Q))
+            for q in range(total_rounds):
                 assert z_bq[b, q].value is not None
                 if z_bq[b, q].value > 0.5:
                     result_string += f"  Round {q}:\n"
