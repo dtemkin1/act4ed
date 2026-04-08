@@ -4,7 +4,7 @@
 #SBATCH -p mit_quicktest
 #SBATCH --time=0:10:00
 #SBATCH -c 24
-#SBATCH --mem=375G
+#SBATCH --mem=124G
 
 set -euo pipefail
 
