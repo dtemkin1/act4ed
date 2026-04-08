@@ -30,6 +30,8 @@ mkdir -p "${JULIA_DEPOT_PATH}"
 mkdir -p "${JULIA_CLUSTER_PROJECT}"
 
 cp "${BASEDIR}/julia/Project.toml" "${JULIA_CLUSTER_PROJECT}/Project.toml"
+rm -rf "${JULIA_CLUSTER_PROJECT}/src"
+cp -R "${BASEDIR}/julia/src" "${JULIA_CLUSTER_PROJECT}/src"
 export JULIA_PROJECT="${JULIA_CLUSTER_PROJECT}"
 
 julia --project="${JULIA_PROJECT}" -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()'
