@@ -53,9 +53,10 @@ def _solve_with_julia(
     log_file = output_dir / f"{label}_all_julia.log"
 
     julia_cmd = os.environ.get("JULIA_CMD", "julia")
+    julia_project = os.environ.get("JULIA_PROJECT", "julia")
     command = [
         julia_cmd,
-        "--project=julia",
+        f"--project={julia_project}",
         str(PROJECT_ROOT / "experiments" / "solve_formulation3_julia.jl"),
         "--instance",
         str(instance_path),

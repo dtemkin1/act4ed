@@ -23,10 +23,14 @@ cd "${BASEDIR}"
 module load julia/1.10.4
 
 export JULIA_NUM_THREADS="${SLURM_CPUS_PER_TASK:-1}"
-export JULIA_PROJECT="${BASEDIR}/julia"
 export JULIA_DEPOT_PATH="${JULIA_DEPOT_PATH:-$HOME/.julia_depot}"
+export JULIA_CLUSTER_PROJECT="${JULIA_CLUSTER_PROJECT:-${BASEDIR}/.julia_cluster_project}"
 
 mkdir -p "${JULIA_DEPOT_PATH}"
+mkdir -p "${JULIA_CLUSTER_PROJECT}"
+
+cp "${BASEDIR}/julia/Project.toml" "${JULIA_CLUSTER_PROJECT}/Project.toml"
+export JULIA_PROJECT="${JULIA_CLUSTER_PROJECT}"
 
 julia --project="${JULIA_PROJECT}" -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()'
 
