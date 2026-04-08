@@ -19,6 +19,7 @@ import pandas as pd
 try:
     import r5py
 except Exception:
+    r5py = None
     # cant use r5py but let run
     warnings.warn(
         "Warning: r5py not found. Please install it with 'pip install r5py'"

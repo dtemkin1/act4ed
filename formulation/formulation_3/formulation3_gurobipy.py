@@ -28,7 +28,10 @@ from formulation.common import (
     tau_m,
 )
 from formulation.formulation_3.problem3_definition import Formulation3
-from solution import Formulation3ModelBundle, Formulation3Solution
+from formulation.formulation_3.solution import (
+    Formulation3ModelBundle,
+    Formulation3Solution,
+)
 
 METERS_PER_MILE = 1609.344
 

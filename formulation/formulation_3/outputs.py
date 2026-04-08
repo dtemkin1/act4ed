@@ -19,7 +19,10 @@ from formulation.common import (
     s_m,
 )
 from formulation.formulation_3.problem3_definition import Formulation3
-from solution import Formulation3Solution, _coerce_reporting_inputs
+from formulation.formulation_3.solution import (
+    Formulation3Solution,
+    _coerce_reporting_inputs,
+)
 
 
 def make_report(
