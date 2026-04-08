@@ -5,6 +5,8 @@
 #SBATCH --time=0:10:00
 #SBATCH -c 24
 #SBATCH --mem=124G
+#SBATCH --output=logs/%x-%j.out
+#SBATCH --error=logs/%x-%j.err
 
 set -euo pipefail
 
