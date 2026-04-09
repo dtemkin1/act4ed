@@ -139,7 +139,7 @@ def make_buses(
     if depots is None:
         depots = make_depots(graph)
     if ranges is None:
-        ranges = [len(graph.nodes) // num_buses] * num_buses
+        ranges = [len(graph.nodes)] * num_buses
     buses: list[Bus] = []
     for i in range(num_buses):
         bus = Bus(
