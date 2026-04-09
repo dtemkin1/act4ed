@@ -6,6 +6,6 @@ query:
   min_f:
     students_served: "10"
   max_r:
-    total_cost: "450000 USD"
-    emissions: "100000 kg"
+    total_cost: "4500000 USD"
+    emissions: "1000000 kg"
   optimize_for: [total_cost]

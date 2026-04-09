@@ -6,6 +6,6 @@ R:
 implementations:
   guideline_200:
     f_max:
-      - "450000 USD"
+      - "4500000 USD"
     r_min:
-      - "10"
+      - "0"
