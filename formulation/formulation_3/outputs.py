@@ -59,7 +59,10 @@ def make_report(
         )
     else:
         for b, bus in enumerate(B):
-            result_string += f"{bus} (capacity {C_b(bus)}, range {R_b(bus)}, wheelchair access {Wh_b(bus) == 1}, monitor needed: {r_bmon[b].X > 0.5})\n"
+            result_string += (
+                f"{bus} (capacity {C_b(bus)}, range {R_b(bus)} mi, "
+                f"wheelchair access {Wh_b(bus) == 1}, monitor needed: {r_bmon[b].X > 0.5})\n"
+            )
             total_rounds = len(Q) if rounds is None else min(rounds, len(Q))
             for q in range(total_rounds):
                 assert z_bq[b, q].X is not None
@@ -101,7 +104,10 @@ def make_report(
                     for m, student in enumerate(M):
                         if a_mbq[m, b, q].X > 0.5:
                             students_on_bus.append(student)
-                    result_string += f"\t\tTotal travel distance: {sum(formulation.d_ij(*path) for path in ordered_route):.2f} meters\n"
+                    result_string += (
+                        f"\t\tTotal travel distance: "
+                        f"{sum(formulation.d_ij(*path) for path in ordered_route):.2f} km\n"
+                    )
                     school_type = TAU[
                         max(
                             (tau for tau in range(len(TAU))),

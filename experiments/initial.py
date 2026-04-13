@@ -34,7 +34,7 @@ def main() -> None:
         ]["length"]
 
         # within 1 km of school
-        if distance <= 1000 and student.school == fuller:
+        if distance <= 1.0 and student.school == fuller:
             nearby_students.append(student)
     print(f"Number of nearby students: {len(nearby_students)}")
 
@@ -93,9 +93,9 @@ def main() -> None:
         ]["length"]
 
         # within 1 km of school
-        if distance <= 1000 and student.school == fuller:
+        if distance <= 1.0 and student.school == fuller:
             both_nearby_students.append(student)
-        if distance <= 1000 and student.school == mcc:
+        if distance <= 1.0 and student.school == mcc:
             both_nearby_students.append(student)
 
     print(f"Number of both nearby students: {len(both_nearby_students)}")

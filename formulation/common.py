@@ -26,6 +26,7 @@ type NodeId = int
 
 
 NETWORK_TYPE = "drive"
+METERS_PER_KILOMETER = 1000.0
 
 
 class SchoolType(IntEnum):
@@ -161,7 +162,7 @@ class ProblemData(ABC):
     @abstractmethod
     def service_graph(self) -> "nx.MultiDiGraph[NodeId]":
         """
-        network graph with edge weights corresponding to travel times in minutes,
+        network graph with edge weights corresponding to travel distances in kilometers,
         only containing nodes in N and edges corresponding to shortest paths between nodes in N.
         uses integer node_id
         """
@@ -240,6 +241,7 @@ class ProblemDataToy(ProblemData):
     @property
     def service_graph(self) -> "nx.MultiDiGraph[NodeId]":
         service_graph: "nx.MultiDiGraph[NodeId]" = nx.MultiDiGraph()
+        service_graph.graph["distance_unit"] = "km"
 
         def add_edge_if_path_exists(start: Place, end: Place):
             # check if edge in graph already, if so skip
@@ -251,13 +253,18 @@ class ProblemDataToy(ProblemData):
 
             if start_id == end_id:
                 service_graph.add_edge(
-                    start_id, end_id, length=0, path=[start_id, end_id]
+                    start_id, end_id, length=0.0, path=[start_id, end_id]
                 )
                 return
 
             try:
                 length, path = self._get_shortest_path_base(start_id, end_id)
-                service_graph.add_edge(start_id, end_id, length=length, path=path)
+                service_graph.add_edge(
+                    start_id,
+                    end_id,
+                    length=_meters_to_kilometers(length),
+                    path=path,
+                )
             except nx.NetworkXNoPath:
                 print(f"Warning: no path between {start} and {end} in the graph")
 
@@ -489,6 +496,7 @@ class ProblemDataReal(ProblemData):
 
     def _make_service_graph(self) -> "nx.MultiDiGraph[NodeId]":
         service_graph: "nx.MultiDiGraph[NodeId]" = nx.MultiDiGraph()
+        service_graph.graph["distance_unit"] = "km"
         stop_school_types = self._stop_school_types()
         pairs = self._service_graph_pairs()
 
@@ -508,7 +516,7 @@ class ProblemDataReal(ProblemData):
 
             if start_id == end_id:
                 service_graph.add_edge(
-                    start_id, end_id, length=0, path=[start_id, end_id]
+                    start_id, end_id, length=0.0, path=[start_id, end_id]
                 )
                 return
 
@@ -519,7 +527,11 @@ class ProblemDataReal(ProblemData):
                 ):
                     return
                 service_graph.add_edge(
-                    start_id, end_id, length=length, path=path, **extra_attrs
+                    start_id,
+                    end_id,
+                    length=_meters_to_kilometers(length),
+                    path=path,
+                    **extra_attrs,
                 )
             except (KeyError, nx.NetworkXNoPath):
                 print(f"Warning: no path between {start} and {end} in the graph")
@@ -598,7 +610,13 @@ class ProblemDataReal(ProblemData):
     @classmethod
     def load_path(cls, path: Path) -> "ProblemDataReal":
         with open(path, "rb") as f:
-            return pickle.load(f)
+            problem_data = pickle.load(f)
+
+        cached_service_graph = getattr(problem_data, "_service_graph_cached", None)
+        if cached_service_graph is not None:
+            _ensure_service_graph_kilometers(cached_service_graph)
+
+        return problem_data
 
     def _make_schools(self) -> list[School]:
         schools_df = pd.read_csv(
@@ -863,6 +881,30 @@ def get_shortest_path[T: Hashable](
 ) -> tuple[float, list[T]]:
     """returns the length and path of the shortest path between start and end"""
     return nx.bidirectional_dijkstra(graph, source=start, target=end, weight=weight)
+
+
+def _meters_to_kilometers(distance_meters: float) -> float:
+    return float(distance_meters) / METERS_PER_KILOMETER
+
+
+def _ensure_service_graph_kilometers(graph: "nx.MultiDiGraph[NodeId]") -> None:
+    unit = graph.graph.get("distance_unit")
+    if unit == "km":
+        return
+
+    lengths = [
+        float(data["length"])
+        for _, _, _, data in graph.edges(keys=True, data=True)
+        if "length" in data
+    ]
+    needs_conversion = unit == "m" or (unit is None and any(length > 100.0 for length in lengths))
+
+    if needs_conversion:
+        for _, _, _, data in graph.edges(keys=True, data=True):
+            if "length" in data:
+                data["length"] = _meters_to_kilometers(float(data["length"]))
+
+    graph.graph["distance_unit"] = "km"
 
 
 def p_m(m: Student):

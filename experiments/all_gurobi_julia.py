@@ -17,7 +17,7 @@ CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 PROJECT_ROOT = CURRENT_FILE_DIR.parent
 DEFAULT_PLACE_NAME = "Framingham, Massachusetts, USA"
 DEFAULT_PROBLEM_NAME = "framingham"
-DEFAULT_PRUNE = 1000
+DEFAULT_PRUNE = 800
 
 
 def _solve_with_python(

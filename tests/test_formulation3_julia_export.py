@@ -23,7 +23,11 @@ from formulation.formulation_3.julia_export import (
     build_formulation3_numeric_instance,
     export_formulation3_instance,
 )
-from formulation.formulation_3.problem3_definition import Formulation3
+from formulation.formulation_3.problem3_definition import (
+    MILES_TO_KILOMETERS,
+    MPH_TO_KILOMETERS_PER_MINUTE,
+    Formulation3,
+)
 
 
 @dataclass
@@ -143,6 +147,12 @@ class Formulation3JuliaExportTests(unittest.TestCase):
         self.assertEqual(instance.needs_wheelchair_m.tolist(), [0, 1])
         self.assertEqual(instance.bus_names.tolist(), ["bus-a"])
         self.assertEqual(instance.student_names.tolist(), ["student-a", "student-b"])
+        np.testing.assert_allclose(instance.range_b, [25 * MILES_TO_KILOMETERS])
+        self.assertAlmostEqual(problem.d_ij(problem.D_PLUS[0], problem.P[0]), 10.0)
+        self.assertAlmostEqual(
+            problem.t_ij(problem.D_PLUS[0], problem.P[0]),
+            10.0 / (40 * MPH_TO_KILOMETERS_PER_MINUTE),
+        )
 
     def test_npz_export_contains_expected_keys_and_shapes(self) -> None:
         problem = _make_tiny_problem(rounds=2)

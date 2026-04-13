@@ -174,7 +174,7 @@ def plot_special_education_students(problem_data: ProblemDataReal) -> None:
     ax.set_title("Location of Special Education Students")
     # add gradient legend
     cbar = plt.colorbar(sm, ax=ax)
-    cbar.set_label("Distance to School (m)")
+    cbar.set_label("Distance to School (km)")
 
     # remove axis borders and ticks
     ax.set_axis_off()

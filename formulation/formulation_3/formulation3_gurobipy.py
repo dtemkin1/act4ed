@@ -27,14 +27,15 @@ from formulation.common import (
     s_m,
     tau_m,
 )
-from formulation.formulation_3.problem3_definition import Formulation3
+from formulation.formulation_3.problem3_definition import (
+    MILES_TO_KILOMETERS,
+    Formulation3,
+)
 from formulation.formulation_3.solution import (
     Formulation3ModelBundle,
     Formulation3Solution,
     _gurobi_status_name,
 )
-
-METERS_PER_MILE = 1609.344
 
 def build_model_from_definition(
     problem: Formulation3,
@@ -143,7 +144,7 @@ def build_model_from_definition(
     }
     arc_end_idx = {arc_idx: node_to_idx[path[1]] for arc_idx, path in enumerate(A_list)}
     service_node_indices = pickup_node_indices + school_node_indices
-    range_limit_by_bus = {b: R_b(bus) * METERS_PER_MILE for b, bus in enumerate(B)}
+    range_limit_by_bus = {b: R_b(bus) * MILES_TO_KILOMETERS for b, bus in enumerate(B)}
     capacity_by_bus = {b: C_b(bus) for b, bus in enumerate(B)}
     cap_upper_by_bus = {b: C_CAP_B(bus) for b, bus in enumerate(B)}
 

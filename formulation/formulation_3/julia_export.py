@@ -20,9 +20,10 @@ from formulation.common import (
     s_m,
     tau_m,
 )
-from formulation.formulation_3.problem3_definition import Formulation3
-
-METERS_PER_MILE = 1609.344
+from formulation.formulation_3.problem3_definition import (
+    MILES_TO_KILOMETERS,
+    Formulation3,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -300,7 +301,7 @@ def build_formulation3_numeric_instance(
     capacity_b = np.asarray([C_b(bus) for bus in B], dtype=np.int64)
     cap_upper_b = np.asarray([problem.C_CAP_B(bus) for bus in B], dtype=np.float64)
     range_b = np.asarray(
-        [R_b(bus) * METERS_PER_MILE for bus in B],
+        [R_b(bus) * MILES_TO_KILOMETERS for bus in B],
         dtype=np.float64,
     )
     wheelchair_ok_b = np.asarray([Wh_b(bus) for bus in B], dtype=np.int64)

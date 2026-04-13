@@ -121,6 +121,78 @@ _sum_expr(iter) = sum(iter; init = JuMP.AffExpr(0.0))
 _encode_utf8_array(text::AbstractString) = collect(codeunits(String(text)))
 _build_log(message::AbstractString) = println("[build_model] ", message)
 
+function _record_count!(counts::Dict{String, Int}, name::AbstractString, value::Integer)
+    counts[String(name)] = get(counts, String(name), 0) + Int(value)
+    return counts
+end
+
+function _log_count_dict(title::AbstractString, counts::Dict{String, Int})
+    _build_log("$(title) total=$(sum(values(counts)))")
+    for (name, value) in sort(collect(counts); by = entry -> (-entry[2], entry[1]))
+        _build_log("  $(name)=$(value)")
+    end
+    return nothing
+end
+
+function _log_vector_stats(label::AbstractString, values::Vector{Int})
+    if isempty(values)
+        _build_log("$(label): none")
+        return nothing
+    end
+    avg = round(sum(values) / length(values); digits = 2)
+    _build_log("$(label) min=$(minimum(values)) avg=$(avg) max=$(maximum(values))")
+    return nothing
+end
+
+function _sum_nested_lengths(groups)::Int
+    total = 0
+    for group in groups
+        total += length(group)
+    end
+    return total
+end
+
+function _node_kind_sets(inst::Formulation3Instance)
+    return (
+        pickup = Set(inst.pickup_node_p),
+        school = Set(inst.school_node_s),
+        school_copy = Set(inst.school_copy_node_s),
+        depot_start = Set(inst.start_depot_node_b),
+        depot_end = Set(inst.end_depot_node_b),
+    )
+end
+
+function _node_kind(node_idx::Int, kind_sets)::String
+    if node_idx in kind_sets.pickup
+        return "pickup"
+    elseif node_idx in kind_sets.school
+        return "school"
+    elseif node_idx in kind_sets.school_copy
+        return "school_copy"
+    elseif node_idx in kind_sets.depot_start
+        return "depot_start"
+    elseif node_idx in kind_sets.depot_end
+        return "depot_end"
+    end
+    return "other"
+end
+
+function _arc_kind_counts(
+    inst::Formulation3Instance,
+    arc_indices,
+)::Dict{String, Int}
+    kind_sets = _node_kind_sets(inst)
+    counts = Dict{String, Int}()
+    for arc_idx in arc_indices
+        key =
+            _node_kind(inst.arc_src[arc_idx], kind_sets) *
+            "->" *
+            _node_kind(inst.arc_dst[arc_idx], kind_sets)
+        counts[key] = get(counts, key, 0) + 1
+    end
+    return counts
+end
+
 function _status_code(status::MOI.TerminationStatusCode)::Int
     if status == MOI.OPTIMAL
         return 2
@@ -567,6 +639,19 @@ function build_model(
         any(!iszero(inst.is_flagged_m[m]) && assignment_feasible[m, b] for m in 1:inst.nM)
         for b in 1:inst.nB
     ]
+    total_assignment_pairs = count(identity, assignment_feasible)
+    _build_log(
+        "assignment pairs=$(total_assignment_pairs) of $(inst.nM * inst.nB) " *
+        "flagged_students=$(length(flagged_idx)) wheelchair_students=$(count(!iszero, inst.needs_wheelchair_m))",
+    )
+    _log_vector_stats(
+        "candidate buses per student",
+        [length(active_bus_indices_by_m[m]) for m in 1:inst.nM],
+    )
+    _log_vector_stats(
+        "candidate students per bus",
+        [length(active_student_indices_by_b[b]) for b in 1:inst.nB],
+    )
 
     school_copy_in_arc_set = Set(findnz(inst.school_copy_in_arc)[2])
     school_copy_out_arc_set = Set(findnz(inst.school_copy_out_arc)[2])
@@ -582,6 +667,10 @@ function build_model(
     _build_log(
         "active arcs per round=" * join(string.(length.(active_arc_indices_by_q)), ","),
     )
+    _log_count_dict("all arc kinds", _arc_kind_counts(inst, 1:inst.nA))
+    for q in 1:inst.nQ
+        _log_count_dict("round q=$(q) arc kinds", _arc_kind_counts(inst, active_arc_indices_by_q[q]))
+    end
 
     time_active_nodes_by_bq = [Int[] for _ in 1:inst.nB, _ in 1:inst.nQ]
     load_active_nodes_by_bq = [Int[] for _ in 1:inst.nB, _ in 1:inst.nQ]
@@ -633,7 +722,28 @@ function build_model(
     @variable(model, e_bqs[b = 1:inst.nB, q in school_end_rounds, s = 1:inst.nS], Bin)
     @variable(model, r_bmon[b = 1:inst.nB; bus_has_flagged_candidate[b]], Bin)
     r_bmon_full = [bus_has_flagged_candidate[b] ? r_bmon[b] : 0.0 for b in 1:inst.nB]
+    var_counts = Dict{String, Int}()
+    _record_count!(var_counts, "x_bqij", sum(inst.nB * length(arcs) for arcs in active_arc_indices_by_q))
+    _record_count!(var_counts, "a_mbq", total_assignment_pairs * inst.nQ)
+    _record_count!(var_counts, "T_bqi", _sum_nested_lengths(time_active_nodes_by_bq))
+    _record_count!(var_counts, "v_bqi", inst.nB * inst.nQ * length(service_node_indices))
+    _record_count!(var_counts, "L_bqi", _sum_nested_lengths(load_active_nodes_by_bq))
+    _record_count!(var_counts, "y_bqtau", inst.nB * inst.nQ * inst.nTau)
+    _record_count!(var_counts, "e_bqs", inst.nB * length(school_end_rounds) * inst.nS)
+    _record_count!(var_counts, "r_bmon", count(identity, bus_has_flagged_candidate))
+    _record_count!(var_counts, "z_b", inst.nB)
+    _record_count!(var_counts, "z_bq", inst.nB * inst.nQ)
+    binary_var_count = sum(
+        get(var_counts, name, 0) for
+        name in ("z_b", "z_bq", "y_bqtau", "x_bqij", "v_bqi", "a_mbq", "e_bqs", "r_bmon")
+    )
+    integer_var_count = get(var_counts, "L_bqi", 0)
+    continuous_var_count = get(var_counts, "T_bqi", 0)
     _build_log("variables ready")
+    _log_count_dict("variable families", var_counts)
+    _build_log(
+        "variable classes binary=$(binary_var_count) integer=$(integer_var_count) continuous=$(continuous_var_count)",
+    )
 
     _build_log("adding objective")
     @objective(
@@ -659,6 +769,11 @@ function build_model(
         _sum_expr(a_mbq[m, b, q] for b in active_bus_indices_by_m[m] for q in 1:inst.nQ)
         for m in 1:inst.nM
     ]
+    constraint_counts = Dict{String, Int}()
+    _record_count!(constraint_counts, "student_assignments", inst.nM)
+    _record_count!(constraint_counts, "served_ratio", 1)
+    _record_count!(constraint_counts, "round_activation_if_students", inst.nB * inst.nQ)
+    _record_count!(constraint_counts, "bus_activation_if_students", inst.nB)
 
     @constraint(model, student_assignments .<= 1)
     @constraint(model, sum(a_mbq) >= inst.PHI * inst.nM)
@@ -718,8 +833,12 @@ function build_model(
 
         _build_log("round q=$(q): adding routing/time/load constraints")
         if q == 1
+            _record_count!(constraint_counts, "round_start_from_depot", inst.nB)
             @constraint(model, start_from_depot .== z_bq[:, q])
         else
+            _record_count!(constraint_counts, "round_start_from_depot_after_first", inst.nB)
+            _record_count!(constraint_counts, "round_school_copy_balance", inst.nB * inst.nS)
+            _record_count!(constraint_counts, "round_school_copy_time_link", inst.nB * inst.nS)
             E_prev = [e_bqs[b, q - 1, s] for b in 1:inst.nB, s in 1:inst.nS]
             T_prev = _expand_block(T_bqi, q - 1, time_active_nodes_by_bq, inst.nB, inst.nN)
             A_prev = _expand_assignment_block(a_mbq, q - 1, active_student_indices_by_b, inst.nM, inst.nB)
@@ -733,16 +852,29 @@ function build_model(
                 inst.M_TIME .* (1 .- E_prev),
             )
         end
+        _record_count!(constraint_counts, "round_start_to_depot_zero", inst.nB)
+        _record_count!(constraint_counts, "round_end_from_depot_zero", inst.nB)
         @constraint(model, start_to_depot .== 0)
         @constraint(model, end_from_depot .== 0)
 
         if q < inst.nQ
+            _record_count!(constraint_counts, "round_chain_activation", inst.nB)
+            _record_count!(constraint_counts, "round_end_to_depot", inst.nB)
             @constraint(model, vec(sum(E_q, dims = 2)) .== z_bq[:, q + 1])
             @constraint(model, end_to_depot .== z_bq[:, q] - z_bq[:, q + 1])
         else
+            _record_count!(constraint_counts, "round_end_to_depot", inst.nB)
             @constraint(model, end_to_depot .== z_bq[:, q])
         end
 
+        _record_count!(constraint_counts, "pickup_out_degree", inst.nB * inst.nP)
+        _record_count!(constraint_counts, "pickup_in_degree", inst.nB * inst.nP)
+        _record_count!(constraint_counts, "pickup_visit_assignment", inst.nB * inst.nP)
+        _record_count!(constraint_counts, "school_in_degree", inst.nB * inst.nS)
+        _record_count!(constraint_counts, "school_out_degree", inst.nB * inst.nS)
+        _record_count!(constraint_counts, "service_node_activation", inst.nB * length(service_node_indices))
+        _record_count!(constraint_counts, "student_pickup_visit_link", inst.nM * inst.nB)
+        _record_count!(constraint_counts, "student_school_visit_link", inst.nM * inst.nB)
         @constraint(model, pickup_out .== V_q[:, inst.pickup_node_p])
         @constraint(model, pickup_in .== V_q[:, inst.pickup_node_p])
         @constraint(model, V_q[:, inst.pickup_node_p] .<= pickup_assignments)
@@ -755,6 +887,10 @@ function build_model(
         @constraint(model, A_q .<= pickup_visits_for_students)
         @constraint(model, A_q .<= school_visits_for_students)
 
+        _record_count!(constraint_counts, "time_arc_big_m", inst.nB * inst.nA)
+        _record_count!(constraint_counts, "school_latest_arrival", inst.nB * inst.nS)
+        _record_count!(constraint_counts, "student_pickup_before_dropoff", inst.nM * inst.nB)
+        _record_count!(constraint_counts, "student_max_ride_time", inst.nM * inst.nB)
         @constraint(
             model,
             time_deltas .>=
@@ -780,6 +916,10 @@ function build_model(
             inst.H_RIDE .+ inst.M_TIME .* (1 .- A_q),
         )
 
+        _record_count!(constraint_counts, "load_arc_lower_big_m", inst.nB * inst.nA)
+        _record_count!(constraint_counts, "load_arc_upper_big_m", inst.nB * inst.nA)
+        _record_count!(constraint_counts, "load_capacity", inst.nB * inst.nN)
+        _record_count!(constraint_counts, "school_end_load_upper", inst.nB * inst.nS)
         @constraint(
             model,
             load_deltas .>=
@@ -799,6 +939,8 @@ function build_model(
             reshape(inst.cap_upper_b, inst.nB, 1) .* (1 .- E_q),
         )
 
+        _record_count!(constraint_counts, "school_type_choice", inst.nB)
+        _record_count!(constraint_counts, "student_school_type_match", inst.nM * inst.nB)
         @constraint(model, vec(sum(Y_q, dims = 2)) .== z_bq[:, q])
         @constraint(model, A_q .<= school_type_match)
         _build_log("round q=$(q): done in $(round(time() - q_t0; digits=2))s")
@@ -815,6 +957,7 @@ function build_model(
         model,
         distance_per_bus .<= inst.range_b .* z_b,
     )
+    _record_count!(constraint_counts, "distance_range", inst.nB)
     _build_log("distance constraints added")
 
     if !isempty(flagged_idx)
@@ -828,18 +971,25 @@ function build_model(
             if !bus_has_flagged_candidate[b]
                 continue
             end
+            _record_count!(constraint_counts, "monitor_upper_bound", 1)
             @constraint(model, r_bmon[b] <= flagged_totals[b])
             for m in flagged_idx
                 if !assignment_feasible[m, b]
                     continue
                 end
                 for q in 1:inst.nQ
+                    _record_count!(constraint_counts, "monitor_assignment_link", 1)
                     @constraint(model, r_bmon[b] >= a_mbq[m, b, q])
                 end
             end
         end
     end
     _build_log("monitor constraints added")
+    _log_count_dict("constraint families", constraint_counts)
+    _build_log(
+        "model size check vars=$(JuMP.num_variables(model)) counted=$(sum(values(var_counts))) " *
+        "constraints=$(JuMP.num_constraints(model; count_variable_in_set_constraints = false)) counted=$(sum(values(constraint_counts)))",
+    )
 
     vars = (
         z_b = z_b,
