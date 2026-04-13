@@ -119,6 +119,7 @@ _default_names(prefix, n) = ["$(prefix)_$(i)" for i in 1:n]
 _zero_affexpr_matrix(nrows, ncols) = [JuMP.AffExpr(0.0) for _ in 1:nrows, _ in 1:ncols]
 _sum_expr(iter) = sum(iter; init = JuMP.AffExpr(0.0))
 _encode_utf8_array(text::AbstractString) = collect(codeunits(String(text)))
+_build_log(message::AbstractString) = println("[build_model] ", message)
 
 function _status_code(status::MOI.TerminationStatusCode)::Int
     if status == MOI.OPTIMAL
@@ -535,10 +536,16 @@ function build_model(
     optimizer = Gurobi.Optimizer,
     log_file = nothing,
 )
+    t0 = time()
+    _build_log(
+        "start nB=$(inst.nB) nM=$(inst.nM) nS=$(inst.nS) nN=$(inst.nN) nA=$(inst.nA) nQ=$(inst.nQ) nTau=$(inst.nTau)",
+    )
+
     model = optimizer === nothing ? Model() : Model(optimizer)
     if optimizer !== nothing && log_file !== nothing
         set_optimizer_attribute(model, "LogFile", String(log_file))
     end
+    _build_log("optimizer initialized")
 
     flagged_idx = findall(!iszero, inst.is_flagged_m)
     service_node_indices = sort(unique(inst.service_node_indices))
@@ -572,6 +579,9 @@ function build_model(
             )
         ]
     end
+    _build_log(
+        "active arcs per round=" * join(string.(length.(active_arc_indices_by_q)), ","),
+    )
 
     time_active_nodes_by_bq = [Int[] for _ in 1:inst.nB, _ in 1:inst.nQ]
     load_active_nodes_by_bq = [Int[] for _ in 1:inst.nB, _ in 1:inst.nQ]
@@ -596,6 +606,7 @@ function build_model(
 
     school_end_rounds = collect(1:max(inst.nQ - 1, 0))
 
+    _build_log("creating variables")
     @variable(model, z_b[1:inst.nB], Bin)
     @variable(model, z_bq[1:inst.nB, 1:inst.nQ], Bin)
     @variable(model, y_bqtau[1:inst.nB, 1:inst.nQ, 1:inst.nTau], Bin)
@@ -622,7 +633,9 @@ function build_model(
     @variable(model, e_bqs[b = 1:inst.nB, q in school_end_rounds, s = 1:inst.nS], Bin)
     @variable(model, r_bmon[b = 1:inst.nB; bus_has_flagged_candidate[b]], Bin)
     r_bmon_full = [bus_has_flagged_candidate[b] ? r_bmon[b] : 0.0 for b in 1:inst.nB]
+    _build_log("variables ready")
 
+    _build_log("adding objective")
     @objective(
         model,
         Min,
@@ -633,6 +646,7 @@ function build_model(
         inst.LAMBDA_ROUND * sum(z_bq) +
         sum(r_bmon_full),
     )
+    _build_log("objective added")
 
     students_per_bus_round = [
         _sum_expr(a_mbq[m, b, q] for m in active_student_indices_by_b[b])
@@ -655,8 +669,11 @@ function build_model(
     # )
     @constraint(model, z_bq .<= students_per_bus_round)
     @constraint(model, z_b .<= students_per_bus)
+    _build_log("global assignment constraints added")
 
     for q in 1:inst.nQ
+        q_t0 = time()
+        _build_log("round q=$(q): building block matrices")
         A_q = _expand_assignment_block(a_mbq, q, active_student_indices_by_b, inst.nM, inst.nB)
         X_q = _expand_block(x_bqij, q, active_arc_indices_by_q, inst.nB, inst.nA)
         V_q = _expand_block(v_bqi, q, service_node_indices_by_q, inst.nB, inst.nN)
@@ -699,6 +716,7 @@ function build_model(
         latest_arrival_rhs = ones(inst.nB) * transpose(inst.latest_arrival_s)
         capacity_rhs = (inst.capacity_b .* type_capacity_multiplier) * ones(1, inst.nN)
 
+        _build_log("round q=$(q): adding routing/time/load constraints")
         if q == 1
             @constraint(model, start_from_depot .== z_bq[:, q])
         else
@@ -783,7 +801,9 @@ function build_model(
 
         @constraint(model, vec(sum(Y_q, dims = 2)) .== z_bq[:, q])
         @constraint(model, A_q .<= school_type_match)
+        _build_log("round q=$(q): done in $(round(time() - q_t0; digits=2))s")
     end
+    _build_log("all round-wise constraints added")
 
     distance_per_bus = [
         sum(
@@ -795,6 +815,7 @@ function build_model(
         model,
         distance_per_bus .<= inst.range_b .* z_b,
     )
+    _build_log("distance constraints added")
 
     if !isempty(flagged_idx)
         flagged_totals = [
@@ -818,6 +839,7 @@ function build_model(
             end
         end
     end
+    _build_log("monitor constraints added")
 
     vars = (
         z_b = z_b,
@@ -840,6 +862,8 @@ function build_model(
         arc_src = inst.arc_src,
         arc_dst = inst.arc_dst,
     )
+
+    _build_log("model construction complete in $(round(time() - t0; digits=2))s")
 
     return (; model, vars, meta)
 end
