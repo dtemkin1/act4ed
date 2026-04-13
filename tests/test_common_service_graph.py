@@ -125,6 +125,32 @@ class CommonServiceGraphTests(unittest.TestCase):
         self.assertFalse(graph.has_edge(stop_e.node_id, school_h.node_id))
         self.assertTrue(graph.has_edge(school_h.node_id, stop_e.node_id))
 
+    def test_stop_to_stop_edges_require_overlapping_school_type_sets(self) -> None:
+        stop_e_only = _make_stop("Stop E only", 1)
+        stop_e_h = _make_stop("Stop E+H", 2)
+        stop_h_only = _make_stop("Stop H only", 3)
+        school_e = _make_school("School E", 10, SchoolType.E)
+        school_h = _make_school("School H", 11, SchoolType.HS)
+        students = [
+            _make_student("student-e-1", stop_e_only, school_e),
+            _make_student("student-e-2", stop_e_h, school_e),
+            _make_student("student-h-1", stop_e_h, school_h),
+            _make_student("student-h-2", stop_h_only, school_h),
+        ]
+
+        graph = _make_problem_data(
+            stops=[stop_e_only, stop_e_h, stop_h_only],
+            schools=[school_e, school_h],
+            students=students,
+        )._make_service_graph()
+
+        self.assertTrue(graph.has_edge(stop_e_only.node_id, stop_e_h.node_id))
+        self.assertTrue(graph.has_edge(stop_e_h.node_id, stop_e_only.node_id))
+        self.assertTrue(graph.has_edge(stop_e_h.node_id, stop_h_only.node_id))
+        self.assertTrue(graph.has_edge(stop_h_only.node_id, stop_e_h.node_id))
+        self.assertFalse(graph.has_edge(stop_e_only.node_id, stop_h_only.node_id))
+        self.assertFalse(graph.has_edge(stop_h_only.node_id, stop_e_only.node_id))
+
     def test_same_node_edges_are_zero_length(self) -> None:
         stop_a = _make_stop("Stop A", 1)
         stop_b = _make_stop("Stop B", 1)
@@ -142,7 +168,10 @@ class CommonServiceGraphTests(unittest.TestCase):
         stop_a = _make_stop("Stop A", 1)
         stop_b = _make_stop("Stop B", 2)
         school_e = _make_school("School E", 10, SchoolType.E)
-        students = [_make_student("student-e", stop_a, school_e)]
+        students = [
+            _make_student("student-e-a", stop_a, school_e),
+            _make_student("student-e-b", stop_b, school_e),
+        ]
 
         graph = _make_problem_data(
             stops=[stop_a, stop_b],

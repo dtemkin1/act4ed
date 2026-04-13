@@ -466,6 +466,14 @@ class ProblemDataReal(ProblemData):
         if isinstance(start, Stop) and isinstance(end, School):
             return end.type in stop_school_types.get(start, set())
 
+        if isinstance(start, Stop) and isinstance(end, Stop):
+            if start.node_id == end.node_id:
+                return True
+            if stop_school_types.get(start, set()).isdisjoint(
+                stop_school_types.get(end, set())
+            ):
+                return False
+
         if start.node_id == end.node_id:
             return True
 
