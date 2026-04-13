@@ -28,6 +28,8 @@ export ACT4ED_CONTAINER=~/containers/ACT4ED.sif
 
 CONTAINER="${ACT4ED_CONTAINER:-${JLAB_CONTAINER:-}}"
 
+module load apptainer/1.4.2 >/dev/null 2>&1 || true
+
 if [[ -n "$CONTAINER" ]]; then
   exec apptainer exec \
     ${ACT4ED_APPTAINER_ARGS:-} \
