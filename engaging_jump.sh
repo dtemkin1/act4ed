@@ -2,7 +2,7 @@
 
 # Job Flags
 #SBATCH -p mit_preemptable
-#SBATCH --time=0:10:00
+#SBATCH --time=10:00:00
 #SBATCH -c 32
 #SBATCH --mem=512G
 #SBATCH --output=logs/%x-%j.out
