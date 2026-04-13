@@ -379,6 +379,15 @@ function _load_sparse(data, prefix)::SparseMatrixCSC{Float64, Int}
     return sparse(rows, cols, vals, nrows, ncols)
 end
 
+function _load_sparse_or_empty(data, prefix)::SparseMatrixCSC{Float64, Int}
+    nrows = _scalar(data, "$(prefix)_n_rows", Int)
+    ncols = _scalar(data, "$(prefix)_n_cols", Int)
+    if nrows == 0 || ncols == 0
+        return spzeros(Float64, nrows, ncols)
+    end
+    return _load_sparse(data, prefix)
+end
+
 function load_instance(path::AbstractString)::Formulation3Instance
     data = NPZ.npzread(
         path,
@@ -419,7 +428,6 @@ function load_instance(path::AbstractString)::Formulation3Instance
             "start_depot_node_b",
             "end_depot_node_b",
             "school_node_s",
-            "school_copy_node_s",
             "latest_arrival_s",
             "node_out_arc_n_rows",
             "node_out_arc_n_cols",
@@ -443,14 +451,8 @@ function load_instance(path::AbstractString)::Formulation3Instance
             "bus_end_arc_vals",
             "school_copy_out_arc_n_rows",
             "school_copy_out_arc_n_cols",
-            "school_copy_out_arc_rows",
-            "school_copy_out_arc_cols",
-            "school_copy_out_arc_vals",
             "school_copy_in_arc_n_rows",
             "school_copy_in_arc_n_cols",
-            "school_copy_in_arc_rows",
-            "school_copy_in_arc_cols",
-            "school_copy_in_arc_vals",
             "student_to_pickup_n_rows",
             "student_to_pickup_n_cols",
             "student_to_pickup_rows",
@@ -485,9 +487,39 @@ function load_instance(path::AbstractString)::Formulation3Instance
     school_node_of_m = _ivec(data, "school_node_of_m")
     pickup_node_p = _ivec(data, "pickup_node_p")
     school_node_s = _ivec(data, "school_node_s")
-    school_copy_node_s = _ivec(data, "school_copy_node_s")
     start_depot_node_b = _ivec(data, "start_depot_node_b")
     end_depot_node_b = _ivec(data, "end_depot_node_b")
+    school_copy_rows = _scalar(data, "school_copy_out_arc_n_rows", Int)
+    school_copy_node_s = if school_copy_rows == 0
+        Int[]
+    else
+        _ivec(NPZ.npzread(path, ["school_copy_node_s"]), "school_copy_node_s")
+    end
+    school_copy_data = if school_copy_rows == 0
+        nothing
+    else
+        NPZ.npzread(
+            path,
+            [
+                "school_copy_out_arc_n_rows",
+                "school_copy_out_arc_n_cols",
+                "school_copy_out_arc_rows",
+                "school_copy_out_arc_cols",
+                "school_copy_out_arc_vals",
+                "school_copy_in_arc_n_rows",
+                "school_copy_in_arc_n_cols",
+                "school_copy_in_arc_rows",
+                "school_copy_in_arc_cols",
+                "school_copy_in_arc_vals",
+            ],
+        )
+    end
+    school_copy_out_arc = school_copy_rows == 0 ?
+        _load_sparse_or_empty(data, "school_copy_out_arc") :
+        _load_sparse(school_copy_data, "school_copy_out_arc")
+    school_copy_in_arc = school_copy_rows == 0 ?
+        _load_sparse_or_empty(data, "school_copy_in_arc") :
+        _load_sparse(school_copy_data, "school_copy_in_arc")
 
     student_to_pickup_node = sparse(
         pickup_node_of_m,
@@ -578,8 +610,8 @@ function load_instance(path::AbstractString)::Formulation3Instance
         node_in_arc,
         _load_sparse(data, "bus_start_arc"),
         _load_sparse(data, "bus_end_arc"),
-        _load_sparse(data, "school_copy_out_arc"),
-        _load_sparse(data, "school_copy_in_arc"),
+        school_copy_out_arc,
+        school_copy_in_arc,
         _load_sparse(data, "student_to_pickup"),
         _load_sparse(data, "student_to_school"),
         _load_sparse(data, "student_to_school_type"),
