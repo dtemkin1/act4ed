@@ -747,8 +747,8 @@ def plot_bus_routes(
         graph.graph["crs"] = "EPSG:3857"  # uses meters
         pos = {
             node: (
-                graph.nodes[node]["location"][0],
-                graph.nodes[node]["location"][1],
+                graph.nodes[node]["x"],
+                graph.nodes[node]["y"],
             )
             for node in graph.nodes()
         }

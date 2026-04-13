@@ -31,7 +31,7 @@ def make_graph(size: tuple[int, int] = (10, 10)) -> "nx.MultiDiGraph[NodeId]":
         mapping[node] = i
         x = node[0]
         y = node[1]
-        graph.add_node(i, x=x, y=y, location=(x, y))
+        graph.add_node(i, x=x, y=y)
     for u, v in graph_2d.edges():
         graph.add_edge(mapping[u], mapping[v], length=graph_2d.edges[u, v, 0]["length"])
 
@@ -49,7 +49,7 @@ def make_schools(
     schools: list[School] = []
     for i in range(num_schools):
         node_id = all_nodes[random.randint(0, len(all_nodes) - 1)]
-        point = Point(graph.nodes[node_id]["location"])
+        point = Point(graph.nodes[node_id]["x"], graph.nodes[node_id]["y"])
         school = School(
             name=f"School {i}",
             geographic_location=point,
@@ -67,7 +67,7 @@ def make_depots(graph: "nx.MultiDiGraph[NodeId]", num_depots: int = 1) -> list[D
     depots: list[Depot] = []
     for i in range(num_depots):
         node_id = all_nodes[random.randint(0, len(all_nodes) - 1)]
-        point = Point(graph.nodes[node_id]["location"])
+        point = Point(graph.nodes[node_id]["x"], graph.nodes[node_id]["y"])
         depot = Depot(
             name=f"Depot {i}",
             geographic_location=point,
@@ -82,7 +82,7 @@ def make_stops(graph: "nx.MultiDiGraph[NodeId]", num_stops: int = 5) -> list[Sto
     stops: list[Stop] = []
     for i in range(num_stops):
         node_id = all_nodes[random.randint(0, len(all_nodes) - 1)]
-        point = Point(graph.nodes[node_id]["location"])
+        point = Point(graph.nodes[node_id]["x"], graph.nodes[node_id]["y"])
         stop = Stop(
             name=f"Stop {i}",
             geographic_location=point,
@@ -108,7 +108,7 @@ def make_students(
 
     for i in range(num_students):
         node_id = all_nodes[random.randint(0, len(all_nodes) - 1)]
-        home_location = Point(graph.nodes[node_id]["location"])
+        home_location = Point(graph.nodes[node_id]["x"], graph.nodes[node_id]["y"])
         # get nearest stop
         stop = min(
             stops,

@@ -721,8 +721,8 @@ def plot_bus_routes(
         graph = problem_data.base_graph
         pos = {
             node: (
-                graph.nodes[node]["location"].x,
-                graph.nodes[node]["location"].y,
+                graph.nodes[node]["x"],
+                graph.nodes[node]["y"],
             )
             for node in graph.nodes()
         }

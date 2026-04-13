@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from formulation.common import Student
+from formulation.common import ProblemDataToy, Student
 
 from formulation.formulation_3.problem3_definition import Formulation3
 from formulation.formulation_3.formulation3 import (
@@ -20,16 +20,18 @@ PLACE_NAME = "Framingham, Massachusetts, USA"
 
 
 def main() -> None:
-    problem_data = setup("framingham", PLACE_NAME)
+    problem_data_original = setup("framingham", PLACE_NAME)
     print("Problem data loaded!")
 
     # pick fuller at first since mcc is right next to it
-    fuller = next(school for school in problem_data.schools if school.id == "FUL")
+    fuller = next(
+        school for school in problem_data_original.schools if school.id == "FUL"
+    )
 
     # only kids living relatively close
     nearby_students: list[Student] = []
-    for student in problem_data.students:
-        distance = problem_data.service_graph.edges[
+    for student in problem_data_original.students:
+        distance = problem_data_original.service_graph.edges[
             student.stop.node_id, fuller.node_id, 0
         ]["length"]
 
@@ -41,14 +43,19 @@ def main() -> None:
     stops_with_students = list(set(student.stop for student in nearby_students))
 
     # only use 1 buses total, wheelchair accessible
-    buses_to_use = list(filter(lambda b: b.has_wheelchair_access, problem_data.buses))[
-        :1
-    ]
+    buses_to_use = list(
+        filter(lambda b: b.has_wheelchair_access, problem_data_original.buses)
+    )[:1]
 
-    problem_data.students = nearby_students
-    problem_data.stops = stops_with_students
-    problem_data.schools = [fuller]
-    problem_data.buses = buses_to_use
+    problem_data = ProblemDataToy(
+        "no_chaining_toy",
+        base_graph=problem_data_original.osm_graph,
+        _stops=stops_with_students,
+        _schools=[fuller],
+        _depots=problem_data_original.depots,
+        _students=nearby_students,
+        _buses=buses_to_use,
+    )
 
     # formulation time baby
     no_chaining = Formulation3(
@@ -82,30 +89,37 @@ def main() -> None:
     print("No-chaining routes plotted")
 
     print("Now doing chaining formulation...")
-    problem_data = setup("framingham", PLACE_NAME)
-    mcc = next(school for school in problem_data.schools if school.id == "MCC")
+    mcc = next(school for school in problem_data_original.schools if school.id == "MCC")
 
     # only kids living relatively close
     both_nearby_students: list[Student] = []
-    for student in problem_data.students:
-        distance = problem_data.service_graph.edges[
+    for student in problem_data_original.students:
+        distance_fuller = problem_data_original.service_graph.edges[
             student.stop.node_id, fuller.node_id, 0
+        ]["length"]
+        distance_mcc = problem_data_original.service_graph.edges[
+            student.stop.node_id, mcc.node_id, 0
         ]["length"]
 
         # within 1 km of school
-        if distance <= 1000 and student.school == fuller:
+        if distance_fuller <= 1.0 and student.school == fuller:
             both_nearby_students.append(student)
-        if distance <= 1000 and student.school == mcc:
+        if distance_mcc <= 1.0 and student.school == mcc:
             both_nearby_students.append(student)
 
     print(f"Number of both nearby students: {len(both_nearby_students)}")
 
     stops_with_students = list(set(student.stop for student in both_nearby_students))
 
-    problem_data.students = both_nearby_students
-    problem_data.stops = stops_with_students
-    problem_data.schools = [fuller, mcc]
-    problem_data.buses = buses_to_use
+    problem_data = ProblemDataToy(
+        "chaining_toy",
+        base_graph=problem_data_original.osm_graph,
+        _stops=stops_with_students,
+        _schools=[fuller, mcc],
+        _depots=problem_data_original.depots,
+        _students=both_nearby_students,
+        _buses=buses_to_use,
+    )
     chaining = Formulation3(
         problem_data=problem_data,
         rounds=3,

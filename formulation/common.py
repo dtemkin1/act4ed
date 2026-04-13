@@ -430,21 +430,20 @@ class ProblemDataReal(ProblemData):
 
             if start_id == end_id:
                 service_graph.add_edge(
-                    start_id, end_id, length=0, path=[start_id, end_id]
+                    start_id, end_id, length=0.0, path=[start_id, end_id]
                 )
                 return
 
             try:
                 # NOTE: length from osm is in meters, convert to km for service graph
-                length, path = self._get_shortest_path_osm(start_id, end_id)
+                length_m, path = self._get_shortest_path_osm(start_id, end_id)
+                length_km = length_m / 1000.0
 
                 if self.prune and isinstance(start, Stop) and isinstance(end, Stop):
-                    if length > self.prune * 1000:  # convert km to m
+                    if length_km > self.prune:
                         return
 
-                service_graph.add_edge(
-                    start_id, end_id, length=(length / 1000), path=path
-                )
+                service_graph.add_edge(start_id, end_id, length=length_km, path=path)
             except nx.NetworkXNoPath:
                 print(f"Warning: no path between {start} and {end} in the graph")
 
@@ -512,7 +511,7 @@ class ProblemDataReal(ProblemData):
                             start_node.node_id,
                             end_node.node_id,
                             length=(
-                                entry["distance"].iloc[0] / 1000
+                                entry["distance"].iloc[0] / 1000.0
                             ),  # convert m to km
                             path=entry["geometry"].iloc[0],
                         )

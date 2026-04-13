@@ -31,6 +31,8 @@ GRAPHML_FILE = CURRENT_FILE_DIR / "outputs" / "framingham_graph.graphml"
 PAIRWISE_CSV = CURRENT_FILE_DIR / "outputs" / "depot_schools_stops_pairwise.csv"
 STUDENT_ASSIGN_CSV = CURRENT_FILE_DIR / "outputs" / "student_to_stop_or_school.csv"
 
+PLACE_NAME = "Framingham, Massachusetts, USA"
+
 
 def setup(
     problem_name: str, place_name: str, prune: int | None = None
@@ -183,3 +185,8 @@ def plot_special_education_students(problem_data: ProblemDataReal) -> None:
         dpi=300,
         bbox_inches="tight",
     )
+
+
+if __name__ == "__main__":
+    problem_data = setup("framingham", PLACE_NAME)
+    print("Number of assigned students: ", len(get_assigned_students(problem_data)))
