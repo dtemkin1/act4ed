@@ -8,7 +8,8 @@ from pathlib import Path
 import gurobipy as gp
 from gurobipy import tupledict, Var
 import numpy as np
-from formulation3_gurobipy import _gurobi_status_name
+
+from formulation.formulation_3.formulation3_gurobipy import _gurobi_status_name
 
 
 PORTABLE_SOLUTION_SCHEMA_VERSION = 1
