@@ -9,7 +9,25 @@ import gurobipy as gp
 from gurobipy import tupledict, Var
 import numpy as np
 
-from formulation.formulation_3.formulation3_gurobipy import _gurobi_status_name
+
+def _gurobi_status_name(status: int) -> str:
+    status_names = {
+        gp.GRB.LOADED: "LOADED",
+        gp.GRB.OPTIMAL: "OPTIMAL",
+        gp.GRB.INFEASIBLE: "INFEASIBLE",
+        gp.GRB.INF_OR_UNBD: "INF_OR_UNBD",
+        gp.GRB.UNBOUNDED: "UNBOUNDED",
+        gp.GRB.CUTOFF: "CUTOFF",
+        gp.GRB.ITERATION_LIMIT: "ITERATION_LIMIT",
+        gp.GRB.NODE_LIMIT: "NODE_LIMIT",
+        gp.GRB.TIME_LIMIT: "TIME_LIMIT",
+        gp.GRB.SOLUTION_LIMIT: "SOLUTION_LIMIT",
+        gp.GRB.INTERRUPTED: "INTERRUPTED",
+        gp.GRB.NUMERIC: "NUMERIC",
+        gp.GRB.SUBOPTIMAL: "SUBOPTIMAL",
+        gp.GRB.USER_OBJ_LIMIT: "USER_OBJ_LIMIT",
+    }
+    return status_names.get(status, str(status))
 
 
 PORTABLE_SOLUTION_SCHEMA_VERSION = 1

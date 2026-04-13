@@ -31,6 +31,7 @@ from formulation.formulation_3.problem3_definition import Formulation3
 from formulation.formulation_3.solution import (
     Formulation3ModelBundle,
     Formulation3Solution,
+    _gurobi_status_name,
 )
 
 METERS_PER_MILE = 1609.344
@@ -597,23 +598,3 @@ def solve_problem(model: gp.Model | Formulation3ModelBundle) -> Formulation3Solu
     if bundle is None:
         return None
     return bundle.snapshot()
-
-
-def _gurobi_status_name(status: int) -> str:
-    status_names = {
-        GRB.LOADED: "LOADED",
-        GRB.OPTIMAL: "OPTIMAL",
-        GRB.INFEASIBLE: "INFEASIBLE",
-        GRB.INF_OR_UNBD: "INF_OR_UNBD",
-        GRB.UNBOUNDED: "UNBOUNDED",
-        GRB.CUTOFF: "CUTOFF",
-        GRB.ITERATION_LIMIT: "ITERATION_LIMIT",
-        GRB.NODE_LIMIT: "NODE_LIMIT",
-        GRB.TIME_LIMIT: "TIME_LIMIT",
-        GRB.SOLUTION_LIMIT: "SOLUTION_LIMIT",
-        GRB.INTERRUPTED: "INTERRUPTED",
-        GRB.NUMERIC: "NUMERIC",
-        GRB.SUBOPTIMAL: "SUBOPTIMAL",
-        GRB.USER_OBJ_LIMIT: "USER_OBJ_LIMIT",
-    }
-    return status_names.get(status, str(status))
