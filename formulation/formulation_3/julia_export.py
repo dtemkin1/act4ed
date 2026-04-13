@@ -8,6 +8,7 @@ import numpy as np
 
 from formulation.common import (
     TAU,
+    BusType,
     C_b,
     R_b,
     Wh_b,
@@ -207,18 +208,28 @@ def _triplet_from_single_mapping(
     return SparseTriplet(n_rows=n_rows, n_cols=n_cols, rows=rows, cols=cols, vals=vals)
 
 
+def _active_buses_for_julia(problem: Formulation3) -> list[Any]:
+    buses = list(problem.B)
+    if not any(student.requires_monitor for student in problem.M):
+        return [bus for bus in buses if bus.type == BusType.C]
+    return buses
+
+
 def build_formulation3_numeric_instance(
     problem: Formulation3,
 ) -> Formulation3NumericInstance:
-    B = problem.B
+    B = problem.B # _active_buses_for_julia(problem)
     M = problem.M
     S = problem.S
-    S_PLUS = problem.S_PLUS
     P = problem.P
     A = problem.A
-    N = problem.N
+    S_PLUS = problem.S_PLUS if problem.rounds > 1 else []
+    N = P + S + S_PLUS + problem.D_PLUS + problem.D_MINUS
 
-    A_list = list(A.keys())
+    included_nodes = set(N)
+    A_list = [
+        arc for arc in A.keys() if arc[0] in included_nodes and arc[1] in included_nodes
+    ]
     node_to_idx = {node: idx for idx, node in enumerate(N)}
     stop_to_idx = {stop: idx for idx, stop in enumerate(P)}
     school_to_idx = {school: idx for idx, school in enumerate(S)}
@@ -363,10 +374,10 @@ def build_formulation3_numeric_instance(
         ),
         bus_end_arc=_triplet_from_memberships(len(B), len(A_list), bus_end_memberships),
         school_copy_out_arc=_triplet_from_memberships(
-            len(S), len(A_list), school_copy_out_memberships
+            len(S_PLUS), len(A_list), school_copy_out_memberships
         ),
         school_copy_in_arc=_triplet_from_memberships(
-            len(S), len(A_list), school_copy_in_memberships
+            len(S_PLUS), len(A_list), school_copy_in_memberships
         ),
         student_to_pickup=_triplet_from_single_mapping(
             len(P), len(M), pickup_row_for_student

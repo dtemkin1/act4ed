@@ -11,6 +11,7 @@ from shapely import Point
 
 from formulation.common import (
     Bus,
+    BusType,
     Depot,
     ProblemData,
     School,
@@ -30,7 +31,7 @@ from formulation.formulation_3.problem3_definition import (
 )
 
 
-@dataclass
+@dataclass(frozen=True)
 class TinyProblemData(ProblemData):
     _service_graph: nx.MultiDiGraph
     _stops: list[Stop]
@@ -99,6 +100,7 @@ def _make_tiny_problem(rounds: int = 2) -> Formulation3:
         range=25,
         has_wheelchair_access=True,
         depot=depot,
+        type=BusType.C,
     )
 
     graph = nx.MultiDiGraph()
@@ -117,6 +119,62 @@ def _make_tiny_problem(rounds: int = 2) -> Formulation3:
         _buses=[bus],
     )
     return Formulation3(problem_data=problem_data, rounds=rounds)
+
+
+def _make_tiny_problem_no_sped_with_mixed_bus_types() -> Formulation3:
+    depot = Depot(name="Depot A", geographic_location=Point(0, 0), node_id=100)
+    stop = Stop(name="Stop A", geographic_location=Point(1, 0), node_id=101)
+    school = School(
+        name="School A",
+        geographic_location=Point(2, 0),
+        node_id=102,
+        id="school-a",
+        type=SchoolType.E,
+        start_time=8 * 60,
+    )
+
+    student = Student(
+        name="student-a",
+        geographic_location=Point(1, 1),
+        school=school,
+        stop=stop,
+        requires_monitor=False,
+        requires_wheelchair=False,
+    )
+
+    standard_bus = Bus(
+        name="bus-c",
+        capacity=40,
+        range=25,
+        has_wheelchair_access=False,
+        depot=depot,
+        type=BusType.C,
+    )
+    nonstandard_bus = Bus(
+        name="bus-b",
+        capacity=30,
+        range=25,
+        has_wheelchair_access=True,
+        depot=depot,
+        type=BusType.B,
+    )
+
+    graph = nx.MultiDiGraph()
+    graph.add_edge(100, 101, key=0, length=10.0, path=[100, 101])
+    graph.add_edge(101, 102, key=0, length=20.0, path=[101, 102])
+    graph.add_edge(102, 100, key=0, length=30.0, path=[102, 100])
+    graph.add_edge(102, 101, key=0, length=15.0, path=[102, 101])
+
+    problem_data = TinyProblemData(
+        name="tiny-no-sped",
+        _service_graph=graph,
+        _stops=[stop],
+        _schools=[school],
+        _depots=[depot],
+        _students=[student],
+        _buses=[standard_bus, nonstandard_bus],
+    )
+    return Formulation3(problem_data=problem_data, rounds=1)
 
 
 class Formulation3JuliaExportTests(unittest.TestCase):
@@ -173,14 +231,36 @@ class Formulation3JuliaExportTests(unittest.TestCase):
             self.assertTrue(np.all(payload["bus_start_arc_cols"] >= 1))
             self.assertEqual(payload["pickup_node_p"].tolist(), [1])
 
+    def test_round1_export_excludes_school_copy_nodes_and_arcs(self) -> None:
+        problem = _make_tiny_problem(rounds=1)
+
+        instance = build_formulation3_numeric_instance(problem)
+
+        self.assertEqual(instance.school_copy_node_s.tolist(), [])
+        self.assertEqual(instance.nN, 4)
+        self.assertLess(instance.nA, len(problem.A))
+        self.assertEqual(instance.school_copy_out_arc.n_rows, 0)
+        self.assertEqual(instance.school_copy_in_arc.n_rows, 0)
+
+    def test_no_sped_instances_only_export_type_c_buses(self) -> None:
+        problem = _make_tiny_problem_no_sped_with_mixed_bus_types()
+
+        instance = build_formulation3_numeric_instance(problem)
+
+        self.assertEqual(instance.nB, 1)
+        self.assertEqual(instance.bus_names.tolist(), ["bus-c"])
+
     def test_exported_index_data_matches_current_gurobi_builder(self) -> None:
         problem = _make_tiny_problem(rounds=2)
 
         instance = build_formulation3_numeric_instance(problem)
-        model, variables = build_model_from_definition(problem)
+        bundle = build_model_from_definition(problem)
+        model = bundle.model
+        variables = bundle.variables
+        meta = bundle.meta
 
-        self.assertEqual(instance.pickup_node_of_m.tolist(), [idx + 1 for idx in variables["meta"]["p_idx"]])
-        self.assertEqual(instance.school_node_of_m.tolist(), [idx + 1 for idx in variables["meta"]["s_idx"]])
+        self.assertEqual(instance.pickup_node_of_m.tolist(), [idx + 1 for idx in meta["p_idx"]])
+        self.assertEqual(instance.school_node_of_m.tolist(), [idx + 1 for idx in meta["s_idx"]])
         self.assertEqual(len(variables["z_b"]), instance.nB)
         self.assertEqual(len(variables["z_bq"]), instance.nB * instance.nQ)
         self.assertEqual(len(variables["x_bqij"]), instance.nB * instance.nQ * instance.nA)
