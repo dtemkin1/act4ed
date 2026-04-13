@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # Job Flags
-#SBATCH -p mit_quicktest
+#SBATCH -p mit_preemptable
 #SBATCH --time=0:10:00
-#SBATCH -c 24
-#SBATCH --mem=124G
+#SBATCH -c 32
+#SBATCH --mem=512G
 #SBATCH --output=logs/%x-%j.out
 #SBATCH --error=logs/%x-%j.err
 
