@@ -4,13 +4,13 @@ from pathlib import Path
 from formulation.common import ProblemDataToy, Student
 
 from formulation.formulation_3.problem3_definition import Formulation3
-from formulation.formulation_3.formulation3 import (
+from formulation.formulation_3.formulation3_gurobipy import (
     build_model_from_definition,
     make_report,
     plot_bus_routes,
     solve_problem,
 )
-from experiments.helpers import setup
+from experiments.helpers import make_osm_in_km, setup
 
 
 CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
@@ -21,6 +21,7 @@ PLACE_NAME = "Framingham, Massachusetts, USA"
 
 def main() -> None:
     problem_data_original = setup("framingham", PLACE_NAME)
+    osm_graph_km = make_osm_in_km(problem_data_original.osm_graph)
     print("Problem data loaded!")
 
     # pick fuller at first since mcc is right next to it
@@ -49,7 +50,7 @@ def main() -> None:
 
     problem_data = ProblemDataToy(
         "no_chaining_toy",
-        base_graph=problem_data_original.osm_graph,
+        base_graph=osm_graph_km,
         _stops=stops_with_students,
         _schools=[fuller],
         _depots=problem_data_original.depots,
@@ -64,15 +65,13 @@ def main() -> None:
     )
     print("No-chaining formulation created")
 
-    no_chaining_model = build_model_from_definition(no_chaining)
+    no_chaining_model, no_chaining_vars = build_model_from_definition(no_chaining)
     print("No-chaining model built")
 
-    solve_problem(no_chaining_model[0])
+    solve_problem(no_chaining_model)
     print("No-chaining problem solved!")
 
-    report_no_chaining = make_report(
-        no_chaining_model[0], no_chaining, no_chaining_model[1]
-    )
+    report_no_chaining = make_report(no_chaining_model, no_chaining, no_chaining_vars)
 
     with open(
         CURRENT_FILE_DIR / "outputs" / "report_no_chaining.txt", "w+", encoding="utf-8"
@@ -81,12 +80,13 @@ def main() -> None:
     print("No-chaining report written")
 
     plot_bus_routes(
-        no_chaining_model[0],
+        no_chaining_model,
         no_chaining,
-        no_chaining_model[1],
+        no_chaining_vars,
         CURRENT_FILE_DIR / "outputs" / "no_chaining_routes.png",
     )
     print("No-chaining routes plotted")
+    no_chaining_model.close()
 
     print("Now doing chaining formulation...")
     mcc = next(school for school in problem_data_original.schools if school.id == "MCC")
@@ -113,7 +113,7 @@ def main() -> None:
 
     problem_data = ProblemDataToy(
         "chaining_toy",
-        base_graph=problem_data_original.osm_graph,
+        base_graph=osm_graph_km,
         _stops=stops_with_students,
         _schools=[fuller, mcc],
         _depots=problem_data_original.depots,
@@ -126,24 +126,26 @@ def main() -> None:
     )
     print("Chaining formulation created")
 
-    chaining_model = build_model_from_definition(chaining)
+    chaining_model, chaining_vars = build_model_from_definition(chaining)
     print("Chaining model built")
 
-    solve_problem(chaining_model[0])
+    solve_problem(chaining_model)
     print("Chaining problem solved!")
 
-    report_chaining = make_report(chaining_model[0], chaining, chaining_model[1])
+    report_chaining = make_report(chaining_model, chaining, chaining_vars)
 
     with open(
         CURRENT_FILE_DIR / "outputs" / "report_chaining.txt", "w+", encoding="utf-8"
     ) as f:
         f.write(report_chaining)
     plot_bus_routes(
-        chaining_model[0],
+        chaining_model,
         chaining,
-        chaining_model[1],
+        chaining_vars,
         CURRENT_FILE_DIR / "outputs" / "chaining_routes.png",
     )
+
+    chaining_model.close()
 
 
 if __name__ == "__main__":

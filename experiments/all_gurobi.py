@@ -26,14 +26,14 @@ def main() -> None:
 
     print("No-chaining formulation created")
 
-    no_chaining_model = build_model_from_definition(no_chaining)
+    no_chaining_model, no_chaining_vars = build_model_from_definition(no_chaining)
     print("No-chaining model built")
 
-    solve_problem(no_chaining_model[0])
+    solve_problem(no_chaining_model)
     print("No-chaining problem solved!")
 
     # report_no_chaining = make_report(
-    #     no_chaining_model[0], no_chaining, no_chaining_model[1]
+    #     no_chaining_model, no_chaining, no_chaining_vars
     # )
 
     # with open(
@@ -45,12 +45,13 @@ def main() -> None:
     # print("No-chaining report written")
 
     # plot_bus_routes(
-    #     no_chaining_model[0],
+    #     no_chaining_model,
     #     no_chaining,
-    #     no_chaining_model[1],
+    #     no_chaining_vars,
     #     CURRENT_FILE_DIR / "outputs" / "no_chaining_routes_all.png",
     # )
     # print("No-chaining routes plotted")
+    no_chaining_model.close()
 
     print("Now doing chaining formulation...")
     problem_data = setup("framingham", PLACE_NAME, 1000)
@@ -60,13 +61,13 @@ def main() -> None:
     )
     print("Chaining formulation created")
 
-    chaining_model = build_model_from_definition(chaining)
+    chaining_model, chaining_vars = build_model_from_definition(chaining)
     print("Chaining model built")
 
-    solve_problem(chaining_model[0])
+    solve_problem(chaining_model)
     print("Chaining problem solved!")
 
-    # report_chaining = make_report(chaining_model[0], chaining, chaining_model[1])
+    # report_chaining = make_report(chaining_model, chaining, chaining_vars)
 
     # with open(
     #     CURRENT_FILE_DIR / "outputs" / "report_chaining_all.txt", "w+", encoding="utf-8"
@@ -74,11 +75,13 @@ def main() -> None:
     #     f.write(report_chaining)
 
     # plot_bus_routes(
-    #     chaining_model[0],
+    #     chaining_model,
     #     chaining,
-    #     chaining_model[1],
+    #     chaining_vars,
     #     CURRENT_FILE_DIR / "outputs" / "chaining_routes_all.png",
     # )
+
+    chaining_model.close()
 
 
 if __name__ == "__main__":

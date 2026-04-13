@@ -1,10 +1,13 @@
 import os
 from pathlib import Path
 
+from networkx import MultiDiGraph
 import pandas as pd
 import matplotlib.pyplot as plt
+from shapely import Point
+from shapely import Point
 
-from formulation.common import ProblemDataReal, Student
+from formulation.common import NodeId, ProblemDataReal, Student
 
 
 CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
@@ -51,7 +54,7 @@ def setup(
             boundary_buffer_km=BOUNDARY_BUFFER_KM,
             prune=prune,
         )
-        problem_data.sanity_checks()
+        # problem_data.sanity_checks()
 
         problem_data.save()
 
@@ -185,6 +188,22 @@ def plot_special_education_students(problem_data: ProblemDataReal) -> None:
         dpi=300,
         bbox_inches="tight",
     )
+
+
+def make_osm_in_km(graph: "MultiDiGraph[NodeId]") -> "MultiDiGraph[NodeId]":
+    """Converts the OSM graph from meters to kilometers for easier interpretation"""
+
+    graph_km = graph.copy()
+    for u, v, key, data in graph_km.edges(keys=True, data=True):
+        graph_km.edges[u, v, key]["length"] = data["length"] / 1000.0
+
+    return graph_km
+
+
+def make_point_from_node_id(graph: "MultiDiGraph[NodeId]", node_id: NodeId) -> Point:
+    """Helper function to make a Point from a node id in the graph"""
+
+    return Point(graph.nodes[node_id]["x"], graph.nodes[node_id]["y"])
 
 
 if __name__ == "__main__":

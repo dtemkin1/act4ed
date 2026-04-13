@@ -272,7 +272,7 @@ class ProblemDataToy(ProblemData):
 
             if start_id == end_id:
                 service_graph.add_edge(
-                    start_id, end_id, length=0, path=[start_id, end_id]
+                    start_id, end_id, length=0.0, path=[start_id, end_id]
                 )
                 return
 

@@ -2,8 +2,8 @@ import os
 from pathlib import Path
 
 from gurobipy import GRB
-from shapely import Point
 
+from experiments.helpers import make_point_from_node_id
 from formulation.common import (
     Depot,
     Bus,
@@ -34,9 +34,7 @@ def main() -> None:
     depot_point = 0
     depot = Depot(
         name="Depot 1",
-        geographic_location=Point(
-            graph.nodes[depot_point]["x"], graph.nodes[depot_point]["y"]
-        ),
+        geographic_location=make_point_from_node_id(graph, depot_point),
         node_id=0,
     )
     bus = Bus(
@@ -50,18 +48,14 @@ def main() -> None:
     stop_node = 1
     stop = Stop(
         name="Stop 1",
-        geographic_location=Point(
-            graph.nodes[stop_node]["x"], graph.nodes[stop_node]["y"]
-        ),
+        geographic_location=make_point_from_node_id(graph, stop_node),
         node_id=1,
     )
 
     school_1_node = 2
     school_1 = School(
         name="School 1",
-        geographic_location=Point(
-            graph.nodes[school_1_node]["x"], graph.nodes[school_1_node]["y"]
-        ),
+        geographic_location=make_point_from_node_id(graph, school_1_node),
         node_id=2,
         id=1,
         type=SchoolType.E,
@@ -71,9 +65,7 @@ def main() -> None:
     school_2_node = 3
     school_2 = School(
         name="School 2",
-        geographic_location=Point(
-            graph.nodes[school_2_node]["x"], graph.nodes[school_2_node]["y"]
-        ),
+        geographic_location=make_point_from_node_id(graph, school_2_node),
         node_id=3,
         id=2,
         type=SchoolType.E,
@@ -83,9 +75,7 @@ def main() -> None:
     students_1 = [
         Student(
             name=f"Student {i}",
-            geographic_location=Point(
-                graph.nodes[stop_node]["x"], graph.nodes[stop_node]["y"]
-            ),
+            geographic_location=make_point_from_node_id(graph, stop_node),
             stop=stop,
             school=school_1,
             requires_monitor=False,
@@ -97,9 +87,7 @@ def main() -> None:
     students_2 = [
         Student(
             name=f"Student {i+20}",
-            geographic_location=Point(
-                graph.nodes[stop_node]["x"], graph.nodes[stop_node]["y"]
-            ),
+            geographic_location=make_point_from_node_id(graph, stop_node),
             stop=stop,
             school=school_2,
             requires_monitor=False,
@@ -163,6 +151,8 @@ def main() -> None:
     )
     with open(report_file, "w+", encoding="utf-8") as f:
         f.write(report)
+
+    model.close()
 
 
 if __name__ == "__main__":
