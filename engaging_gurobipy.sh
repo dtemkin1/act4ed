@@ -25,7 +25,7 @@ if [[ -n "$CONTAINER" ]]; then
 		--bind "${BASEDIR}:/work" \
 		--pwd /work \
 		"$CONTAINER" \
-		bash -lc 'set -euo pipefail; uv sync --frozen; exec uv run python -m experiments.all_gurobi "$@"' bash "$@"
+		bash -lc 'set -euo pipefail; /usr/local/bin/uv sync --frozen; exec /usr/local/bin/uv run python -m experiments.all_gurobi "$@"' bash "$@"
 fi
 
 uv sync --frozen
