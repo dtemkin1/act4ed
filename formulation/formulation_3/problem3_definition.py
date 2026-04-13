@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field, replace
 from functools import cached_property
+from pathlib import Path
 import networkx as nx
 from dataclasses_json import dataclass_json
 
@@ -63,7 +64,7 @@ class ExperimentConfig:
     @cached_property
     def filtered_problem_data(self):
         # filter problem data according to config
-        problem_data = ProblemDataReal.load_path(self.problem_data_pkl)
+        problem_data = ProblemDataReal.load_path(Path(self.problem_data_pkl))
         filtered_students = problem_data.students
         if self.students_to_consider:
             filtered_students = [

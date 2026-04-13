@@ -8,6 +8,7 @@ from pathlib import Path
 import gurobipy as gp
 from gurobipy import tupledict, Var
 import numpy as np
+from formulation3_gurobipy import _gurobi_status_name
 
 
 PORTABLE_SOLUTION_SCHEMA_VERSION = 1
@@ -109,8 +110,8 @@ def _portable_solution_payload(solution: "Formulation3Solution") -> dict[str, np
     return payload
 
 
-def _load_portable_variables(data: Any) -> dict[str, dict[Any, float]]:
-    variables: dict[str, dict[Any, float]] = {}
+def _load_portable_variables(data: Any) -> dict[str, dict[Any, float | None]]:
+    variables: dict[str, dict[Any, float | None]] = {}
     for name, arity in PORTABLE_VARIABLE_ARITIES.items():
         indices_key = f"{name}_indices"
         values_key = f"{name}_values"
@@ -126,7 +127,7 @@ def _load_portable_variables(data: Any) -> dict[str, dict[Any, float]]:
         if indices.ndim == 1:
             indices = indices.reshape(-1, arity)
 
-        family_values: dict[Any, float] = {}
+        family_values: dict[Any, float | None] = {}
         for key_row, value in zip(indices, values, strict=True):
             key = int(key_row[0]) if arity == 1 else tuple(int(idx) for idx in key_row)
             family_values[key] = float(value)
@@ -189,7 +190,8 @@ class Formulation3Solution:
         output_path = Path(path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         if output_path.suffix == ".npz":
-            np.savez_compressed(output_path, **_portable_solution_payload(self))
+            payload = _portable_solution_payload(self)
+            np.savez_compressed(str(output_path), allow_pickle=False, **payload)
             return output_path
 
         with output_path.open("wb") as handle:
@@ -236,7 +238,7 @@ class _SnapshotVar:
     X: float | None
 
 
-class _SnapshotVarSet(dict[Any, float | None]):
+class _SnapshotVarSet(dict):
     def __init__(
         self,
         values: dict[Any, float | None],

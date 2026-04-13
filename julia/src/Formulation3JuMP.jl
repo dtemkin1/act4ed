@@ -648,11 +648,11 @@ function build_model(
 
     @constraint(model, student_assignments .<= 1)
     @constraint(model, sum(a_mbq) >= inst.PHI * inst.nM)
-    @constraint(
-        model,
-        [m = 1:inst.nM, b = 1:inst.nB, q = 1:inst.nQ; assignment_feasible[m, b]],
-        a_mbq[m, b, q] <= z_bq[b, q],
-    )
+    # @constraint(
+    #     model,
+    #     [m = 1:inst.nM, b = 1:inst.nB, q = 1:inst.nQ; assignment_feasible[m, b]],
+    #     a_mbq[m, b, q] <= z_bq[b, q],
+    # )
     @constraint(model, z_bq .<= students_per_bus_round)
     @constraint(model, z_b .<= students_per_bus)
 
