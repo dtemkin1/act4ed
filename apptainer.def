@@ -1,7 +1,9 @@
 Bootstrap: docker
-From: python:3.11-slim
+From: python:3.13-slim
 
 %post
+    JULIA_VERSION=1.12.5
+
     apt-get update
     apt-get install -y --no-install-recommends \
         build-essential \
@@ -20,6 +22,10 @@ From: python:3.11-slim
     apt-get update
     apt-get install -y --no-install-recommends temurin-21-jdk
 
+    curl -fsSL "https://julialang-s3.julialang.org/bin/linux/x64/${JULIA_VERSION%.*}/julia-${JULIA_VERSION}-linux-x86_64.tar.gz" \
+        | tar -xz -C /opt
+    ln -s "/opt/julia-${JULIA_VERSION}" /opt/julia
+
     mkdir -p /opt/java
     ln -s "$(dirname "$(dirname "$(readlink -f "$(command -v javac)")")")" /opt/java/openjdk
 
@@ -31,8 +37,9 @@ From: python:3.11-slim
 %environment
     export LC_ALL=C.UTF-8
     export LANG=C.UTF-8
+    export JULIA_HOME=/opt/julia
     export JAVA_HOME=/opt/java/openjdk
-    export PATH=$JAVA_HOME/bin:/usr/local/bin:$PATH
+    export PATH=$JULIA_HOME/bin:$JAVA_HOME/bin:/usr/local/bin:$PATH
 
 %runscript
     exec "$@"
