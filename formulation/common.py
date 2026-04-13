@@ -62,6 +62,7 @@ class BusType(IntEnum):
     WC = 3
     """4 wheelchair access"""
 
+
 @dataclass(frozen=True)
 class Base:
     """base class for all entities in the problem, just has a name for now"""
@@ -130,14 +131,19 @@ class School(NodeLocationData):
 class Bus(Base):
     """
     a bus that can be used for transportation,
-    has a capacity, range, and may have wheelchair access
+    has a capacity, range (in miles), and may have wheelchair access
     """
 
     capacity: int
-    range: int
+    range: float
     has_wheelchair_access: bool
     depot: Depot
     type: BusType | None = None
+
+    @property
+    def range_km(self) -> float:
+        """range in kilometers"""
+        return self.range * 1.60934  # convert miles to km
 
     def __str__(self):
         return self.name
@@ -176,7 +182,7 @@ class ProblemData(ABC):
     @abstractmethod
     def service_graph(self) -> "nx.MultiDiGraph[NodeId]":
         """
-        network graph with edge weights corresponding to travel times in minutes,
+        network graph with edge weights corresponding to travel times in minutes and length in km,
         only containing nodes in N and edges corresponding to shortest paths between nodes in N.
         uses integer node_id
         """
@@ -326,14 +332,14 @@ class ProblemDataReal(ProblemData):
     """path to buses csv file"""
     place_name: str
     """place name to geocode for graph construction, e.g. 'Framingham, MA'"""
-    boundary_buffer_m: int = 1000
-    """buffer in meters to apply to the place boundary when constructing the graph"""
+    boundary_buffer_km: float = 1.0
+    """buffer in kilometers to apply to the place boundary when constructing the graph"""
     osm_pbf_path: Path | None = None
     """path to osm pbf file, required if use_r5 is True"""
     use_r5: bool = False
     """flag to use r5py for more accurate travel time estimates, or networkx for faster shortest path calculations"""
     prune: int | None = None
-    """flag for whether to prune the service graph based on stop distance (in meters)."""
+    """flag for whether to prune the service graph based on stop distance (in kilometers)."""
 
     # post init data
     @cached_property
@@ -384,7 +390,7 @@ class ProblemDataReal(ProblemData):
 
         # project to utm for meters-based buffering
         projected = gdf.to_crs(gdf.estimate_utm_crs())
-        projected["geometry"] = projected.buffer(self.boundary_buffer_m)
+        projected["geometry"] = projected.buffer(self.boundary_buffer_km * 1000)
 
         # project back to original crs for osmnx
         buffered = projected.to_crs(gdf.crs)
@@ -429,13 +435,16 @@ class ProblemDataReal(ProblemData):
                 return
 
             try:
+                # NOTE: length from osm is in meters, convert to km for service graph
                 length, path = self._get_shortest_path_osm(start_id, end_id)
 
                 if self.prune and isinstance(start, Stop) and isinstance(end, Stop):
-                    if length > self.prune:
+                    if length > self.prune * 1000:  # convert km to m
                         return
 
-                service_graph.add_edge(start_id, end_id, length=length, path=path)
+                service_graph.add_edge(
+                    start_id, end_id, length=(length / 1000), path=path
+                )
             except nx.NetworkXNoPath:
                 print(f"Warning: no path between {start} and {end} in the graph")
 
@@ -502,7 +511,9 @@ class ProblemDataReal(ProblemData):
                         service_graph.add_edge(
                             start_node.node_id,
                             end_node.node_id,
-                            length=entry["distance"].iloc[0],
+                            length=(
+                                entry["distance"].iloc[0] / 1000
+                            ),  # convert m to km
                             path=entry["geometry"].iloc[0],
                         )
 
@@ -628,7 +639,7 @@ class ProblemDataReal(ProblemData):
                 "id": str,
                 "depot_name": str,
                 "capacity": int,
-                "range": int,
+                "range": float,
                 "has_wheelchair_access": bool,
                 "type": str,
             },
@@ -830,8 +841,8 @@ def Wh_b(b: Bus):
 
 
 def R_b(b: Bus):
-    """range of bus b in miles"""
-    return b.range
+    """range of bus b in km"""
+    return b.range_km
 
 
 def h_s(s: School):

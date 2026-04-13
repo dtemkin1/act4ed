@@ -23,14 +23,14 @@ def make_graph(size: tuple[int, int] = (10, 10)) -> "nx.MultiDiGraph[NodeId]":
     graph_2d = cast("nx.MultiDiGraph[tuple[int, int]]", graph_2d)
     # Add weights to the edges
     for u, v in graph_2d.edges():
-        graph_2d.edges[u, v, 0]["length"] = 1000.0  # 1 km between adjacent nodes
+        graph_2d.edges[u, v, 0]["length"] = 1.0  # 1 km between adjacent nodes
 
     graph: "nx.MultiDiGraph[NodeId]" = nx.MultiDiGraph()
     mapping: dict[tuple[int, int], NodeId] = {}
     for i, node in enumerate(graph_2d.nodes()):
         mapping[node] = i
-        x = node[0] * 1000.0  # convert to meters
-        y = node[1] * 1000.0  # convert to meters
+        x = node[0]
+        y = node[1]
         graph.add_node(i, x=x, y=y, location=(x, y))
     for u, v in graph_2d.edges():
         graph.add_edge(mapping[u], mapping[v], length=graph_2d.edges[u, v, 0]["length"])
@@ -131,7 +131,7 @@ def make_buses(
     graph: "nx.MultiDiGraph[NodeId]",
     num_buses: int = 3,
     capacities: list[int] | None = None,
-    ranges: list[int] | None = None,
+    ranges: list[float] | None = None,
     depots: list[Depot] | None = None,
 ) -> list[Bus]:
     if capacities is None:

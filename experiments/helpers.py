@@ -10,7 +10,7 @@ from formulation.common import ProblemDataReal, Student
 CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 
 # where
-BOUNDARY_BUFFER_M = 1000
+BOUNDARY_BUFFER_KM = 1.0
 
 # data files
 DEPOT_CSV = CURRENT_FILE_DIR / "data" / "depot.csv"
@@ -21,7 +21,7 @@ BUSES_CSV = CURRENT_FILE_DIR / "data" / "buses.csv"
 
 # thresholds
 MAX_WALK_TIME_S = 15 * 60  # 15 mins
-MAX_WALK_DIST_M = 1000  # 1 km (should we do miles? idk)
+MAX_WALK_DIST_KM = 1.0  # 1 km
 
 # base street network
 NETWORK_TYPE = "drive"
@@ -46,7 +46,7 @@ def setup(
             depots_path=DEPOT_CSV,
             buses_path=BUSES_CSV,
             place_name=place_name,
-            boundary_buffer_m=BOUNDARY_BUFFER_M,
+            boundary_buffer_km=BOUNDARY_BUFFER_KM,
             prune=prune,
         )
         problem_data.sanity_checks()

@@ -21,7 +21,8 @@ from formulation.common import (
     make_school_copy,
 )
 
-MILES_TO_METERS = 26.8224
+MPH_TO_KM_PER_MIN = 37.282
+"divide the mph value by 37.282"
 
 
 @dataclass_json
@@ -160,8 +161,8 @@ class Formulation3:
     """capacity multiplier for different school types"""
 
     # https://malegislature.gov/Laws/GeneralLaws/PartI/TitleXIV/Chapter90/Section17
-    BUS_SPEED_NOT_HIGHWAY: float = 40 * MILES_TO_METERS
-    BUS_SPEED_SCHOOL_ZONE: float = 20 * MILES_TO_METERS
+    BUS_SPEED_NOT_HIGHWAY: float = 40.0 / MPH_TO_KM_PER_MIN
+    BUS_SPEED_SCHOOL_ZONE: float = 20.0 / MPH_TO_KM_PER_MIN
 
     # sets
     G: "nx.MultiDiGraph[NodeId]" = field(init=False)
@@ -270,7 +271,7 @@ class Formulation3:
         return self.d_ij(i, j) / self.BUS_SPEED_NOT_HIGHWAY
 
     def d_ij(self, i: Place, j: Place) -> float:
-        """shortest distance from node i to node j in meters"""
+        """shortest distance from node i to node j in km"""
 
         return self.A[i, j]
 
