@@ -5,7 +5,6 @@ from networkx import MultiDiGraph
 import pandas as pd
 import matplotlib.pyplot as plt
 from shapely import Point
-from shapely import Point
 
 from formulation.common import NodeId, ProblemDataReal, Student
 
