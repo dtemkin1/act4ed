@@ -571,16 +571,29 @@ class ProblemDataReal(ProblemData):
 
     def save(self):
         """save problem data to disk for later loading and use in formulation"""
-        with open(
-            CURRENT_FILE_DIR / "cache" / f"{self.name}_problem_data.pkl", "wb+"
-        ) as f:
+        cache_dir = CURRENT_FILE_DIR / "cache"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+
+        prob_name = f"{self.name}{'_' + str(self.prune) if self.prune else ''}_problem_data"
+        with open(cache_dir / f"{prob_name}.pkl", "wb+") as f:
             pickle.dump(self, f)
 
     @classmethod
     def load(cls, name: str, prune: int | None = None) -> "ProblemDataReal":
         """load problem data from disk"""
-        prob_name = f"{name}{'_' + str(prune) if prune else ''}_problem_data"
-        return cls.load_path(CURRENT_FILE_DIR / "cache" / f"{prob_name}.pkl")
+        cache_dir = CURRENT_FILE_DIR / "cache"
+
+        # Try the prune-specific cache first, then fall back to legacy unpruned naming.
+        candidate_names = [f"{name}{'_' + str(prune) if prune else ''}_problem_data"]
+        if prune is not None:
+            candidate_names.append(f"{name}_problem_data")
+
+        for candidate in candidate_names:
+            path = cache_dir / f"{candidate}.pkl"
+            if path.exists():
+                return cls.load_path(path)
+
+        raise FileNotFoundError(f"No cached problem data found in {cache_dir}")
 
     @classmethod
     def load_path(cls, path: Path) -> "ProblemDataReal":
