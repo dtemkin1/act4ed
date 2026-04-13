@@ -53,6 +53,16 @@ class SchoolType(IntEnum):
     """high school"""
 
 
+class BusType(IntEnum):
+    C = 0
+    """71 passengers, no wheelchair access"""
+    BWC = 1
+    """31 passengers, 2 wheelchair access"""
+    B = 2
+    """48 passengers, no wheelchair access"""
+    WC = 3
+    """4 wheelchair access"""
+
 @dataclass(frozen=True)
 class Base:
     """base class for all entities in the problem, just has a name for now"""
@@ -128,6 +138,7 @@ class Bus(Base):
     range: int
     has_wheelchair_access: bool
     depot: Depot
+    type: BusType | None = None
 
     def __str__(self):
         return self.name
@@ -620,6 +631,7 @@ class ProblemDataReal(ProblemData):
                 "capacity": int,
                 "range": int,
                 "has_wheelchair_access": bool,
+                "type": str,
             },
         )
         return_buses: list[Bus] = []
@@ -631,6 +643,9 @@ class ProblemDataReal(ProblemData):
                 range=row["range"],
                 depot=depot,
                 has_wheelchair_access=bool(row["has_wheelchair_access"]),
+                type=(
+                    BusType[row["type"]] if row["type"] in BusType.__members__ else None
+                ),
             )
             return_buses.append(bus)
         return return_buses

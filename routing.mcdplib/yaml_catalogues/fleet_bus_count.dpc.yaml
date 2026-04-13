@@ -1,15 +1,77 @@
 F:
-  - "Nat"
-  - "Nat"
-  - "Nat"
+  - Nat
+  - Nat
+  - Nat
 R:
-  - "USD"
-
+  - USD
 implementations:
-  guideline_200:
+  guideline_0:
     f_max:
-      - "50"
-      - "8000"
-      - "20"
+      - "0"
+      - "0"
+      - "0"
     r_min:
-      - "540000 USD"
+      - 0 USD
+  guideline_1:
+    f_max:
+      - "1"
+      - "50"
+      - "1"
+    r_min:
+      - 50000 USD
+  guideline_2:
+    f_max:
+      - "2"
+      - "100"
+      - "1"
+    r_min:
+      - 100000 USD
+  guideline_3:
+    f_max:
+      - "3"
+      - "150"
+      - "2"
+    r_min:
+      - 150000 USD
+  guideline_4:
+    f_max:
+      - "4"
+      - "200"
+      - "2"
+    r_min:
+      - 200000 USD
+  guideline_5:
+    f_max:
+      - "5"
+      - "250"
+      - "3"
+    r_min:
+      - 250000 USD
+  guideline_6:
+    f_max:
+      - "6"
+      - "300"
+      - "3"
+    r_min:
+      - 300000 USD
+  guideline_7:
+    f_max:
+      - "7"
+      - "350"
+      - "4"
+    r_min:
+      - 350000 USD
+  guideline_8:
+    f_max:
+      - "8"
+      - "400"
+      - "4"
+    r_min:
+      - 400000 USD
+  guideline_9:
+    f_max:
+      - "9"
+      - "450"
+      - "5"
+    r_min:
+      - 450000 USD

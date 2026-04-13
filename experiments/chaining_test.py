@@ -29,7 +29,7 @@ def main() -> None:
     output_dir = CURRENT_FILE_DIR / "outputs"
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    graph = make_graph(size=(4, 2))
+    graph = make_graph(size=(4, 1))
 
     depot_point = 0
     depot = Depot(
@@ -129,7 +129,9 @@ def main() -> None:
     )
 
     if model.Status == GRB.INFEASIBLE:
-        iis_path = output_dir / f"{toy_data.problem_data.name}_rounds_{toy_data.rounds}.ilp"
+        iis_path = (
+            output_dir / f"{toy_data.problem_data.name}_rounds_{toy_data.rounds}.ilp"
+        )
         model.computeIIS()
         model.write(str(iis_path))
         print(f"Wrote IIS to {iis_path}")
