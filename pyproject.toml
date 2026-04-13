@@ -33,6 +33,7 @@ dependencies = [
     "gurobipy>=13.0.1",
     "dataclasses-json>=0.6.7",
     "loguru>=0.7.3",
+    "pytest>=9.0.3",
 ]
 
 [tool.uv]
