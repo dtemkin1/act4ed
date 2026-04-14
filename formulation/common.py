@@ -197,6 +197,133 @@ class ProblemData(ABC):
         """all nodes in the problem, including stops, schools, and depots"""
         return self.stops + self.schools + self.depots
 
+    def restricted(
+        self,
+        *,
+        school_ids: list[str | int] | None = None,
+        school_types: list[SchoolType | str | int] | None = None,
+    ) -> "FilteredProblemData":
+        if not school_ids and not school_types:
+            raise ValueError("must provide at least one school id or school type")
+
+        allowed_school_ids = None if not school_ids else set(school_ids)
+        allowed_school_types = (
+            None if not school_types else {_coerce_school_type(value) for value in school_types}
+        )
+
+        selected_schools = [
+            school
+            for school in self.schools
+            if (
+                allowed_school_ids is None or school.id in allowed_school_ids
+            ) and (
+                allowed_school_types is None or school.type in allowed_school_types
+            )
+        ]
+        if not selected_schools:
+            raise ValueError("no schools matched the requested restriction")
+
+        selected_school_ids = {school.id for school in selected_schools}
+        selected_students = [
+            student for student in self.students if student.school.id in selected_school_ids
+        ]
+        if not selected_students:
+            raise ValueError("no students matched the requested school restriction")
+
+        selected_school_ids = {student.school.id for student in selected_students}
+        selected_schools = [
+            school for school in selected_schools if school.id in selected_school_ids
+        ]
+        selected_stops_set = {student.stop for student in selected_students}
+        selected_stops = [stop for stop in self.stops if stop in selected_stops_set]
+
+        return FilteredProblemData(
+            name=f"{self.name}_{_restriction_suffix(school_ids, school_types)}",
+            base_problem_data=self,
+            _stops=selected_stops,
+            _schools=selected_schools,
+            _depots=list(self.depots),
+            _students=selected_students,
+            _buses=list(self.buses),
+        )
+
+    def restrict_to_school(self, school: School | str | int) -> "FilteredProblemData":
+        school_id = school.id if isinstance(school, School) else school
+        return self.restricted(school_ids=[school_id])
+
+    def restrict_to_school_type(
+        self,
+        school_type: SchoolType | str | int,
+    ) -> "FilteredProblemData":
+        return self.restricted(school_types=[school_type])
+
+
+def _coerce_school_type(value: SchoolType | str | int) -> SchoolType:
+    if isinstance(value, SchoolType):
+        return value
+    if isinstance(value, str):
+        return SchoolType[value]
+    return SchoolType(value)
+
+
+def _restriction_suffix(
+    school_ids: list[str | int] | None,
+    school_types: list[SchoolType | str | int] | None,
+) -> str:
+    parts: list[str] = []
+    if school_ids:
+        parts.append("schools_" + "-".join(str(value) for value in school_ids))
+    if school_types:
+        parts.append(
+            "types_" + "-".join(_coerce_school_type(value).name for value in school_types)
+        )
+    return "_".join(parts)
+
+
+@dataclass(frozen=True)
+class FilteredProblemData(ProblemData):
+    base_problem_data: ProblemData
+    _stops: list[Stop]
+    _schools: list[School]
+    _depots: list[Depot]
+    _students: list[Student]
+    _buses: list[Bus]
+
+    @cached_property
+    def _service_graph_cached(self) -> "nx.MultiDiGraph[NodeId]":
+        node_ids = {node.node_id for node in self.all_nodes}
+        service_graph = self.base_problem_data.service_graph.subgraph(node_ids).copy()
+        service_graph.graph.update(self.base_problem_data.service_graph.graph)
+        _ensure_service_graph_kilometers(service_graph)
+        return service_graph
+
+    @property
+    def service_graph(self) -> "nx.MultiDiGraph[NodeId]":
+        return self._service_graph_cached
+
+    @property
+    def stops(self) -> list[Stop]:
+        return self._stops
+
+    @property
+    def schools(self) -> list[School]:
+        return self._schools
+
+    @property
+    def depots(self) -> list[Depot]:
+        return self._depots
+
+    @property
+    def students(self) -> list[Student]:
+        return self._students
+
+    @property
+    def buses(self) -> list[Bus]:
+        return self._buses
+
+    def __getattr__(self, name: str):
+        return getattr(self.base_problem_data, name)
+
 
 @dataclass(frozen=True)
 class ProblemDataToy(ProblemData):

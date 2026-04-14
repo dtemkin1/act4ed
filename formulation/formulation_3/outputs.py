@@ -170,7 +170,7 @@ def plot_bus_routes(
 
     problem_data = formulation.problem_data
 
-    if isinstance(problem_data, ProblemDataReal):
+    if hasattr(problem_data, "osm_graph"):
         graph = problem_data.osm_graph
         pos: dict[NodeId, tuple[float, float]] = {
             node: (
@@ -179,7 +179,7 @@ def plot_bus_routes(
             )
             for node in G.nodes()
         }
-    elif isinstance(problem_data, ProblemDataToy):
+    elif hasattr(problem_data, "base_graph"):
         graph = problem_data.base_graph
         graph.graph["crs"] = "EPSG:3857"  # uses meters
         pos = {

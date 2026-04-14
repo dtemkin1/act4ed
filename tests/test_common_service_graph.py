@@ -62,6 +62,7 @@ def _make_problem_data(
     object.__setattr__(problem_data, "_schools_cached", schools)
     object.__setattr__(problem_data, "_students_cached", students)
     object.__setattr__(problem_data, "_depots_cached", depots or [])
+    object.__setattr__(problem_data, "_buses_cached", [])
 
     path_lengths = lengths or {}
 
@@ -73,6 +74,95 @@ def _make_problem_data(
 
 
 class CommonServiceGraphTests(unittest.TestCase):
+    def test_restrict_to_school_uses_cached_graph_and_keeps_only_relevant_nodes(self) -> None:
+        stop_a = _make_stop("Stop A", 1)
+        stop_b = _make_stop("Stop B", 2)
+        stop_c = _make_stop("Stop C", 3)
+        school_e = _make_school("School E", 10, SchoolType.E)
+        school_h = _make_school("School H", 11, SchoolType.HS)
+        depot = _make_depot("Depot", 20)
+        students = [
+            _make_student("student-e-1", stop_a, school_e),
+            _make_student("student-e-2", stop_b, school_e),
+            _make_student("student-h-1", stop_c, school_h),
+        ]
+
+        problem_data = _make_problem_data(
+            stops=[stop_a, stop_b, stop_c],
+            schools=[school_e, school_h],
+            students=students,
+            depots=[depot],
+        )
+        _ = problem_data.service_graph
+
+        def should_not_recompute(*args, **kwargs):
+            raise AssertionError("restricted view should reuse the cached service graph")
+
+        object.__setattr__(problem_data, "_get_shortest_path_osm", should_not_recompute)
+
+        restricted = problem_data.restrict_to_school(school_e.id)
+        graph = restricted.service_graph
+
+        self.assertEqual([school.id for school in restricted.schools], [school_e.id])
+        self.assertEqual(
+            [student.name for student in restricted.students],
+            ["student-e-1", "student-e-2"],
+        )
+        self.assertEqual([stop.name for stop in restricted.stops], ["Stop A", "Stop B"])
+        self.assertEqual(
+            set(graph.nodes),
+            {depot.node_id, stop_a.node_id, stop_b.node_id, school_e.node_id},
+        )
+        self.assertFalse(graph.has_node(stop_c.node_id))
+        self.assertFalse(graph.has_node(school_h.node_id))
+        self.assertTrue(graph.has_edge(stop_a.node_id, school_e.node_id))
+
+    def test_restrict_to_school_type_keeps_all_matching_schools_and_stops(self) -> None:
+        stop_shared = _make_stop("Stop Shared", 1)
+        stop_e = _make_stop("Stop E", 2)
+        stop_h = _make_stop("Stop H", 3)
+        school_e_1 = _make_school("School E1", 10, SchoolType.E)
+        school_e_2 = _make_school("School E2", 11, SchoolType.E)
+        school_h = _make_school("School H", 12, SchoolType.HS)
+        depot = _make_depot("Depot", 20)
+        students = [
+            _make_student("student-e-1", stop_shared, school_e_1),
+            _make_student("student-e-2", stop_e, school_e_2),
+            _make_student("student-h-1", stop_h, school_h),
+        ]
+
+        restricted = _make_problem_data(
+            stops=[stop_shared, stop_e, stop_h],
+            schools=[school_e_1, school_e_2, school_h],
+            students=students,
+            depots=[depot],
+        ).restrict_to_school_type("E")
+
+        self.assertEqual(
+            [school.id for school in restricted.schools],
+            [school_e_1.id, school_e_2.id],
+        )
+        self.assertEqual(
+            [student.name for student in restricted.students],
+            ["student-e-1", "student-e-2"],
+        )
+        self.assertEqual(
+            [stop.name for stop in restricted.stops],
+            ["Stop Shared", "Stop E"],
+        )
+        self.assertEqual(
+            set(restricted.service_graph.nodes),
+            {
+                depot.node_id,
+                stop_shared.node_id,
+                stop_e.node_id,
+                school_e_1.node_id,
+                school_e_2.node_id,
+            },
+        )
+        self.assertFalse(restricted.service_graph.has_node(stop_h.node_id))
+        self.assertFalse(restricted.service_graph.has_node(school_h.node_id))
+
     def test_stop_to_school_edges_follow_student_school_types(self) -> None:
         stop_e = _make_stop("Stop E", 1)
         stop_h = _make_stop("Stop H", 2)
