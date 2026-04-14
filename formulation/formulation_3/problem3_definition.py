@@ -268,7 +268,60 @@ class Formulation3:
     def t_ij(self, i: Place, j: Place) -> float:
         """travel time from node i to node j in minutes"""
 
-        return self.d_ij(i, j) / self.BUS_SPEED_NOT_HIGHWAY
+        nodes = self.A_PATH[i, j]
+        paths: list[list[NodeId]] = []
+
+        # for every pair of nodes, get path between them
+        for k in range(len(nodes) - 1):
+            ik_edge_data = self.problem_data.service_graph.get_edge_data(
+                nodes[k], nodes[k + 1], key=0, default=None
+            )
+            if ik_edge_data is not None:
+                paths.append(ik_edge_data["path"])
+
+        travel_time = 0.0
+        for path in paths:
+            for k in range(len(path) - 1):
+                edge_data = self.problem_data.base_graph.get_edge_data(
+                    path[k], path[k + 1], key=0
+                )
+                speed = self.BUS_SPEED_NOT_HIGHWAY  # default speed if no edge data
+                if edge_data is not None:
+                    is_school_zone: bool = edge_data.get("hazard", "") == "school_zone"
+                    is_highway: bool = edge_data.get("highway", "") == "motorway"
+                    speed_limit_mph: str = float(
+                        edge_data.get("maxspeed", "40 mph").split()[0]
+                    )  # in the format '30 mph'
+
+                    speed_limit = (
+                        speed_limit_mph / MPH_TO_KM_PER_MIN
+                    )  # convert to km/min
+
+                    if is_school_zone:
+                        speed = min(self.BUS_SPEED_SCHOOL_ZONE, speed_limit)
+                    elif is_highway:
+                        speed = (
+                            speed_limit  # assume bus can go at speed limit on highways
+                        )
+                    else:
+                        speed = min(self.BUS_SPEED_NOT_HIGHWAY, speed_limit)
+
+                else:
+                    raise ValueError(
+                        f"No edge data for {path[k]} to {path[k+1]} in base graph"
+                    )
+
+                length_km = 0.0
+                if isinstance(self.problem_data, ProblemDataReal):
+                    # length is in meters since data is from osm
+                    length_km = edge_data["length"] / 1000.0
+                else:
+                    # length is assumed to be in km
+                    length_km = edge_data["length"]
+
+                travel_time += length_km / speed
+
+        return travel_time
 
     def d_ij(self, i: Place, j: Place) -> float:
         """shortest distance from node i to node j in km"""

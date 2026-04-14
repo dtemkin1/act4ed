@@ -733,32 +733,17 @@ def plot_bus_routes(
 
     problem_data = formulation.problem_data
 
-    if isinstance(problem_data, ProblemDataReal):
-        graph = problem_data.osm_graph
-        pos: dict[NodeId, tuple[float, float]] = {
-            node: (
-                graph.nodes[node]["x"],
-                graph.nodes[node]["y"],
-            )
-            for node in G.nodes()
-        }
-    elif isinstance(problem_data, ProblemDataToy):
-        graph = problem_data.base_graph
+    graph = problem_data.base_graph
+    if "crs" not in graph.graph:
+        graph.graph["crs"] = "EPSG:3857"  # uses meters
 
-        if "crs" not in graph.graph:
-            graph.graph["crs"] = "EPSG:3857"  # uses meters
-
-        pos = {
-            node: (
-                graph.nodes[node]["x"],
-                graph.nodes[node]["y"],
-            )
-            for node in graph.nodes()
-        }
-    else:
-        raise NotImplementedError(
-            "Plotting only implemented for ProblemDataReal and ProblemDataToy currently"
+    pos = {
+        node: (
+            graph.nodes[node]["x"],
+            graph.nodes[node]["y"],
         )
+        for node in graph.nodes()
+    }
 
     if prob.status not in [GRB.OPTIMAL]:
         print("No feasible solution to visualize.")

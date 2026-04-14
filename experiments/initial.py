@@ -50,7 +50,7 @@ def main() -> None:
 
     problem_data = ProblemDataToy(
         "no_chaining_toy",
-        base_graph=osm_graph_km,
+        _base_graph=osm_graph_km,
         _stops=stops_with_students,
         _schools=[fuller],
         _depots=problem_data_original.depots,
@@ -113,7 +113,7 @@ def main() -> None:
 
     problem_data = ProblemDataToy(
         "chaining_toy",
-        base_graph=osm_graph_km,
+        _base_graph=osm_graph_km,
         _stops=stops_with_students,
         _schools=[fuller, mcc],
         _depots=problem_data_original.depots,

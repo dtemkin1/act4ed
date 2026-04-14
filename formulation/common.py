@@ -180,6 +180,13 @@ class ProblemData(ABC):
 
     @property
     @abstractmethod
+    def base_graph(self) -> "nx.MultiDiGraph[NodeId]":
+        """
+        base network, e.g. road network graph for real data or grid graph for toy data
+        """
+
+    @property
+    @abstractmethod
     def service_graph(self) -> "nx.MultiDiGraph[NodeId]":
         """
         network graph with edge weights corresponding to travel times in minutes and length in km,
@@ -225,13 +232,17 @@ class ProblemDataToy(ProblemData):
     including graph construction and shortest path calculations
     """
 
-    base_graph: "nx.MultiDiGraph[NodeId]"
+    _base_graph: "nx.MultiDiGraph[NodeId]"
 
     _stops: list[Stop]
     _schools: list[School]
     _depots: list[Depot]
     _students: list[Student]
     _buses: list[Bus]
+
+    @property
+    def base_graph(self):
+        return self._base_graph
 
     @property
     def stops(self) -> list[Stop]:
@@ -346,10 +357,14 @@ class ProblemDataReal(ProblemData):
     def service_graph(self):
         return self._make_service_graph()
 
+    @property
+    def base_graph(self) -> "nx.MultiDiGraph[NodeId]":
+        return self.osm_graph
+
     @cached_property
     def osm_graph(self) -> "nx.MultiDiGraph[NodeId]":
         """road network graph without edge weights, used for shortest path calculations"""
-        return self._make_osm_graph()
+        return self.base_graph
 
     @cached_property
     def stops(self) -> list[Stop]:

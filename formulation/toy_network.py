@@ -173,7 +173,7 @@ def make_toy_problem_data(
 
     return ProblemDataToy(
         name=name,
-        base_graph=graph,
+        _base_graph=graph,
         _schools=schools,
         _depots=depots,
         _stops=stops,

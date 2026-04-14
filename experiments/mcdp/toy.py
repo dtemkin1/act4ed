@@ -44,7 +44,7 @@ MAX_ROUNDS = 2
 
 PROBLEM_DATA = ProblemDataToy(
     name="toy_problem",
-    base_graph=GRID,
+    _base_graph=GRID,
     _schools=SCHOOLS,
     _depots=DEPOTS,
     _stops=STOPS,

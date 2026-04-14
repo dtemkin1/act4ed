@@ -98,7 +98,7 @@ def main() -> None:
 
     problem_data = ProblemDataToy(
         name="chaining_test",
-        base_graph=graph,
+        _base_graph=graph,
         _depots=[depot],
         _buses=[bus],
         _stops=[stop],
