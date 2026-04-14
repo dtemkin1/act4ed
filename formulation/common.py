@@ -653,7 +653,9 @@ class ProblemDataReal(ProblemData):
                 depot=depot,
                 has_wheelchair_access=bool(row["has_wheelchair_access"]),
                 type=(
-                    BusType[row["type"]] if row["type"] in BusType.__members__ else None
+                    BusType[row["type"]]
+                    if row.get("type") in BusType.__members__
+                    else None
                 ),
             )
             return_buses.append(bus)
