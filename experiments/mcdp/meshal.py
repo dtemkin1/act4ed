@@ -52,7 +52,7 @@ BUSES = make_buses(
 )
 SCHOOLS = make_schools(GRID, num_schools=2)
 STOPS = make_stops(GRID, num_stops=4)
-STUDENTS = make_students(GRID, num_students=10, schools=SCHOOLS, stops=STOPS)
+STUDENTS = make_students(GRID, num_students=20, schools=SCHOOLS, stops=STOPS)
 
 MAX_ROUNDS = 2
 
