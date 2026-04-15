@@ -8,4 +8,4 @@
 BASEDIR=$(dirname $0)
 
 cd ${BASEDIR}
-uv run python -m experiments.all_gurobi
+uv run python -m experiments.tests.all_gurobi
