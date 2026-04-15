@@ -41,11 +41,11 @@ def make_graph(size: tuple[int, int] = (10, 10)) -> "nx.MultiDiGraph[NodeId]":
 def make_schools(
     graph: "nx.MultiDiGraph[NodeId]",
     num_schools: int = 3,
-    types: list[SchoolType] | None = None,
-) -> list[School]:
+    types: tuple[SchoolType, ...] | None = None,
+) -> tuple[School, ...]:
     if types is None:
-        types = list(SchoolType.__members__.values())
-    all_nodes = list(graph.nodes)
+        types = tuple(SchoolType.__members__.values())
+    all_nodes = graph.nodes
     schools: list[School] = []
     for i in range(num_schools):
         node_id = all_nodes[random.randint(0, len(all_nodes) - 1)]
@@ -59,11 +59,13 @@ def make_schools(
             id=str(i),
         )
         schools.append(school)
-    return schools
+    return tuple(schools)
 
 
-def make_depots(graph: "nx.MultiDiGraph[NodeId]", num_depots: int = 1) -> list[Depot]:
-    all_nodes = list(graph.nodes)
+def make_depots(
+    graph: "nx.MultiDiGraph[NodeId]", num_depots: int = 1
+) -> tuple[Depot, ...]:
+    all_nodes = graph.nodes
     depots: list[Depot] = []
     for i in range(num_depots):
         node_id = all_nodes[random.randint(0, len(all_nodes) - 1)]
@@ -74,11 +76,13 @@ def make_depots(graph: "nx.MultiDiGraph[NodeId]", num_depots: int = 1) -> list[D
             node_id=node_id,
         )
         depots.append(depot)
-    return depots
+    return tuple(depots)
 
 
-def make_stops(graph: "nx.MultiDiGraph[NodeId]", num_stops: int = 5) -> list[Stop]:
-    all_nodes = list(graph.nodes)
+def make_stops(
+    graph: "nx.MultiDiGraph[NodeId]", num_stops: int = 5
+) -> tuple[Stop, ...]:
+    all_nodes = graph.nodes
     stops: list[Stop] = []
     for i in range(num_stops):
         node_id = all_nodes[random.randint(0, len(all_nodes) - 1)]
@@ -89,21 +93,21 @@ def make_stops(graph: "nx.MultiDiGraph[NodeId]", num_stops: int = 5) -> list[Sto
             node_id=node_id,
         )
         stops.append(stop)
-    return stops
+    return tuple(stops)
 
 
 def make_students(
     graph: "nx.MultiDiGraph[NodeId]",
     num_students: int = 20,
-    schools: list[School] | None = None,
-    stops: list[Stop] | None = None,
-) -> list[Student]:
+    schools: tuple[School, ...] | None = None,
+    stops: tuple[Stop, ...] | None = None,
+) -> tuple[Student, ...]:
     if schools is None:
         schools = make_schools(graph)
     if stops is None:
         stops = make_stops(graph)
     num_schools = len(schools)
-    all_nodes = list(graph.nodes)
+    all_nodes = graph.nodes
     students: list[Student] = []
 
     for i in range(num_students):
@@ -124,7 +128,7 @@ def make_students(
             requires_monitor=(i % 4 == 0),
         )
         students.append(student)
-    return students
+    return tuple(students)
 
 
 def make_buses(
@@ -132,8 +136,8 @@ def make_buses(
     num_buses: int = 3,
     capacities: list[int] | None = None,
     ranges: list[float] | None = None,
-    depots: list[Depot] | None = None,
-) -> list[Bus]:
+    depots: tuple[Depot, ...] | None = None,
+) -> tuple[Bus, ...]:
     if capacities is None:
         capacities = [40] * num_buses
     if depots is None:

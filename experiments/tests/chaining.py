@@ -26,7 +26,7 @@ CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 
 
 def main() -> None:
-    output_dir = CURRENT_FILE_DIR / "outputs"
+    output_dir = CURRENT_FILE_DIR / ".." / "outputs"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     graph = make_graph(size=(4, 1))
@@ -37,6 +37,7 @@ def main() -> None:
         geographic_location=make_point_from_node_id(graph, depot_point),
         node_id=0,
     )
+
     bus = Bus(
         name="Bus 1",
         capacity=41,
@@ -72,7 +73,7 @@ def main() -> None:
         start_time=8 * 60 + 15,  # 8:15 AM in minutes
     )
 
-    students_1 = [
+    students_1 = tuple(
         Student(
             name=f"Student {i}",
             geographic_location=make_point_from_node_id(graph, stop_node),
@@ -82,9 +83,9 @@ def main() -> None:
             requires_wheelchair=False,
         )
         for i in range(20)
-    ]
+    )
 
-    students_2 = [
+    students_2 = tuple(
         Student(
             name=f"Student {i+20}",
             geographic_location=make_point_from_node_id(graph, stop_node),
@@ -94,15 +95,15 @@ def main() -> None:
             requires_wheelchair=False,
         )
         for i in range(20)
-    ]
+    )
 
     problem_data = ProblemDataToy(
         name="chaining_test",
         _base_graph=graph,
-        _depots=[depot],
-        _buses=[bus],
-        _stops=[stop],
-        _schools=[school_1, school_2],
+        _depots=(depot,),
+        _buses=(bus,),
+        _stops=(stop,),
+        _schools=(school_1, school_2),
         _students=students_1 + students_2,
     )
 

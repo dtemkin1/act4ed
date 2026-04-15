@@ -74,7 +74,9 @@ def main() -> None:
     report_no_chaining = make_report(no_chaining_model, no_chaining, no_chaining_vars)
 
     with open(
-        CURRENT_FILE_DIR / "outputs" / "report_no_chaining.txt", "w+", encoding="utf-8"
+        CURRENT_FILE_DIR / ".." / "outputs" / "report_no_chaining.txt",
+        "w+",
+        encoding="utf-8",
     ) as f:
         f.write(report_no_chaining)
     print("No-chaining report written")
@@ -83,7 +85,7 @@ def main() -> None:
         no_chaining_model,
         no_chaining,
         no_chaining_vars,
-        CURRENT_FILE_DIR / "outputs" / "no_chaining_routes.png",
+        CURRENT_FILE_DIR / ".." / "outputs" / "no_chaining_routes.png",
     )
     print("No-chaining routes plotted")
     no_chaining_model.close()
@@ -135,14 +137,16 @@ def main() -> None:
     report_chaining = make_report(chaining_model, chaining, chaining_vars)
 
     with open(
-        CURRENT_FILE_DIR / "outputs" / "report_chaining.txt", "w+", encoding="utf-8"
+        CURRENT_FILE_DIR / ".." / "outputs" / "report_chaining.txt",
+        "w+",
+        encoding="utf-8",
     ) as f:
         f.write(report_chaining)
     plot_bus_routes(
         chaining_model,
         chaining,
         chaining_vars,
-        CURRENT_FILE_DIR / "outputs" / "chaining_routes.png",
+        CURRENT_FILE_DIR / ".." / "outputs" / "chaining_routes.png",
     )
 
     chaining_model.close()

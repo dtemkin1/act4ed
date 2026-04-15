@@ -7,9 +7,6 @@ import numpy as np
 from formulation.common import (
     TAU,
     C_b,
-    NodeId,
-    ProblemDataReal,
-    ProblemDataToy,
     R_b,
     Wh_b,
     depot_b,
@@ -22,15 +19,6 @@ from formulation.common import (
     tau_m,
 )
 from formulation.formulation_3.problem3_definition import Formulation3
-
-# from formulation.formulation_3.toy_network import (
-#     make_buses,
-#     make_depots,
-#     make_graph,
-#     make_schools,
-#     make_stops,
-#     make_students,
-# )
 
 
 def build_model_from_definition(

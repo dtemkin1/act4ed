@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field, replace
-from functools import cached_property
+from functools import cache, cached_property
 import networkx as nx
 from dataclasses_json import dataclass_json
 
@@ -167,37 +167,37 @@ class Formulation3:
     # sets
     G: "nx.MultiDiGraph[NodeId]" = field(init=False)
     """road network graph"""
-    P: list[Stop] = field(init=False, default_factory=list)
+    P: tuple[Stop, ...] = field(init=False, default_factory=list)
     """pickup stop nodes"""
-    S: list[School] = field(init=False, default_factory=list)
+    S: tuple[School, ...] = field(init=False, default_factory=list)
     """school nodes"""
-    S_PLUS: list[School] = field(init=False, default_factory=list)
+    S_PLUS: tuple[School, ...] = field(init=False, default_factory=list)
     """school start-copy nodes"""
-    D: list[Depot] = field(init=False, default_factory=list)
+    D: tuple[Depot, ...] = field(init=False, default_factory=list)
     """depot nodes"""
-    D_PLUS: list[Depot] = field(init=False, default_factory=list)
+    D_PLUS: tuple[Depot, ...] = field(init=False, default_factory=list)
     """depot start-copy nodes"""
-    D_MINUS: list[Depot] = field(init=False, default_factory=list)
+    D_MINUS: tuple[Depot, ...] = field(init=False, default_factory=list)
     """depot end-copy nodes"""
-    N: list[Place] = field(init=False, default_factory=list)
+    N: tuple[Place, ...] = field(init=False, default_factory=list)
     """all nodes"""
-    B: list[Bus] = field(init=False, default_factory=list)
+    B: tuple[Bus, ...] = field(init=False, default_factory=list)
     """buses"""
-    M: list[Student] = field(init=False, default_factory=list)
+    M: tuple[Student, ...] = field(init=False, default_factory=list)
     """students"""
-    F: list[Student] = field(init=False, default_factory=list)
+    F: tuple[Student, ...] = field(init=False, default_factory=list)
     """students needing monitor, eg special education or wheelchair"""
-    W: list[Student] = field(init=False, default_factory=list)
+    W: tuple[Student, ...] = field(init=False, default_factory=list)
     """students needing wheelchair access"""
 
     # utility
     A: dict[tuple[Place, Place], float] = field(init=False, default_factory=dict)
     """arc travel times in minutes"""
-    A_PATH: dict[tuple[Place, Place], list[NodeId]] = field(
+    A_PATH: dict[tuple[Place, Place], tuple[NodeId, ...]] = field(
         init=False, default_factory=dict
     )
     """arc shortest paths"""
-    Q: list[int] = field(init=False, default_factory=list)
+    Q: tuple[int, ...] = field(init=False, default_factory=tuple)
     """rounds a bus is allowed to have"""
     Q_MAX: int = field(init=False)
     """maximum number of sequential rounds allowed per bus (handpicked)."""
@@ -218,30 +218,38 @@ class Formulation3:
         self.G = self.problem_data.service_graph
         self.P = self.problem_data.stops
         self.S = self.problem_data.schools
-        self.S_PLUS = [make_school_copy(school) for school in self.problem_data.schools]
+        self.S_PLUS = tuple(
+            make_school_copy(school) for school in self.problem_data.schools
+        )
         self.D = self.problem_data.depots
-        self.D_PLUS = [
+        self.D_PLUS = tuple(
             make_depot_start_copy(depot) for depot in self.problem_data.depots
-        ]
-        self.D_MINUS = [
+        )
+        self.D_MINUS = tuple(
             make_depot_end_copy(depot) for depot in self.problem_data.depots
-        ]
+        )
 
-        self.N = self.P + self.S + self.S_PLUS + self.D_PLUS + self.D_MINUS
+        self.N = tuple(
+            list(self.P)
+            + list(self.S)
+            + list(self.S_PLUS)
+            + list(self.D_PLUS)
+            + list(self.D_MINUS)
+        )
         self.B = self.problem_data.buses
         self.M = self.problem_data.students
-        self.F = [
+        self.F = tuple(
             student
             for student in self.problem_data.students
             if student.requires_monitor or student.requires_wheelchair
-        ]
-        self.W = [
+        )
+        self.W = tuple(
             student
             for student in self.problem_data.students
             if student.requires_wheelchair
-        ]
+        )
 
-        self.Q = list(range(self.rounds))
+        self.Q = tuple(range(self.rounds))
         self.Q_MAX = self.rounds - 1
 
         self.A = {}
@@ -269,57 +277,15 @@ class Formulation3:
         """travel time from node i to node j in minutes"""
 
         nodes = self.A_PATH[i, j]
-        paths: list[list[NodeId]] = []
-
-        # for every pair of nodes, get path between them
-        for k in range(len(nodes) - 1):
-            ik_edge_data = self.problem_data.service_graph.get_edge_data(
-                nodes[k], nodes[k + 1], key=0, default=None
-            )
-            if ik_edge_data is not None:
-                paths.append(ik_edge_data["path"])
+        paths = get_paths_between_nodes(nodes, self.problem_data.service_graph)
 
         travel_time = 0.0
         for path in paths:
-            for k in range(len(path) - 1):
-                edge_data = self.problem_data.base_graph.get_edge_data(
-                    path[k], path[k + 1], key=0
-                )
-                speed = self.BUS_SPEED_NOT_HIGHWAY  # default speed if no edge data
-                if edge_data is not None:
-                    is_school_zone: bool = edge_data.get("hazard", "") == "school_zone"
-                    is_highway: bool = edge_data.get("highway", "") == "motorway"
-                    speed_limit_mph: str = float(
-                        edge_data.get("maxspeed", "40 mph").split()[0]
-                    )  # in the format '30 mph'
-
-                    speed_limit = (
-                        speed_limit_mph / MPH_TO_KM_PER_MIN
-                    )  # convert to km/min
-
-                    if is_school_zone:
-                        speed = min(self.BUS_SPEED_SCHOOL_ZONE, speed_limit)
-                    elif is_highway:
-                        speed = (
-                            speed_limit  # assume bus can go at speed limit on highways
-                        )
-                    else:
-                        speed = min(self.BUS_SPEED_NOT_HIGHWAY, speed_limit)
-
-                else:
-                    raise ValueError(
-                        f"No edge data for {path[k]} to {path[k+1]} in base graph"
-                    )
-
-                length_km = 0.0
-                if isinstance(self.problem_data, ProblemDataReal):
-                    # length is in meters since data is from osm
-                    length_km = edge_data["length"] / 1000.0
-                else:
-                    # length is assumed to be in km
-                    length_km = edge_data["length"]
-
-                travel_time += length_km / speed
+            travel_time += get_travel_time(
+                path,
+                self.problem_data.base_graph,
+                meters=(isinstance(self.problem_data, ProblemDataReal)),
+            )
 
         return travel_time
 
@@ -341,6 +307,55 @@ class Formulation3:
         return C_b(b) * max(
             self.KAPPA[school.type] for school in self.problem_data.schools
         )
+
+
+@cache
+def get_paths_between_nodes(
+    nodes: tuple[NodeId, ...], service_graph: "nx.MultiDiGraph[NodeId]"
+) -> list[tuple[NodeId, ...]]:
+    """utility function to get paths between consecutive nodes in a list"""
+    paths = []
+    for k in range(len(nodes) - 1):
+        edge_data = service_graph.get_edge_data(
+            nodes[k], nodes[k + 1], key=0, default=None
+        )
+        if edge_data is not None:
+            paths.append(edge_data["path"])
+
+    return paths
+
+
+@cache
+def get_travel_time(
+    path: tuple[NodeId, ...],
+    base_graph: "nx.MultiDiGraph[NodeId]",
+    meters: bool = False,
+) -> float:
+    """utility function to get travel time along a path, used for caching travel times"""
+
+    travel_time = 0.0
+    for k in range(len(path) - 1):
+        edge_data = base_graph.get_edge_data(path[k], path[k + 1], key=0)
+        speed = MPH_TO_KM_PER_MIN * 40.0  # default speed if no edge data
+        if edge_data is not None:
+            is_school_zone: bool = edge_data.get("hazard", "") == "school_zone"
+            is_highway: bool = edge_data.get("highway", "") == "motorway"
+            speed_limit_mph: str = float(
+                edge_data.get("maxspeed", "40 mph").split()[0]
+            )  # in the format '30 mph'
+            speed_limit = speed_limit_mph / MPH_TO_KM_PER_MIN
+
+            if is_school_zone:
+                speed = min(MPH_TO_KM_PER_MIN * 20.0, speed_limit)
+            elif is_highway:
+                speed = speed_limit
+            else:
+                speed = min(MPH_TO_KM_PER_MIN * 40.0, speed_limit)
+
+        length_km = (edge_data["length"] / 1000.0) if meters else edge_data["length"]
+        travel_time += length_km / speed
+
+    return travel_time
 
 
 if __name__ == "__main__":

@@ -12,9 +12,6 @@ from loguru import logger
 from formulation.common import (
     TAU,
     C_b,
-    NodeId,
-    ProblemDataReal,
-    ProblemDataToy,
     R_b,
     Wh_b,
     depot_b,
@@ -715,7 +712,6 @@ def plot_bus_routes(
 ):
     # raise NotImplementedError("plotting not implemented yet :(")
 
-    G = formulation.G
     B = formulation.B
     A = formulation.A
     A_PATH = formulation.A_PATH

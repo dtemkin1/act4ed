@@ -53,14 +53,14 @@ def setup(
             boundary_buffer_km=BOUNDARY_BUFFER_KM,
             prune=prune,
         )
-        # problem_data.sanity_checks()
+        problem_data.sanity_checks()
 
         problem_data.save()
 
     return problem_data
 
 
-def get_assigned_students(problem_data: ProblemDataReal) -> list[Student]:
+def get_assigned_students(problem_data: ProblemDataReal) -> tuple[Student, ...]:
     """
     Uses the assigned_students.csv file to get a list of students
     with their assigned bus stops and schools. This is used for plotting the
@@ -106,7 +106,7 @@ def get_assigned_students(problem_data: ProblemDataReal) -> list[Student]:
         assigned_students["BUS STOP"].isin(stop_names)
     ]
 
-    students = []
+    students: list[Student] = []
     for _, row in assigned_students.iterrows():
         requires_monitor = "SPED" in row["Student_Program"]
         # am not sure this is how they mark it, follow up
@@ -129,7 +129,7 @@ def get_assigned_students(problem_data: ProblemDataReal) -> list[Student]:
         )
         students.append(student)
 
-    return students
+    return tuple(students)
 
 
 def plot_special_education_students(problem_data: ProblemDataReal) -> None:

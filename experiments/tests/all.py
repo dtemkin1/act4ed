@@ -22,6 +22,7 @@ def experimental_config():
         problem_data_pkl=str(
             CURRENT_FILE_DIR
             / ".."
+            / ".."
             / "formulation"
             / "cache"
             / "framingham_problem_data.pkl"
@@ -53,7 +54,7 @@ def main() -> None:
     )
 
     with open(
-        CURRENT_FILE_DIR / "outputs" / "report_no_chaining_all.txt",
+        CURRENT_FILE_DIR / ".." / "outputs" / "report_no_chaining_all.txt",
         "w+",
         encoding="utf-8",
     ) as f:
@@ -64,7 +65,7 @@ def main() -> None:
         no_chaining_model[0],
         no_chaining,
         no_chaining_model[1],
-        CURRENT_FILE_DIR / "outputs" / "no_chaining_routes_all.png",
+        CURRENT_FILE_DIR / ".." / "outputs" / "no_chaining_routes_all.png",
     )
     print("No-chaining routes plotted")
 
@@ -85,7 +86,9 @@ def main() -> None:
     report_chaining = make_report(chaining_model[0], chaining, chaining_model[1])
 
     with open(
-        CURRENT_FILE_DIR / "outputs" / "report_chaining_all.txt", "w+", encoding="utf-8"
+        CURRENT_FILE_DIR / ".." / "outputs" / "report_chaining_all.txt",
+        "w+",
+        encoding="utf-8",
     ) as f:
         f.write(report_chaining)
 
@@ -93,7 +96,7 @@ def main() -> None:
         chaining_model[0],
         chaining,
         chaining_model[1],
-        CURRENT_FILE_DIR / "outputs" / "chaining_routes_all.png",
+        CURRENT_FILE_DIR / ".." / "outputs" / "chaining_routes_all.png",
     )
 
 

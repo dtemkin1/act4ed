@@ -196,31 +196,31 @@ class ProblemData(ABC):
 
     @property
     @abstractmethod
-    def stops(self) -> list[Stop]:
+    def stops(self) -> tuple[Stop, ...]:
         """stops where students can be picked up"""
 
     @property
     @abstractmethod
-    def schools(self) -> list[School]:
+    def schools(self) -> tuple[School, ...]:
         """schools students can be dropped off at"""
 
     @property
     @abstractmethod
-    def depots(self) -> list[Depot]:
+    def depots(self) -> tuple[Depot, ...]:
         """depots where buses start and end their routes"""
 
     @property
     @abstractmethod
-    def students(self) -> list[Student]:
+    def students(self) -> tuple[Student, ...]:
         """students to be picked up and dropped off"""
 
     @property
     @abstractmethod
-    def buses(self) -> list[Bus]:
+    def buses(self) -> tuple[Bus, ...]:
         """buses available for transportation"""
 
     @property
-    def all_nodes(self) -> list[Place]:
+    def all_nodes(self) -> tuple[Place, ...]:
         """all nodes in the problem, including stops, schools, and depots"""
         return self.stops + self.schools + self.depots
 
@@ -234,34 +234,34 @@ class ProblemDataToy(ProblemData):
 
     _base_graph: "nx.MultiDiGraph[NodeId]"
 
-    _stops: list[Stop]
-    _schools: list[School]
-    _depots: list[Depot]
-    _students: list[Student]
-    _buses: list[Bus]
+    _stops: tuple[Stop, ...]
+    _schools: tuple[School, ...]
+    _depots: tuple[Depot, ...]
+    _students: tuple[Student, ...]
+    _buses: tuple[Bus, ...]
 
     @property
     def base_graph(self):
         return self._base_graph
 
     @property
-    def stops(self) -> list[Stop]:
+    def stops(self) -> tuple[Stop, ...]:
         return self._stops
 
     @property
-    def schools(self) -> list[School]:
+    def schools(self) -> tuple[School, ...]:
         return self._schools
 
     @property
-    def depots(self) -> list[Depot]:
+    def depots(self) -> tuple[Depot, ...]:
         return self._depots
 
     @property
-    def students(self) -> list[Student]:
+    def students(self) -> tuple[Student, ...]:
         return self._students
 
     @property
-    def buses(self) -> list[Bus]:
+    def buses(self) -> tuple[Bus, ...]:
         return self._buses
 
     def _get_shortest_path_base(
@@ -282,13 +282,13 @@ class ProblemDataToy(ProblemData):
                 return
 
             if start_id == end_id:
-                service_graph.add_edge(
-                    start_id, end_id, length=0.0, path=[start_id, end_id]
-                )
+                path = (start_id, end_id)
+                service_graph.add_edge(start_id, end_id, length=0.0, path=path)
                 return
 
             try:
-                length, path = self._get_shortest_path_base(start_id, end_id)
+                length, path_list = self._get_shortest_path_base(start_id, end_id)
+                path = tuple(path_list)
                 service_graph.add_edge(start_id, end_id, length=length, path=path)
             except nx.NetworkXNoPath:
                 print(f"Warning: no path between {start} and {end} in the graph")
@@ -364,26 +364,26 @@ class ProblemDataReal(ProblemData):
     @cached_property
     def osm_graph(self) -> "nx.MultiDiGraph[NodeId]":
         """road network graph without edge weights, used for shortest path calculations"""
-        return self.base_graph
+        return self._make_osm_graph()
 
     @cached_property
-    def stops(self) -> list[Stop]:
+    def stops(self) -> tuple[Stop, ...]:
         return self._make_stops()
 
     @cached_property
-    def schools(self) -> list[School]:
+    def schools(self) -> tuple[School, ...]:
         return self._make_schools()
 
     @cached_property
-    def depots(self) -> list[Depot]:
+    def depots(self) -> tuple[Depot, ...]:
         return self._make_depots()
 
     @cached_property
-    def students(self) -> list[Student]:
+    def students(self) -> tuple[Student, ...]:
         return self._make_students()
 
     @cached_property
-    def buses(self) -> list[Bus]:
+    def buses(self) -> tuple[Bus, ...]:
         return self._make_buses()
 
     @cached_property
@@ -444,15 +444,15 @@ class ProblemDataReal(ProblemData):
                 return
 
             if start_id == end_id:
-                service_graph.add_edge(
-                    start_id, end_id, length=0.0, path=[start_id, end_id]
-                )
+                path = (start_id, end_id)
+                service_graph.add_edge(start_id, end_id, length=0.0, path=path)
                 return
 
             try:
                 # NOTE: length from osm is in meters, convert to km for service graph
-                length_m, path = self._get_shortest_path_osm(start_id, end_id)
+                length_m, path_list = self._get_shortest_path_osm(start_id, end_id)
                 length_km = length_m / 1000.0
+                path = tuple(path_list)
 
                 if self.prune and isinstance(start, Stop) and isinstance(end, Stop):
                     if length_km > self.prune:
@@ -528,7 +528,7 @@ class ProblemDataReal(ProblemData):
                             length=(
                                 entry["distance"].iloc[0] / 1000.0
                             ),  # convert m to km
-                            path=entry["geometry"].iloc[0],
+                            path=tuple(entry["geometry"].iloc[0]),
                         )
 
         return service_graph
@@ -551,7 +551,7 @@ class ProblemDataReal(ProblemData):
         with open(path, "rb") as f:
             return pickle.load(f)
 
-    def _make_schools(self) -> list[School]:
+    def _make_schools(self) -> tuple[School, ...]:
         schools_df = pd.read_csv(
             self.schools_path,
             dtype={
@@ -577,9 +577,9 @@ class ProblemDataReal(ProblemData):
                 start_time=start_time.hour * 60 + start_time.minute,
             )
             return_schools.append(school)
-        return return_schools
+        return tuple(return_schools)
 
-    def _make_depots(self) -> list[Depot]:
+    def _make_depots(self) -> tuple[Depot, ...]:
         depots_df = pd.read_csv(
             self.depots_path, dtype={"id": str, "lon": float, "lat": float}
         )
@@ -593,9 +593,9 @@ class ProblemDataReal(ProblemData):
                 geographic_location=geographic_location,
             )
             return_depots.append(depot)
-        return return_depots
+        return tuple(return_depots)
 
-    def _make_stops(self) -> list[Stop]:
+    def _make_stops(self) -> tuple[Stop, ...]:
         stops_df = pd.read_csv(
             self.stops_path, dtype={"id": str, "lon": float, "lat": float}
         )
@@ -610,9 +610,9 @@ class ProblemDataReal(ProblemData):
                 geographic_location=geographic_location,
             )
             return_stops.append(stop)
-        return return_stops
+        return tuple(return_stops)
 
-    def _make_students(self) -> list[Student]:
+    def _make_students(self) -> tuple[Student, ...]:
         students_df = pd.read_csv(
             self.students_path,
             dtype={
@@ -642,11 +642,11 @@ class ProblemDataReal(ProblemData):
                 requires_wheelchair=bool(row["is_wheelchair_user"]),
             )
             return_students.append(this_student)
-        return return_students
+        return tuple(return_students)
 
     def _make_buses(
         self,
-    ) -> list[Bus]:
+    ) -> tuple[Bus, ...]:
         buses_df = pd.read_csv(
             self.buses_path,
             dtype={
@@ -674,7 +674,7 @@ class ProblemDataReal(ProblemData):
                 ),
             )
             return_buses.append(bus)
-        return return_buses
+        return tuple(return_buses)
 
     def _get_nearest_node_id(self, geographic_location: Point) -> NodeId:
         """Get the nearest node in the graph to a given point."""
@@ -789,7 +789,7 @@ class ProblemDataReal(ProblemData):
         # and that there are no duplicate edges or goofy artifacts
 
 
-TAU = list(SchoolType)
+TAU = tuple(SchoolType)
 """school types"""
 
 
