@@ -31,7 +31,6 @@ def main():
     plt.title("Pareto Front for Toy MCDP")
 
     points = [(float(t[0]), float(t[1])) for t in output]
-    print(points)
     antichain = get_antichain(points)
 
     plot_x = []
@@ -47,10 +46,14 @@ def main():
             plot_y.append(y_inter)
 
     # make look nicer...
-    plt.tight_layout()
+
+    plt.plot(plot_x, plot_y, linewidth=2)
+    plt.scatter([p[0] for p in antichain], [p[1] for p in antichain], s=50)
+    plt.fill_between(plot_x, y1=plot_y, y2=min(plot_y), alpha=0.1)
+
     plt.xlim(0, 10)
     plt.ylim(bottom=0)
-    plt.fill_between(plot_x, y1=plot_y, y2=max(plot_y), alpha=0.1)
+    plt.tight_layout()
 
     plt.grid()
     plt.savefig(OUTPUT_FILE)

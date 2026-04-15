@@ -45,7 +45,7 @@ def make_schools(
 ) -> tuple[School, ...]:
     if types is None:
         types = tuple(SchoolType.__members__.values())
-    all_nodes = graph.nodes
+    all_nodes = list(graph.nodes)
     schools: list[School] = []
     for i in range(num_schools):
         node_id = all_nodes[random.randint(0, len(all_nodes) - 1)]
@@ -65,7 +65,7 @@ def make_schools(
 def make_depots(
     graph: "nx.MultiDiGraph[NodeId]", num_depots: int = 1
 ) -> tuple[Depot, ...]:
-    all_nodes = graph.nodes
+    all_nodes = list(graph.nodes)
     depots: list[Depot] = []
     for i in range(num_depots):
         node_id = all_nodes[random.randint(0, len(all_nodes) - 1)]
@@ -82,7 +82,7 @@ def make_depots(
 def make_stops(
     graph: "nx.MultiDiGraph[NodeId]", num_stops: int = 5
 ) -> tuple[Stop, ...]:
-    all_nodes = graph.nodes
+    all_nodes = list(graph.nodes)
     stops: list[Stop] = []
     for i in range(num_stops):
         node_id = all_nodes[random.randint(0, len(all_nodes) - 1)]
@@ -107,7 +107,7 @@ def make_students(
     if stops is None:
         stops = make_stops(graph)
     num_schools = len(schools)
-    all_nodes = graph.nodes
+    all_nodes = list(graph.nodes)
     students: list[Student] = []
 
     for i in range(num_students):

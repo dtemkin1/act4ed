@@ -27,7 +27,7 @@ FLEET_OUTPUT = CURRENT_FILE_DIR / ".." / "outputs" / "fleet_bus_count.dpc.yaml"
 ROUTING_OUTPUT = CURRENT_FILE_DIR / ".." / "outputs" / "routing_service.dpc.yaml"
 
 BUS_COSTS = 50000
-BUS_RANGE = 20000
+BUS_RANGE = 300
 BUS_CAPACITIES = 50
 BUS_WHEELCHAIRS = True
 
