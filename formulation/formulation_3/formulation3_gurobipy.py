@@ -167,7 +167,7 @@ def build_model_from_definition(
     logger.info("y_bqtau vars added")
     v_bqi = model.addVars(B_idx, Q_idx, N_idx, vtype=GRB.BINARY, name="v_bqi")
     logger.info("v_bqi vars added")
-    a_mbq = model.addVars(M_idx, B_idx, Q_idx, vtype=GRB.BINARY, name="a_mbq")
+    a_mbq = model.addVars(M_idx, B_idx, Q_idx, vtype=GRB.CONTINUOUS, name="a_mbq")
     logger.info("a_mbq vars added")
     T_bqi = model.addVars(
         B_idx,
