@@ -2,7 +2,7 @@
 
 julia_version = "1.12.5"
 manifest_format = "2.0"
-project_hash = "cf034443511c621844a4b3e16e9215d152a5a117"
+project_hash = "2d0886eae519b9b43cef53f46385dba36520f532"
 
 [[deps.ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
@@ -105,7 +105,7 @@ uuid = "7b1f6079-737a-58dc-b8bc-7a2ca5c1b5ee"
 version = "1.11.0"
 
 [[deps.Formulation3JuMP]]
-deps = ["Gurobi", "JuMP", "LinearAlgebra", "NPZ", "SparseArrays", "Test"]
+deps = ["Gurobi", "JuMP", "LinearAlgebra", "MathOptInterface", "NPZ", "Random", "SparseArrays", "Test"]
 path = "."
 uuid = "d174fced-3dd8-4e89-8fe5-cd8b0dc7f8bf"
 version = "0.1.0"
