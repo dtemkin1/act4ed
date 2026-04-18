@@ -134,6 +134,7 @@ class Bus(Base):
     has a capacity, range (in miles), and may have wheelchair access
     """
 
+    id: str
     capacity: int
     range: float
     has_wheelchair_access: bool
@@ -651,6 +652,7 @@ class ProblemDataReal(ProblemData):
             self.buses_path,
             dtype={
                 "id": str,
+                "num": str,
                 "depot_name": str,
                 "capacity": int,
                 "range": float,
@@ -662,7 +664,8 @@ class ProblemDataReal(ProblemData):
         for _, row in buses_df.iterrows():
             depot = next(d for d in self.depots if d.name == row["depot_name"])
             bus = Bus(
-                name=row["id"],
+                id=row["id"],
+                name=row["num"],
                 capacity=row["capacity"],
                 range=row["range"],
                 depot=depot,

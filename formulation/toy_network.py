@@ -148,6 +148,7 @@ def make_buses(
     for i in range(num_buses):
         bus = Bus(
             name=f"Bus {i}",
+            id=str(i),
             capacity=capacities[i % len(capacities)],
             range=ranges[i % len(ranges)],
             depot=depots[i % len(depots)],
