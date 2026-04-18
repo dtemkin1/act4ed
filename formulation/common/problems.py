@@ -1,20 +1,32 @@
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from abc import ABC, abstractmethod
-from enum import IntEnum
-from functools import cache, cached_property
+from functools import cached_property
 import os
 from pathlib import Path
 import warnings
 
 import datetime as dt
 import pickle
-from collections.abc import Hashable
 
 import geopandas as gpd
 from matplotlib import pyplot as plt
 import networkx as nx
 import osmnx as ox
 import pandas as pd
+
+from formulation.common.constants import NETWORK_TYPE
+from formulation.common.classes import (
+    NodeId,
+    SchoolType,
+    BusType,
+    Bus,
+    Stop,
+    School,
+    Depot,
+    Student,
+    Place,
+)
+from formulation.common.utils import get_shortest_path
 
 try:
     import r5py
@@ -36,138 +48,6 @@ except Exception as exc:
 
 CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 
-type NodeId = int
-"""node id in OSM and service graph"""
-
-
-NETWORK_TYPE = "drive"
-
-
-class SchoolType(IntEnum):
-    E = 0
-    """elementary"""
-    MS = 1
-    """middle school"""
-    HS = 2
-    """high school"""
-
-
-class BusType(IntEnum):
-    C = 0
-    """71 passengers, no wheelchair access"""
-    BWC = 1
-    """31 passengers, 2 wheelchair access"""
-    B = 2
-    """48 passengers, no wheelchair access"""
-    WC = 3
-    """4 wheelchair access"""
-
-
-@dataclass(frozen=True)
-class Base:
-    """base class for all entities in the problem, just has a name for now"""
-
-    name: str
-
-    def __str__(self):
-        return self.name
-
-
-@dataclass(frozen=True)
-class LocationData(Base):
-    """
-    base class for entities with geographic location,
-    i.e. stops, schools, depots, and students
-    """
-
-    geographic_location: Point
-
-
-@dataclass(frozen=True)
-class NodeLocationData(LocationData):
-    """
-    base class for entities that have both geographic location
-    and a corresponding node in the graph,
-    i.e. stops, schools, and depots
-    """
-
-    node_id: NodeId
-    geographic_location: Point
-
-
-@dataclass(frozen=True)
-class Stop(NodeLocationData):
-    """
-    a stop where students can be picked up,
-    corresponds to a node in the graph
-    """
-
-
-@dataclass(frozen=True)
-class Depot(NodeLocationData):
-    """
-    a depot where buses start and end their routes,
-    corresponds to a node in the graph
-    """
-
-
-@dataclass(frozen=True)
-class School(NodeLocationData):
-    """
-    a school where students can be dropped off,
-    corresponds to a node in the graph
-    """
-
-    id: str
-    type: SchoolType
-    start_time: int
-    """mins from midnight"""
-
-    def __str__(self):
-        return self.name
-
-
-@dataclass(frozen=True)
-class Bus(Base):
-    """
-    a bus that can be used for transportation,
-    has a capacity, range (in miles), and may have wheelchair access
-    """
-
-    id: str
-    capacity: int
-    range: float
-    has_wheelchair_access: bool
-    depot: Depot
-    type: BusType | None = None
-
-    @property
-    def range_km(self) -> float:
-        """range in kilometers"""
-        return self.range * 1.60934  # convert miles to km
-
-    def __str__(self):
-        return self.name
-
-
-@dataclass(frozen=True)
-class Student(LocationData):
-    """
-    a student that needs to be picked up and dropped off,
-    has a school, stop, and specific needs
-    """
-
-    school: School
-    stop: Stop
-    requires_monitor: bool
-    requires_wheelchair: bool
-
-    def __str__(self):
-        return self.name
-
-
-Place = School | Depot | Stop
-
 
 @dataclass(frozen=True)
 class ProblemData(ABC):
@@ -185,6 +65,7 @@ class ProblemData(ABC):
         """
         base network, e.g. road network graph for real data or grid graph for toy data
         """
+        ...
 
     @property
     @abstractmethod
@@ -194,36 +75,113 @@ class ProblemData(ABC):
         only containing nodes in N and edges corresponding to shortest paths between nodes in N.
         uses integer node_id
         """
+        ...
 
     @property
     @abstractmethod
     def stops(self) -> tuple[Stop, ...]:
         """stops where students can be picked up"""
+        ...
 
     @property
     @abstractmethod
     def schools(self) -> tuple[School, ...]:
         """schools students can be dropped off at"""
+        ...
 
     @property
     @abstractmethod
     def depots(self) -> tuple[Depot, ...]:
         """depots where buses start and end their routes"""
+        ...
 
     @property
     @abstractmethod
     def students(self) -> tuple[Student, ...]:
         """students to be picked up and dropped off"""
+        ...
 
     @property
     @abstractmethod
     def buses(self) -> tuple[Bus, ...]:
         """buses available for transportation"""
+        ...
 
     @property
     def all_nodes(self) -> tuple[Place, ...]:
         """all nodes in the problem, including stops, schools, and depots"""
         return self.stops + self.schools + self.depots
+
+    def _get_shortest_path_base(
+        self, start: NodeId, end: NodeId, weight: str = "length"
+    ) -> tuple[float, list[NodeId]]:
+        return get_shortest_path(self.base_graph, start, end, weight)
+
+    def sanity_checks(
+        self, boundary_gdf: gpd.GeoDataFrame | None = None, save: bool = False
+    ):
+        """perform sanity checks on the transportation network."""
+
+        # nodes v edges
+        print("Number of nodes:", len(self.base_graph.nodes))
+        print("Number of edges:", len(self.base_graph.edges))
+
+        # degree distribution
+        degrees = [deg for _, deg in self.base_graph.degree()]
+        print("Min degree:", min(degrees))
+        print("Max degree:", max(degrees))
+        print("Mean degree:", sum(degrees) / len(degrees))
+
+        # attributes
+        print(
+            "Node attributes:",
+            [
+                data
+                for n, (_, data) in enumerate(self.base_graph.nodes.items())
+                if n < 1
+            ][0],
+        )
+        print(
+            "Edge attributes:",
+            [
+                data
+                for e, (_, _, data) in enumerate(self.base_graph.edges(data=True))
+                if e < 1
+            ][0],
+        )
+
+        print("# of Stops:", len(self.stops))
+        print("# of Schools:", len(self.schools))
+        print("# of Depots:", len(self.depots))
+        print("# of Students:", len(self.students))
+        print("# of Buses:", len(self.buses))
+
+        # plot map rq with outline of city boundary
+        _, ax = ox.plot_graph(
+            self.base_graph,
+            node_size=5,
+            edge_linewidth=0.5,
+            figsize=(8, 8),
+            show=False,
+            close=False,
+        )
+        if boundary_gdf is not None:
+            boundary_gdf.boundary.plot(ax=ax, color="red", linewidth=2)
+        # plt.show()
+
+        if save:
+            with open(
+                CURRENT_FILE_DIR / ".." / "outputs" / "sanity_checks.png", "wb+"
+            ) as f:
+                plt.savefig(f, dpi=300)
+
+        # service graph checks
+        print("Total needed nodes (stops + schools + depots):", len(self.all_nodes))
+        print("Number of nodes in service graph:", len(self.service_graph.nodes))
+        print("Number of edges in service graph:", len(self.service_graph.edges))
+
+        # note for self: make sure only one node per intersection/dead end,
+        # and that there are no duplicate edges or goofy artifacts
 
 
 @dataclass(frozen=True)
@@ -264,11 +222,6 @@ class ProblemDataToy(ProblemData):
     @property
     def buses(self) -> tuple[Bus, ...]:
         return self._buses
-
-    def _get_shortest_path_base(
-        self, start: NodeId, end: NodeId, weight: str = "length"
-    ) -> tuple[float, list[NodeId]]:
-        return get_shortest_path(self.base_graph, start, end, weight)
 
     @cached_property
     def service_graph(self):
@@ -428,11 +381,6 @@ class ProblemDataReal(ProblemData):
 
         return graph
 
-    def _get_shortest_path_osm(
-        self, start: NodeId, end: NodeId, weight: str = "length"
-    ) -> tuple[float, list[NodeId]]:
-        return get_shortest_path(self.osm_graph, start, end, weight)
-
     def _make_service_graph(self) -> "nx.MultiDiGraph[NodeId]":
         service_graph: "nx.MultiDiGraph[NodeId]" = nx.MultiDiGraph()
 
@@ -451,7 +399,7 @@ class ProblemDataReal(ProblemData):
 
             try:
                 # NOTE: length from osm is in meters, convert to km for service graph
-                length_m, path_list = self._get_shortest_path_osm(start_id, end_id)
+                length_m, path_list = self._get_shortest_path_base(start_id, end_id)
                 length_km = length_m / 1000.0
                 path = tuple(path_list)
 
@@ -537,7 +485,7 @@ class ProblemDataReal(ProblemData):
     def save(self):
         """save problem data to disk for later loading and use in formulation"""
         with open(
-            CURRENT_FILE_DIR / "cache" / f"{self.name}_problem_data.pkl", "wb+"
+            CURRENT_FILE_DIR / ".." / "cache" / f"{self.name}_problem_data.pkl", "wb+"
         ) as f:
             pickle.dump(self, f)
 
@@ -545,7 +493,7 @@ class ProblemDataReal(ProblemData):
     def load(cls, name: str, prune: int | None = None) -> "ProblemDataReal":
         """load problem data from disk"""
         prob_name = f"{name}{'_' + str(prune) if prune else ''}_problem_data"
-        return cls.load_path(CURRENT_FILE_DIR / "cache" / f"{prob_name}.pkl")
+        return cls.load_path(CURRENT_FILE_DIR / ".." / "cache" / f"{prob_name}.pkl")
 
     @classmethod
     def load_path(cls, path: Path) -> "ProblemDataReal":
@@ -728,152 +676,3 @@ class ProblemDataReal(ProblemData):
             # find the stop with the minimum distance to the student
             nearest_stop = min(all_stop_distances.items(), key=lambda item: item[1])[0]
             return nearest_stop
-
-    def sanity_checks(
-        self, boundary_gdf: gpd.GeoDataFrame | None = None, save: bool = False
-    ):
-        """perform sanity checks on the transportation network."""
-
-        # nodes v edges
-        print("Number of nodes:", len(self.osm_graph.nodes))
-        print("Number of edges:", len(self.osm_graph.edges))
-
-        # degree distribution
-        degrees = [deg for _, deg in self.osm_graph.degree()]
-        print("Min degree:", min(degrees))
-        print("Max degree:", max(degrees))
-        print("Mean degree:", sum(degrees) / len(degrees))
-
-        # attributes
-        print(
-            "Node attributes:",
-            [data for n, (_, data) in enumerate(self.osm_graph.nodes.items()) if n < 1][
-                0
-            ],
-        )
-        print(
-            "Edge attributes:",
-            [
-                data
-                for e, (_, _, data) in enumerate(self.osm_graph.edges(data=True))
-                if e < 1
-            ][0],
-        )
-
-        print("# of Stops:", len(self.stops))
-        print("# of Schools:", len(self.schools))
-        print("# of Depots:", len(self.depots))
-        print("# of Students:", len(self.students))
-        print("# of Buses:", len(self.buses))
-
-        # plot map rq with outline of city boundary
-        _, ax = ox.plot_graph(
-            self.osm_graph,
-            node_size=5,
-            edge_linewidth=0.5,
-            figsize=(8, 8),
-            show=False,
-            close=False,
-        )
-        if boundary_gdf is not None:
-            boundary_gdf.boundary.plot(ax=ax, color="red", linewidth=2)
-        # plt.show()
-
-        if save:
-            with open(CURRENT_FILE_DIR / "outputs" / "sanity_checks.png", "wb+") as f:
-                plt.savefig(f, dpi=300)
-
-        # service graph checks
-        print("Total needed nodes (stops + schools + depots):", len(self.all_nodes))
-        print("Number of nodes in service graph:", len(self.service_graph.nodes))
-        print("Number of edges in service graph:", len(self.service_graph.edges))
-
-        # note for self: make sure only one node per intersection/dead end,
-        # and that there are no duplicate edges or goofy artifacts
-
-
-TAU = tuple(SchoolType)
-"""school types"""
-
-
-@cache
-def make_place_copy[T: Place](place: T, suffix: str = "copy") -> T:
-    return replace(place, name=place.name + f" ({suffix})")
-
-
-@cache
-def make_school_copy(school: School) -> School:
-    return make_place_copy(school)
-
-
-@cache
-def make_depot_end_copy(depot: Depot) -> Depot:
-    return make_place_copy(depot, "end copy")
-
-
-@cache
-def make_depot_start_copy(depot: Depot) -> Depot:
-    return make_place_copy(depot, "start copy")
-
-
-@cache
-def get_shortest_path[T: Hashable](
-    graph: "nx.MultiDiGraph[T]", start: T, end: T, weight: str = "length"
-) -> tuple[float, list[T]]:
-    """returns the length and path of the shortest path between start and end"""
-    return nx.bidirectional_dijkstra(graph, source=start, target=end, weight=weight)
-
-
-def p_m(m: Student):
-    """pickup stop of student m"""
-    return m.stop
-
-
-def s_m(m: Student):
-    """school of student m"""
-    return m.school
-
-
-def tau_m(m: Student):
-    """type of school of student m"""
-    return m.school.type
-
-
-def f_m(m: Student):
-    """1 if student m if flagged"""
-    return 1 if m.requires_monitor or m.requires_wheelchair else 0
-
-
-def depot_b(b: Bus):
-    """depot of bus b"""
-    return b.depot
-
-
-def C_b(b: Bus):
-    """capacity of bus b"""
-    return b.capacity
-
-
-def Wh_b(b: Bus):
-    """1 if bus b has wheelchair access"""
-    return 1 if b.has_wheelchair_access else 0
-
-
-def R_b(b: Bus):
-    """range of bus b in km"""
-    return b.range_km
-
-
-def h_s(s: School):
-    """start time of school s in minutes from midnight"""
-    return s.start_time
-
-
-def slack_s(s: School):
-    """required slack time for school s in minutes, same in our case"""
-    return 30
-
-
-def l_s(s: School):
-    """latest allowable arrival time at school s in minutes from midnight"""
-    return h_s(s) - slack_s(s)

@@ -4,8 +4,8 @@ import cvxpy as cp
 import osmnx as ox
 import numpy as np
 
-from formulation.common import (
-    TAU,
+from formulation.common.constants import TAU
+from formulation.common.utils import (
     C_b,
     R_b,
     Wh_b,
@@ -18,7 +18,7 @@ from formulation.common import (
     s_m,
     tau_m,
 )
-from formulation.formulation_3.problem3_definition import Formulation3
+from formulation.formulation_3.definition import Formulation3
 
 
 def build_model_from_definition(
@@ -90,8 +90,8 @@ def build_model_from_definition(
     )  # 1 if bus b as a monitor (ie serves a flagged student)
 
     # Precompute some index structures
-    A_list = list(A.keys())  # ordered arcs
-    num_A = len(A_list)
+    # A_list = list(A.keys())  # ordered arcs
+    # num_A = len(A_list)
 
     # adjacency from N to arcs (boolean masks)
     # starts_at = {
@@ -678,7 +678,6 @@ def plot_bus_routes(
 ):
     # Extract and print the route
 
-    G = formulation.G
     B = formulation.B
     A = formulation.A
     A_PATH = formulation.A_PATH

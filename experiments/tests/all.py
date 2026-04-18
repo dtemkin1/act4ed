@@ -1,8 +1,8 @@
 import os
 from pathlib import Path
 
-from formulation.formulation_3.problem3_definition import ExperimentConfig, Formulation3
-from formulation.formulation_3.formulation3 import (
+from formulation.formulation_3.definition import ExperimentConfig, Formulation3
+from formulation.formulation_3.cvxpy import (
     build_model_from_definition,
     make_report,
     plot_bus_routes,

@@ -1,12 +1,12 @@
 import os
 from pathlib import Path
 
-from formulation.formulation_3.problem3_definition import Formulation3
-from formulation.formulation_3.formulation3_gurobipy import (
+from formulation.formulation_3.definition import Formulation3
+from formulation.formulation_3.gurobipy import (
     build_model_from_definition,
     solve_problem,
 )
-from experiments.helpers import setup
+from experiments.helpers import setup_framingham
 
 
 CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
@@ -16,7 +16,7 @@ PLACE_NAME = "Framingham, Massachusetts, USA"
 
 
 def main() -> None:
-    problem_data = setup("framingham", PLACE_NAME, 1.0)
+    problem_data = setup_framingham(1.0)
 
     # formulation time baby
     no_chaining = Formulation3(
@@ -54,7 +54,7 @@ def main() -> None:
     no_chaining_model.close()
 
     print("Now doing chaining formulation...")
-    problem_data = setup("framingham", PLACE_NAME, 1000)
+    problem_data = setup_framingham(1.0)
     chaining = Formulation3(
         problem_data=problem_data,
         rounds=3,

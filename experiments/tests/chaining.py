@@ -4,18 +4,18 @@ from pathlib import Path
 from gurobipy import GRB
 
 from experiments.helpers import make_point_from_node_id
-from formulation.common import (
+from formulation.common.classes import (
     Depot,
     Bus,
-    ProblemDataToy,
     School,
     SchoolType,
     Stop,
     Student,
 )
-from formulation.formulation_3.problem3_definition import Formulation3
-from formulation.toy_network import make_graph
-from formulation.formulation_3.formulation3_gurobipy import (
+from formulation.common.problems import ProblemDataToy
+from formulation.common.toy import make_graph
+from formulation.formulation_3.definition import Formulation3
+from formulation.formulation_3.gurobipy import (
     build_model_from_definition,
     make_report,
     solve_problem,

@@ -3,9 +3,8 @@ from functools import cache, cached_property
 import networkx as nx
 from dataclasses_json import dataclass_json
 
-from formulation.common import (
+from formulation.common.classes import (
     Bus,
-    C_b,
     Depot,
     NodeId,
     School,
@@ -13,16 +12,20 @@ from formulation.common import (
     Student,
     Stop,
     Place,
-    ProblemData,
-    ProblemDataReal,
+)
+from formulation.common.problems import ProblemData, ProblemDataReal
+from formulation.common.utils import (
+    C_b,
     l_s,
     make_depot_end_copy,
     make_depot_start_copy,
     make_school_copy,
 )
-
-MPH_TO_KM_PER_MIN = 37.282
-"divide the mph value by 37.282"
+from formulation.common.constants import (
+    MPH_TO_KM_PER_MIN,
+    BUS_SPEED_NOT_HIGHWAY,
+    BUS_SPEED_SCHOOL_ZONE,
+)
 
 
 @dataclass_json
@@ -159,10 +162,6 @@ class Formulation3:
         },
     )
     """capacity multiplier for different school types"""
-
-    # https://malegislature.gov/Laws/GeneralLaws/PartI/TitleXIV/Chapter90/Section17
-    BUS_SPEED_NOT_HIGHWAY: float = 40.0 / MPH_TO_KM_PER_MIN
-    BUS_SPEED_SCHOOL_ZONE: float = 20.0 / MPH_TO_KM_PER_MIN
 
     # sets
     G: "nx.MultiDiGraph[NodeId]" = field(init=False)
@@ -336,7 +335,7 @@ def get_travel_time(
     travel_time = 0.0
     for k in range(len(path) - 1):
         edge_data = base_graph.get_edge_data(path[k], path[k + 1], key=0)
-        speed = MPH_TO_KM_PER_MIN * 40.0  # default speed if no edge data
+        speed = BUS_SPEED_NOT_HIGHWAY  # default speed if no edge data
         if edge_data is not None:
             is_school_zone: bool = edge_data.get("hazard", "") == "school_zone"
             is_highway: bool = edge_data.get("highway", "") == "motorway"
@@ -346,11 +345,11 @@ def get_travel_time(
             speed_limit = speed_limit_mph / MPH_TO_KM_PER_MIN
 
             if is_school_zone:
-                speed = min(MPH_TO_KM_PER_MIN * 20.0, speed_limit)
+                speed = min(BUS_SPEED_SCHOOL_ZONE, speed_limit)
             elif is_highway:
                 speed = speed_limit
             else:
-                speed = min(MPH_TO_KM_PER_MIN * 40.0, speed_limit)
+                speed = min(BUS_SPEED_NOT_HIGHWAY, speed_limit)
 
         length_km = (edge_data["length"] / 1000.0) if meters else edge_data["length"]
         travel_time += length_km / speed

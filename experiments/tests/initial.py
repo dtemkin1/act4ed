@@ -1,10 +1,10 @@
 import os
 from pathlib import Path
 
-from formulation.common import ProblemDataToy, Student
-
-from formulation.formulation_3.problem3_definition import Formulation3
-from formulation.formulation_3.formulation3_gurobipy import (
+from formulation.common.classes import Student
+from formulation.common.problems import ProblemDataToy
+from formulation.formulation_3.definition import Formulation3
+from formulation.formulation_3.gurobipy import (
     build_model_from_definition,
     make_report,
     plot_bus_routes,

@@ -33,7 +33,7 @@ GRAPHML_FILE = CURRENT_FILE_DIR / "outputs" / "framingham_graph.graphml"
 PAIRWISE_CSV = CURRENT_FILE_DIR / "outputs" / "depot_schools_stops_pairwise.csv"
 STUDENT_ASSIGN_CSV = CURRENT_FILE_DIR / "outputs" / "student_to_stop_or_school.csv"
 
-PLACE_NAME = "Framingham, Massachusetts, USA"
+FRAMINGHAM_NAME = "Framingham, Massachusetts, USA"
 
 
 def setup(
@@ -58,6 +58,10 @@ def setup(
         problem_data.save()
 
     return problem_data
+
+
+def setup_framingham(prune: int | None = None) -> ProblemDataReal:
+    return setup("framingham", FRAMINGHAM_NAME, prune)
 
 
 def get_assigned_students(problem_data: ProblemDataReal) -> tuple[Student, ...]:
@@ -206,5 +210,5 @@ def make_point_from_node_id(graph: "MultiDiGraph[NodeId]", node_id: NodeId) -> P
 
 
 if __name__ == "__main__":
-    problem_data = setup("framingham", PLACE_NAME)
+    problem_data = setup_framingham()
     print("Number of assigned students: ", len(get_assigned_students(problem_data)))

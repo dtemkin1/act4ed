@@ -15,23 +15,22 @@ from typing import Any, NamedTuple
 
 from gurobipy import GRB, Var, tupledict
 
-from formulation.common import ProblemDataToy
-from formulation.formulation_3.problem3_definition import Formulation3
-from formulation.formulation_3.formulation3_gurobipy import (
-    build_model_from_definition,
-    solve_problem,
-)
-from experiments.mcdp.toy import (
-    get_all_combos,
-)
-from formulation.toy_network import (
+from formulation.common.problems import ProblemDataToy
+from formulation.common.toy import (
     make_buses,
     make_depots,
     make_graph,
     make_stops,
     make_schools,
+    make_students,
 )
-from formulation.toy_network import make_students
+from formulation.formulation_3.definition import Formulation3
+from formulation.formulation_3.gurobipy import (
+    build_model_from_definition,
+    solve_problem,
+)
+from experiments.mcdp.toy import get_all_combos
+
 
 CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 

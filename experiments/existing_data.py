@@ -17,8 +17,9 @@ import osmnx as ox
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 
-from experiments.helpers import setup, PLACE_NAME
-from formulation.common import ProblemData, Stop
+from experiments.helpers import setup_framingham
+from formulation.common.problems import ProblemData
+from formulation.common.classes import Stop
 
 CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 
@@ -368,7 +369,7 @@ def plot_existing_routes(
 
 
 def main() -> None:
-    problem_data = setup("framingham", PLACE_NAME)
+    problem_data = setup_framingham()
 
     existing_routes = get_existing_routes(problem_data)
     metadata = get_solution_metadata(existing_routes)

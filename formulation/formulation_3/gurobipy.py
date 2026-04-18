@@ -9,8 +9,8 @@ import osmnx as ox
 
 from loguru import logger
 
-from formulation.common import (
-    TAU,
+from formulation.common.constants import TAU
+from formulation.common.utils import (
     C_b,
     R_b,
     Wh_b,
@@ -23,7 +23,7 @@ from formulation.common import (
     s_m,
     tau_m,
 )
-from formulation.formulation_3.problem3_definition import Formulation3
+from formulation.formulation_3.definition import Formulation3
 
 METERS_PER_MILE = 1609.344
 
