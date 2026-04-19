@@ -3,7 +3,7 @@ import random
 
 import networkx as nx
 
-from formulation.common import (
+from formulation.common.classes import (
     Bus,
     Depot,
     NodeId,
@@ -11,9 +11,18 @@ from formulation.common import (
     SchoolType,
     Stop,
     Student,
-    ProblemDataToy,
+    DemographicInfo,
 )
-from shapely import Point
+from formulation.common.problems import ProblemDataToy
+
+
+try:
+    from shapely.geometry import Point
+except Exception as exc:
+    raise ImportError(
+        "Shapely not found. Please install it with 'pip install shapely'"
+        " and ensure Java is properly configured."
+    ) from exc
 
 random.seed(42)  # for reproducibility <3
 
@@ -124,8 +133,9 @@ def make_students(
             geographic_location=home_location,
             school=random_school,
             stop=stop,
-            requires_wheelchair=(i % 5 == 0),
-            requires_monitor=(i % 4 == 0),
+            demographics=DemographicInfo(
+                special_ed=(i % 4 == 0), wheelchair_user=(i % 5 == 0)
+            ),
         )
         students.append(student)
     return tuple(students)

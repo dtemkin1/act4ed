@@ -104,7 +104,7 @@ def build_model_from_definition(
 
         if f_m(student) == 1:
             flagged_student_indices.append(m)
-        if student.requires_wheelchair:
+        if student.demographics.wheelchair_user:
             wheelchair_student_indices.append(m)
 
     depot_start_arcs_by_bus = {

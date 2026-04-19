@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from enum import IntEnum
+from typing import NamedTuple
 
 try:
     from shapely.geometry import Point
@@ -31,6 +32,13 @@ class BusType(IntEnum):
     """48 passengers, no wheelchair access"""
     WC = 3
     """4 wheelchair access"""
+
+
+class DemographicInfo(NamedTuple):
+    """demographic info for a student"""
+
+    special_ed: bool
+    wheelchair_user: bool
 
 
 @dataclass(frozen=True)
@@ -132,8 +140,7 @@ class Student(LocationData):
 
     school: School
     stop: Stop
-    requires_monitor: bool
-    requires_wheelchair: bool
+    demographics: DemographicInfo
 
     def __str__(self):
         return self.name

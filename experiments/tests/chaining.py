@@ -5,6 +5,7 @@ from gurobipy import GRB
 
 from experiments.helpers import make_point_from_node_id
 from formulation.common.classes import (
+    DemographicInfo,
     Depot,
     Bus,
     School,
@@ -79,8 +80,7 @@ def main() -> None:
             geographic_location=make_point_from_node_id(graph, stop_node),
             stop=stop,
             school=school_1,
-            requires_monitor=False,
-            requires_wheelchair=False,
+            demographics=DemographicInfo(special_ed=False, wheelchair_user=False),
         )
         for i in range(20)
     )
@@ -91,8 +91,7 @@ def main() -> None:
             geographic_location=make_point_from_node_id(graph, stop_node),
             stop=stop,
             school=school_2,
-            requires_monitor=False,
-            requires_wheelchair=False,
+            demographics=DemographicInfo(special_ed=False, wheelchair_user=False),
         )
         for i in range(20)
     )

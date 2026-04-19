@@ -52,7 +52,7 @@ def tau_m(m: Student):
 
 def f_m(m: Student):
     """1 if student m if flagged"""
-    return 1 if m.requires_monitor or m.requires_wheelchair else 0
+    return 1 if m.demographics.special_ed or m.demographics.wheelchair_user else 0
 
 
 def depot_b(b: Bus):

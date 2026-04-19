@@ -16,6 +16,7 @@ import pandas as pd
 
 from formulation.common.constants import NETWORK_TYPE
 from formulation.common.classes import (
+    DemographicInfo,
     NodeId,
     SchoolType,
     BusType,
@@ -587,8 +588,10 @@ class ProblemDataReal(ProblemData):
                 geographic_location=geographic_location,
                 school=school,
                 stop=nearest_stop,
-                requires_monitor=bool(row["is_sp_ed"]),
-                requires_wheelchair=bool(row["is_wheelchair_user"]),
+                demographics=DemographicInfo(
+                    special_ed=bool(row["is_sp_ed"]),
+                    wheelchair_user=bool(row["is_wheelchair_user"]),
+                ),
             )
             return_students.append(this_student)
         return tuple(return_students)

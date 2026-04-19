@@ -6,7 +6,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from shapely import Point
 
-from formulation.common import NodeId, ProblemDataReal, Student
+from formulation.common.classes import DemographicInfo, NodeId, Student
+from formulation.common.problems import ProblemDataReal
 
 
 CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
@@ -112,9 +113,9 @@ def get_assigned_students(problem_data: ProblemDataReal) -> tuple[Student, ...]:
 
     students: list[Student] = []
     for _, row in assigned_students.iterrows():
-        requires_monitor = "SPED" in row["Student_Program"]
+        special_ed = "SPED" in row["Student_Program"]
         # am not sure this is how they mark it, follow up
-        requires_wheelchair = "WHEELCHAIR" in row["Student_Program"]
+        wheelchair_user = "WHEELCHAIR" in row["Student_Program"]
         stop = next(stop for stop in problem_data.stops if stop.name == row["BUS STOP"])
 
         student = Student(
@@ -128,8 +129,9 @@ def get_assigned_students(problem_data: ProblemDataReal) -> tuple[Student, ...]:
             stop=next(
                 stop for stop in problem_data.stops if stop.name == row["BUS STOP"]
             ),
-            requires_monitor=requires_monitor,
-            requires_wheelchair=requires_wheelchair,
+            demographics=DemographicInfo(
+                special_ed=special_ed, wheelchair_user=wheelchair_user
+            ),
         )
         students.append(student)
 
@@ -146,7 +148,7 @@ def plot_special_education_students(problem_data: ProblemDataReal) -> None:
     special_education_students = [
         student
         for student in students
-        if student.requires_monitor or student.requires_wheelchair
+        if student.demographics.special_ed or student.demographics.wheelchair_user
     ]
 
     # plot framingham graph with special education students highlighted

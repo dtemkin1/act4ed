@@ -80,12 +80,14 @@ class ExperimentConfig:
             filtered_students = [
                 student
                 for student in filtered_students
-                if not student.requires_wheelchair
+                if not student.demographics.wheelchair_user
             ]
 
         if not self.consider_monitor_students:
             filtered_students = [
-                student for student in filtered_students if not student.requires_monitor
+                student
+                for student in filtered_students
+                if not student.demographics.special_ed
             ]
 
         filtered_schools = problem_data.schools
@@ -240,12 +242,12 @@ class Formulation3:
         self.F = tuple(
             student
             for student in self.problem_data.students
-            if student.requires_monitor or student.requires_wheelchair
+            if student.demographics.special_ed or student.demographics.wheelchair_user
         )
         self.W = tuple(
             student
             for student in self.problem_data.students
-            if student.requires_wheelchair
+            if student.demographics.wheelchair_user
         )
 
         self.Q = tuple(range(self.rounds))
