@@ -5,8 +5,17 @@ import os
 from pathlib import Path
 import re
 import subprocess
+from typing import Any
 
-from formulation.common import SchoolType
+from formulation.bird_adapter import (
+    BirdAdapterConfig,
+    BirdBackendSolution,
+    BirdExportInstance,
+    export_bird_instance,
+    normalized_result_from_bird_solution,
+    routing_solution_json_from_bird_solution,
+)
+from formulation.common import SchoolType, FilteredProblemData
 from formulation.formulation_3.julia_export import export_formulation3_instance
 from formulation.formulation_3.problem3_definition import Formulation3
 from formulation.formulation_3.formulation3_gurobipy import (
@@ -14,21 +23,28 @@ from formulation.formulation_3.formulation3_gurobipy import (
     build_model_from_definition,
     solve_problem,
 )
+from formulation.normalized_result import (
+    NormalizedRoutingResult,
+    normalized_result_from_formulation3_solution,
+    RoutingSolutionJson,
+    routing_solution_json_from_formulation3_solution,
+)
 from experiments.helpers import setup
+from helpers import ProblemDataReal
 
 
 CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 PROJECT_ROOT = CURRENT_FILE_DIR.parent
 DEFAULT_PLACE_NAME = "Framingham, Massachusetts, USA"
 DEFAULT_PROBLEM_NAME = "framingham"
-DEFAULT_PRUNE = 800
+DEFAULT_PRUNE = 3000
 
 
 @dataclass(frozen=True)
 class RunScope:
     label_suffix: str
     description: str
-    problem_data: object
+    problem_data: ProblemDataReal | FilteredProblemData
 
 
 def _slugify(value: str) -> str:
@@ -37,7 +53,7 @@ def _slugify(value: str) -> str:
 
 
 def _build_run_scopes(
-    problem_data,
+    problem_data: ProblemDataReal,
     *,
     per_school: bool,
     per_school_type: bool,
@@ -141,6 +157,87 @@ def _solve_with_julia(
     return solution
 
 
+def _save_normalized_result(
+    normalized_result: NormalizedRoutingResult,
+    *,
+    label: str,
+    output_dir: Path,
+) -> Path:
+    output_path = output_dir / f"{label}_all_normalized.json"
+    normalized_result.save(output_path)
+    print(f"{label}: saved normalized result to {output_path}")
+    return output_path
+
+
+def _save_routing_solution_json(
+    routing_solution_json: RoutingSolutionJson,
+    *,
+    label: str,
+    output_dir: Path,
+) -> Path:
+    output_path = output_dir / f"{label}_all_solution.json"
+    routing_solution_json.save(output_path)
+    print(f"{label}: saved route-level solution JSON to {output_path}")
+    return output_path
+
+
+def _solve_with_bird(
+    problem_data: Any,
+    *,
+    label: str,
+    output_dir: Path,
+    cohort: str,
+    bus_type: str | None,
+    lambda_value: float,
+    reassign_stops: bool,
+    stop_assignment_lambda: float,
+    max_walking_distance_km: float | None,
+    method: str,
+) -> NormalizedRoutingResult:
+    adapter_config = BirdAdapterConfig(
+        cohort=cohort,
+        bus_type=bus_type,
+        lambda_value=lambda_value,
+        reassign_stops=reassign_stops,
+        stop_assignment_lambda=stop_assignment_lambda,
+        max_walking_distance_km=max_walking_distance_km,
+    )
+    instance_path = export_bird_instance(
+        problem_data,
+        output_dir / f"{label}_all_instance.npz",
+        adapter_config,
+    )
+    solution_path = output_dir / f"{label}_all.npz"
+    log_file = output_dir / f"{label}_all_julia.log"
+
+    julia_cmd = os.environ.get("JULIA_CMD", "julia")
+    julia_project = os.environ.get("JULIA_PROJECT", "julia")
+    command = [
+        julia_cmd,
+        f"--project={julia_project}",
+        str(PROJECT_ROOT / "experiments" / "solve_bird_backend_julia.jl"),
+        "--instance",
+        str(instance_path),
+        "--solution",
+        str(solution_path),
+        "--method",
+        method,
+        "--log-file",
+        str(log_file),
+    ]
+    print(f"{label}: exported Bird instance to {instance_path}")
+    subprocess.run(command, check=True, cwd=PROJECT_ROOT)
+    print(f"{label}: Bird Julia solve finished")
+
+    instance = BirdExportInstance.load(instance_path)
+    solution = BirdBackendSolution.load(solution_path)
+    normalized_result = normalized_result_from_bird_solution(instance, solution)
+    routing_solution_json = routing_solution_json_from_bird_solution(instance, solution)
+    _save_normalized_result(normalized_result, label=label, output_dir=output_dir)
+    _save_routing_solution_json(routing_solution_json, label=label, output_dir=output_dir)
+    return normalized_result
+
+
 def _build_problem(
     *,
     problem_data,
@@ -165,9 +262,25 @@ def _run_case(
     print(f"{label}: formulation created with rounds={rounds} ({description})")
 
     if backend == "python":
-        return _solve_with_python(formulation, label=label, output_dir=output_dir)
+        solution = _solve_with_python(formulation, label=label, output_dir=output_dir)
+        normalized_result = normalized_result_from_formulation3_solution(formulation, solution)
+        routing_solution_json = routing_solution_json_from_formulation3_solution(
+            formulation,
+            solution,
+        )
+        _save_normalized_result(normalized_result, label=label, output_dir=output_dir)
+        _save_routing_solution_json(routing_solution_json, label=label, output_dir=output_dir)
+        return solution
     if backend == "julia":
-        return _solve_with_julia(formulation, label=label, output_dir=output_dir)
+        solution = _solve_with_julia(formulation, label=label, output_dir=output_dir)
+        normalized_result = normalized_result_from_formulation3_solution(formulation, solution)
+        routing_solution_json = routing_solution_json_from_formulation3_solution(
+            formulation,
+            solution,
+        )
+        _save_normalized_result(normalized_result, label=label, output_dir=output_dir)
+        _save_routing_solution_json(routing_solution_json, label=label, output_dir=output_dir)
+        return solution
     raise ValueError(f"unsupported backend: {backend}")
 
 
@@ -175,7 +288,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--backend",
-        choices=("python", "julia"),
+        choices=("python", "julia", "bird"),
         default="python",
         help="Model builder/solver backend to use.",
     )
@@ -218,6 +331,46 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Run separate no-chaining and chaining solves for each school type with students.",
     )
+    parser.add_argument(
+        "--bird-cohort",
+        choices=("conventional", "sped_no_wheelchair"),
+        default="conventional",
+        help="Student cohort to export when running the Bird backend.",
+    )
+    parser.add_argument(
+        "--bird-bus-type",
+        default=None,
+        help="Homogeneous bus type slice for Bird runs, e.g. C, B, BWC, WC, or an enum value.",
+    )
+    parser.add_argument(
+        "--bird-method",
+        choices=("scenario", "lbh"),
+        default="scenario",
+        help="Bird solve method to use in Julia.",
+    )
+    parser.add_argument(
+        "--bird-lambda",
+        type=float,
+        default=1.0e4,
+        help="Per-route penalty lambda used by Bird scenario generation.",
+    )
+    parser.add_argument(
+        "--bird-reassign-stops",
+        action="store_true",
+        help="Optionally reassign students to existing stops before exporting the Bird instance.",
+    )
+    parser.add_argument(
+        "--bird-stop-assignment-lambda",
+        type=float,
+        default=1.0e4,
+        help="Lambda used by the optional Bird student-to-stop reassignment model.",
+    )
+    parser.add_argument(
+        "--bird-max-walking-km",
+        type=float,
+        default=None,
+        help="Optional max walking distance for Bird stop reassignment; current stop remains feasible as fallback.",
+    )
     return parser.parse_args()
 
 
@@ -226,7 +379,7 @@ def main() -> None:
 
     output_dir = args.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
-
+    print(f"Pruning distance: {args.prune}")
     problem_data = setup(args.problem_name, args.place_name, args.prune)
     scopes = _build_run_scopes(
         problem_data,
@@ -238,6 +391,25 @@ def main() -> None:
     print(f"Prepared {len(scopes)} run scope(s)")
 
     for scope in scopes:
+        if args.backend == "bird":
+            label = _scoped_label("bird", scope)
+            print(
+                f"{label}: Bird backend run ({scope.description}, cohort={args.bird_cohort}, bus_type={args.bird_bus_type}, method={args.bird_method}, lambda={args.bird_lambda}, reassign_stops={args.bird_reassign_stops})"
+            )
+            _solve_with_bird(
+                scope.problem_data,
+                label=label,
+                output_dir=output_dir,
+                cohort=args.bird_cohort,
+                bus_type=args.bird_bus_type,
+                lambda_value=args.bird_lambda,
+                reassign_stops=args.bird_reassign_stops,
+                stop_assignment_lambda=args.bird_stop_assignment_lambda,
+                max_walking_distance_km=args.bird_max_walking_km,
+                method=args.bird_method,
+            )
+            continue
+
         _run_case(
             backend=args.backend,
             label=_scoped_label("no_chaining", scope),
