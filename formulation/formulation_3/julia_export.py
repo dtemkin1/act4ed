@@ -218,7 +218,7 @@ def _active_buses_for_julia(problem: Formulation3) -> list[Any]:
 def build_formulation3_numeric_instance(
     problem: Formulation3,
 ) -> Formulation3NumericInstance:
-    B = problem.B # _active_buses_for_julia(problem)
+    B = _active_buses_for_julia(problem)
     M = problem.M
     S = problem.S
     P = problem.P
