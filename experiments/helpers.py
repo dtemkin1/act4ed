@@ -33,7 +33,7 @@ STUDENT_ASSIGN_CSV = CURRENT_FILE_DIR / "outputs" / "student_to_stop_or_school.c
 
 
 def setup(
-    problem_name: str, place_name: str, prune: int | None = None
+    problem_name: str, place_name: str, prune: int | None = None, save_path: Path | None = None
 ) -> ProblemDataReal:
     try:
         problem_data = ProblemDataReal.load(problem_name, prune)
@@ -51,7 +51,7 @@ def setup(
         )
         problem_data.sanity_checks()
 
-        problem_data.save()
+        problem_data.save(cache_dir=save_path)
 
     return problem_data
 
