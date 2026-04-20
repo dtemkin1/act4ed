@@ -628,6 +628,9 @@ class ProblemDataReal(ProblemData):
                     entry["geometry"] = geometry
                 itinerary_lookup[key] = entry
         return itinerary_lookup
+    
+    def _make_spatio_temporal_graph(self):
+        raise NotImplementedError("spatio-temporal graph construction not implemented yet")
 
     def _make_service_graph(self) -> "nx.MultiDiGraph[NodeId]":
         service_graph: "nx.MultiDiGraph[NodeId]" = nx.MultiDiGraph()
@@ -716,9 +719,9 @@ class ProblemDataReal(ProblemData):
 
         return service_graph
 
-    def save(self):
+    def save(self, cache_dir: Path | None = None):
         """save problem data to disk for later loading and use in formulation"""
-        cache_dir = CURRENT_FILE_DIR / "cache"
+        cache_dir = cache_dir or (CURRENT_FILE_DIR / "cache")
         cache_dir.mkdir(parents=True, exist_ok=True)
 
         prob_name = f"{self.name}{'_' + str(self.prune) if self.prune else ''}_problem_data"
@@ -732,8 +735,8 @@ class ProblemDataReal(ProblemData):
 
         # Try the prune-specific cache first, then fall back to legacy unpruned naming.
         candidate_names = [f"{name}{'_' + str(prune) if prune else ''}_problem_data"]
-        if prune is not None:
-            candidate_names.append(f"{name}_problem_data")
+        # if prune is None:
+        #     candidate_names.append(f"{name}_problem_data")
 
         for candidate in candidate_names:
             path = cache_dir / f"{candidate}.pkl"
