@@ -167,7 +167,7 @@ class Formulation3:
 
     # sets
     G: "nx.MultiDiGraph[NodeId]" = field(init=False)
-    """road network graph"""
+    """service graph"""
     P: list[Stop] = field(init=False, default_factory=list)
     """pickup stop nodes"""
     S: list[School] = field(init=False, default_factory=list)
