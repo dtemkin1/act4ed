@@ -23,10 +23,10 @@ from formulation.common.classes import Stop
 
 CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 
-ASSIGNED_STUDENTS = CURRENT_FILE_DIR / "data" / "assigned_students.csv"
-BUSES = CURRENT_FILE_DIR / "data" / "buses.csv"
+ASSIGNED_STUDENTS = CURRENT_FILE_DIR / ".." / "data" / "assigned_students.csv"
+BUSES = CURRENT_FILE_DIR / ".." / "data" / "buses.csv"
 
-OUTPUT_ROUTES = CURRENT_FILE_DIR / "outputs" / "existing_routes.json"
+OUTPUT_ROUTES = CURRENT_FILE_DIR / ".." / "outputs" / "existing_routes.json"
 
 
 class RawBusRoutes(NamedTuple):
