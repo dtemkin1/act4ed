@@ -8,7 +8,6 @@
 """
 
 import csv
-from dataclasses import replace
 import os
 from pathlib import Path
 from typing import Any, NamedTuple
