@@ -108,8 +108,8 @@ def get_rows() -> list[SamplingTable]:
                 PHI=phi,
             )
 
-            model, vals = build_model_from_definition(formulation, 4)
-            solve_problem(model)
+            model, vals = build_model_from_definition(formulation)
+            solve_problem(model, 4.0)
 
             if model.Status == GRB.INFEASIBLE:
                 print(
