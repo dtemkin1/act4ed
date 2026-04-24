@@ -579,6 +579,7 @@ def solve_problem(model: gp.Model, mem_limit: float = float("inf")) -> None:
 
     if model.Status == GRB.MEM_LIMIT:
         model.Params.Threads = 1
+        model.Params.SoftMemLimit = float("inf")
         model.optimize()
 
     print()
