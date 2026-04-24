@@ -16,7 +16,7 @@ PLACE_NAME = "Framingham, Massachusetts, USA"
 
 
 def main() -> None:
-    problem_data = setup_framingham(1.0)
+    problem_data = setup_framingham(prune=1.0)
 
     # formulation time baby
     no_chaining = Formulation3(

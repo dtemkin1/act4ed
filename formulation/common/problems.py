@@ -4,6 +4,7 @@ from functools import cached_property
 import os
 from pathlib import Path
 import warnings
+from typing import cast
 
 import datetime as dt
 import pickle
@@ -118,9 +119,7 @@ class ProblemData(ABC):
     ) -> tuple[float, list[NodeId]]:
         return get_shortest_path(self.base_graph, start, end, weight)
 
-    def sanity_checks(
-        self, boundary_gdf: gpd.GeoDataFrame | None = None, save: bool = False
-    ):
+    def sanity_checks(self):
         """perform sanity checks on the transportation network."""
 
         # nodes v edges
@@ -158,23 +157,23 @@ class ProblemData(ABC):
         print("# of Buses:", len(self.buses))
 
         # plot map rq with outline of city boundary
-        _, ax = ox.plot_graph(
-            self.base_graph,
-            node_size=5,
-            edge_linewidth=0.5,
-            figsize=(8, 8),
-            show=False,
-            close=False,
-        )
-        if boundary_gdf is not None:
-            boundary_gdf.boundary.plot(ax=ax, color="red", linewidth=2)
+        # _, ax = ox.plot_graph(
+        #     self.base_graph,
+        #     node_size=5,
+        #     edge_linewidth=0.5,
+        #     figsize=(8, 8),
+        #     show=False,
+        #     close=False,
+        # )
+        # if boundary_gdf is not None:
+        #     boundary_gdf.boundary.plot(ax=ax, color="red", linewidth=2)
         # plt.show()
 
-        if save:
-            with open(
-                CURRENT_FILE_DIR / ".." / "outputs" / "sanity_checks.png", "wb+"
-            ) as f:
-                plt.savefig(f, dpi=300)
+        # if save:
+        #     with open(
+        #         CURRENT_FILE_DIR / ".." / "outputs" / "sanity_checks.png", "wb+"
+        #     ) as f:
+        #         plt.savefig(f, dpi=300)
 
         # service graph checks
         print("Total needed nodes (stops + schools + depots):", len(self.all_nodes))
@@ -483,10 +482,15 @@ class ProblemDataReal(ProblemData):
 
         return service_graph
 
+    @property
+    def _file_name(self):
+        return f"{self.name}{'_' + str(self.prune) if self.prune else ''}_problem_data"
+
     def save(self):
         """save problem data to disk for later loading and use in formulation"""
         with open(
-            CURRENT_FILE_DIR / ".." / "cache" / f"{self.name}_problem_data.pkl", "wb+"
+            CURRENT_FILE_DIR / ".." / "cache" / f"{self._file_name}.pkl",
+            "wb+",
         ) as f:
             pickle.dump(self, f)
 
@@ -679,3 +683,153 @@ class ProblemDataReal(ProblemData):
             # find the stop with the minimum distance to the student
             nearest_stop = min(all_stop_distances.items(), key=lambda item: item[1])[0]
             return nearest_stop
+
+
+@dataclass(frozen=True)
+class ProblemDataRealSurrogate(ProblemDataReal):
+    """
+    surrogate version of ProblemDataReal, which divides the geographic area into a grid of hexagons
+    and assigns all nodes to the nearest grid cell centroid, to speed up shortest path calculations
+    and reduce noise in the graph
+    """
+
+    prune = None
+    osm_pbf_path = None
+    use_r5 = False
+
+    # 40 by 40, making each hexagon ~0.5km in framingham
+    NUM_OF_HEXAGONS = 1600
+
+    @property
+    def _file_name(self):
+        return f"{self.name}_hex_problem_data"
+
+    @classmethod
+    def load(cls, name: str, prune: None = None) -> "ProblemDataReal":
+        """load problem data from disk"""
+        prob_name = f"{name}_hex_problem_data"
+        return cls.load_path(CURRENT_FILE_DIR / ".." / "cache" / f"{prob_name}.pkl")
+
+    @property
+    def hex_graph(self) -> "nx.MultiDiGraph[tuple[int, int]]":
+        """
+        hexagonal lattice graph used for surrogate service graph construction,
+        with edge weights corresponding to distance in meters
+        """
+
+        rows = int(self.NUM_OF_HEXAGONS**0.5)
+        cols = int(self.NUM_OF_HEXAGONS**0.5)
+
+        hex_graph = nx.hexagonal_lattice_graph(rows, cols, create_using=nx.MultiDiGraph)
+        hex_graph = cast("nx.MultiDiGraph[tuple[int, int]]", hex_graph)
+
+        max_x_osm: float = max(data["x"] for _, data in self.osm_graph.nodes(data=True))
+        min_x_osm: float = min(data["x"] for _, data in self.osm_graph.nodes(data=True))
+        max_y_osm: float = max(data["y"] for _, data in self.osm_graph.nodes(data=True))
+        min_y_osm: float = min(data["y"] for _, data in self.osm_graph.nodes(data=True))
+
+        max_x_pos: float = max(data["pos"][0] for _, data in hex_graph.nodes(data=True))
+        min_x_pos: float = min(data["pos"][0] for _, data in hex_graph.nodes(data=True))
+        max_y_pos: float = max(data["pos"][1] for _, data in hex_graph.nodes(data=True))
+        min_y_pos: float = min(data["pos"][1] for _, data in hex_graph.nodes(data=True))
+
+        for node, data in hex_graph.nodes.items():
+            x_pos: float = data["pos"][0]
+            y_pos: float = data["pos"][1]
+
+            # scale x and y from hex graph to original graph coordinates
+            x_scaled = min_x_osm + (x_pos - min_x_pos) / (max_x_pos - min_x_pos) * (
+                max_x_osm - min_x_osm
+            )
+            y_scaled = min_y_osm + (y_pos - min_y_pos) / (max_y_pos - min_y_pos) * (
+                max_y_osm - min_y_osm
+            )
+
+            hex_graph.nodes[node]["x"] = x_scaled
+            hex_graph.nodes[node]["y"] = y_scaled
+
+        for u, v in hex_graph.edges():
+            # distance between centroids in m
+            hex_graph.edges[u, v, 0]["length"] = (
+                # FIX: this gives distance in lat long, fix...
+                (hex_graph.nodes[u]["x"] - hex_graph.nodes[v]["x"]) ** 2
+                + (hex_graph.nodes[u]["y"] - hex_graph.nodes[v]["y"]) ** 2
+            ) ** 0.5
+
+        return hex_graph
+
+    @cached_property
+    def mapping_hex_base(self) -> dict[tuple[int, int], NodeId]:
+        """
+        get mapping from hex graph node ids to nearest node ids in the base graph,
+        for use in shortest path calculations
+        """
+        mapping: dict[tuple[int, int], NodeId] = {}
+        for i, node in enumerate(self.hex_graph.nodes()):
+            mapping[node] = i
+        return mapping
+
+    @cached_property
+    def base_graph(self) -> "nx.MultiDiGraph[NodeId]":
+        hex_graph = self.hex_graph
+
+        base_graph: "nx.MultiDiGraph[NodeId]" = nx.MultiDiGraph()
+        for node, data in hex_graph.nodes.items():
+            base_graph.add_node(self.mapping_hex_base[node], **data)
+        for u, v, data in hex_graph.edges(data=True):
+            base_graph.add_edge(
+                self.mapping_hex_base[u], self.mapping_hex_base[v], **data
+            )
+
+        return base_graph
+
+    def _get_nearest_hex_node_id(self, geographic_location: Point) -> tuple[int, int]:
+        """Get the nearest node in the hex graph to a given point."""
+        x = geographic_location.x
+        y = geographic_location.y
+
+        # find nearest hex node by using geographic coordinates
+        nearest_node = min(
+            self.hex_graph.nodes(),
+            key=lambda node: (
+                (self.hex_graph.nodes[node]["x"] - x) ** 2
+                + (self.hex_graph.nodes[node]["y"] - y) ** 2
+            )
+            ** 0.5,
+        )
+
+        return nearest_node
+
+    def _make_stops(self):
+        # rather than make multiple stops assigned to the same hex node,
+        # we will assign each stop to the nearest hex node and create a new stop there
+        # with the same attributes (except for node_id and geographic_location)
+        stops: list[Stop] = []
+        for stop in super()._make_stops():
+            nearest_hex_node_id = self._get_nearest_hex_node_id(
+                stop.geographic_location
+            )
+
+            geo_point = self.mapping_hex_geo[nearest_hex_node_id]
+            new_stop = Stop(
+                name=stop.name,
+                node_id=self.mapping_hex_base[nearest_hex_node_id],
+                geographic_location=Point(geo_point[0], geo_point[1]),
+            )
+            stops.append(new_stop)
+        return tuple(stops)
+
+    def _get_nearest_stop(self, geo_location):
+        stop_locations = [stop.geographic_location for stop in self.stops]
+        nearest_stop_location = min(
+            stop_locations,
+            key=lambda loc: (
+                (loc.x - geo_location.x) ** 2 + (loc.y - geo_location.y) ** 2
+            )
+            ** 0.5,
+        )
+
+        # get stop assigned to this hex node
+        for stop in self.stops:
+            if stop.geographic_location == nearest_stop_location:
+                return stop

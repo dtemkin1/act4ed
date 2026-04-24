@@ -29,8 +29,6 @@ from formulation.formulation_3.gurobipy import (
     build_model_from_definition,
     solve_problem,
 )
-from experiments.mcdp.toy import get_all_combos
-
 
 CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 
@@ -44,14 +42,14 @@ BUS_RANGE = 200
 BUS_CAPACITIES = 50
 BUS_WHEELCHAIRS = True
 
-GRID = make_graph((10, 10))
+GRID = make_graph((40, 40))
 DEPOTS = make_depots(GRID, num_depots=1)
 BUSES = make_buses(
-    GRID, num_buses=10, capacities=[BUS_CAPACITIES], ranges=[BUS_RANGE], depots=DEPOTS
+    GRID, num_buses=20, capacities=[BUS_CAPACITIES], ranges=[BUS_RANGE], depots=DEPOTS
 )
-SCHOOLS = make_schools(GRID, num_schools=2)
-STOPS = make_stops(GRID, num_stops=4)
-STUDENTS = make_students(GRID, num_students=20, schools=SCHOOLS, stops=STOPS)
+SCHOOLS = make_schools(GRID, num_schools=5)
+STOPS = make_stops(GRID, num_stops=100)
+STUDENTS = make_students(GRID, num_students=500, schools=SCHOOLS, stops=STOPS)
 
 MAX_ROUNDS = 2
 
@@ -99,31 +97,25 @@ def make_sampling_csv(rows: list[SamplingTable]) -> None:
 
 def get_rows() -> list[SamplingTable]:
     implementations: list[SamplingTable] = []
-    groups_of_students = get_all_combos(len(PROBLEM_DATA.students))
+    phi_vals = [x / 100.0 for x in range(0, 101, 5)]
 
     # functionality if which students we transport
-    for i, group in enumerate(groups_of_students):
+    for i, phi in enumerate(phi_vals):
         for r in range(MAX_ROUNDS):
-            problem_data = replace(
-                PROBLEM_DATA, _students=[PROBLEM_DATA.students[j] for j in group]
-            )
+            problem_data = PROBLEM_DATA
             formulation = Formulation3(
                 problem_data=problem_data,
                 rounds=r + 1,
+                PHI=phi,
             )
 
-            model, vals = build_model_from_definition(formulation)
+            model, vals = build_model_from_definition(formulation, 4)
             solve_problem(model)
 
             if model.Status == GRB.INFEASIBLE:
-                result = SamplingTable(
-                    implementation=[],
-                    fixed_functionality=group,
-                    minimal_resources=(float("inf"), r + 1, 0, 0, 0, 0),
-                    compute_time_simulation=model.Runtime,
-                    compute_time_query=0.0,
+                print(
+                    f"Implementation {i} with phi={phi} and rounds={r+1} is infeasible."
                 )
-                implementations.append(result)
                 model.close()
                 continue
 
@@ -134,6 +126,7 @@ def get_rows() -> list[SamplingTable]:
             z_b: tupledict[tuple[Any], Var] = vals["z_b"]
             x_bqij: tupledict[tuple[Any, ...], Var] = vals["x_bqij"]
             r_bmon: tupledict[tuple[Any, ...], Var] = vals["r_bmon"]
+            a_mbq: tupledict[tuple[Any, ...], Var] = vals["a_mbq"]
 
             total_distance = 0.0
             buses_with_monitors = 0
@@ -178,7 +171,11 @@ def get_rows() -> list[SamplingTable]:
 
             result = SamplingTable(
                 implementation=[b for b in range(len(B)) if z_b[b].X > 0.5],
-                fixed_functionality=group,
+                fixed_functionality=[
+                    student
+                    for m, student in enumerate(problem_data.students)
+                    if any(a_mbq[m, b, q].X > 0.5 for b in range(len(B)) for q in Q)
+                ],
                 minimal_resources=(
                     total_distance,
                     r + 1,
