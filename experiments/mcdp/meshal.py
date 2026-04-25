@@ -110,7 +110,7 @@ def get_rows() -> list[SamplingTable]:
 
             model, vals = build_model_from_definition(formulation)
             # dont run on local with 64 gb...
-            solve_problem(model, 64.0)
+            solve_problem(model)
 
             if model.Status == GRB.INFEASIBLE:
                 print(

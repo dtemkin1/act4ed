@@ -569,18 +569,7 @@ def build_model_from_definition(
 
 def solve_problem(model: gp.Model, mem_limit: float = float("inf")) -> None:
     print("Solving MILP")
-    # model.optimize()
-
-    # Start with a moderate number of threads
-    model.Params.Threads = 8
-    # Limit the amount of memory (in GB)
-    model.Params.SoftMemLimit = mem_limit
     model.optimize()
-
-    if model.Status == GRB.MEM_LIMIT:
-        model.Params.Threads = 1
-        model.Params.SoftMemLimit = float("inf")
-        model.optimize()
 
     print()
     print("Status:", _gurobi_status_name(model.Status))
