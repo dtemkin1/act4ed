@@ -46,8 +46,8 @@ DEPOTS = make_depots(GRID, num_depots=1)
 BUSES = make_buses(
     GRID, num_buses=8, capacities=[BUS_CAPACITIES], ranges=[BUS_RANGE], depots=DEPOTS
 )
-SCHOOLS = make_schools(GRID, num_schools=5)
-STOPS = make_stops(GRID, num_stops=25)
+SCHOOLS = make_schools(GRID, num_schools=4)
+STOPS = make_stops(GRID, num_stops=20)
 STUDENTS = make_students(GRID, num_students=200, schools=SCHOOLS, stops=STOPS)
 
 MAX_ROUNDS = 2
@@ -100,13 +100,15 @@ def get_rows() -> list[SamplingTable]:
 
     # functionality if which students we transport
     for i, phi in enumerate(phi_vals):
-        for r in range(MAX_ROUNDS):
+        for r in range(1, MAX_ROUNDS + 1):
             problem_data = PROBLEM_DATA
             formulation = Formulation3(
                 problem_data=problem_data,
-                rounds=r + 1,
+                rounds=r,
                 PHI=phi,
             )
+
+            print("Running implementation", i, "with phi =", phi, "and rounds =", r)
 
             model, vals = build_model_from_definition(formulation)
             # dont run on local with 64 gb...
@@ -114,7 +116,7 @@ def get_rows() -> list[SamplingTable]:
 
             if model.Status == GRB.INFEASIBLE:
                 print(
-                    f"Implementation {i} with phi={phi} and rounds={r+1} is infeasible."
+                    f"Implementation {i} with phi={phi} and rounds={r} is infeasible."
                 )
                 model.close()
                 continue
@@ -178,7 +180,7 @@ def get_rows() -> list[SamplingTable]:
                 ],
                 minimal_resources=(
                     total_distance,
-                    r + 1,
+                    r,
                     buses_with_monitors,
                     buses_total,
                     total_bus_capacity,
