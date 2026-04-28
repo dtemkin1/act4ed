@@ -228,3 +228,5 @@ logs/
 
 # Local data file
 rico_data
+out-*
+bird
