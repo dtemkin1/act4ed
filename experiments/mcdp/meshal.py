@@ -41,14 +41,25 @@ BUS_RANGE = 200
 BUS_CAPACITIES = 50
 BUS_WHEELCHAIRS = True
 
-GRID = make_graph((40, 40))
-DEPOTS = make_depots(GRID, num_depots=1)
+GRID_SIZE = (20, 20)
+NUM_BUSES = 6
+NUM_DEPOTS = 1
+NUM_SCHOOLS = 3
+NUM_STOPS = 10
+NUM_STUDENTS = 50
+
+GRID = make_graph(GRID_SIZE)
+DEPOTS = make_depots(GRID, num_depots=NUM_DEPOTS)
 BUSES = make_buses(
-    GRID, num_buses=8, capacities=[BUS_CAPACITIES], ranges=[BUS_RANGE], depots=DEPOTS
+    GRID,
+    num_buses=NUM_BUSES,
+    capacities=[BUS_CAPACITIES],
+    ranges=[BUS_RANGE],
+    depots=DEPOTS,
 )
-SCHOOLS = make_schools(GRID, num_schools=4)
-STOPS = make_stops(GRID, num_stops=20)
-STUDENTS = make_students(GRID, num_students=200, schools=SCHOOLS, stops=STOPS)
+SCHOOLS = make_schools(GRID, num_schools=NUM_SCHOOLS)
+STOPS = make_stops(GRID, num_stops=NUM_STOPS)
+STUDENTS = make_students(GRID, num_students=NUM_STUDENTS, schools=SCHOOLS, stops=STOPS)
 
 MAX_ROUNDS = 2
 
