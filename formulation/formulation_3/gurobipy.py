@@ -567,7 +567,7 @@ def build_model_from_definition(
     }
 
 
-def solve_problem(model: gp.Model) -> None:
+def solve_problem(model: gp.Model, mem_limit: float = float("inf")) -> None:
     print("Solving MILP")
     model.optimize()
 

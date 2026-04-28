@@ -8,7 +8,7 @@ from formulation.formulation_3.cvxpy import (
     plot_bus_routes,
     solve_problem,
 )
-from experiments.helpers import setup
+from experiments.helpers import setup_framingham
 
 
 CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
@@ -34,7 +34,7 @@ def experimental_config():
 
 
 def main() -> None:
-    problem_data = setup("framingham", PLACE_NAME)
+    problem_data = setup_framingham()
 
     # formulation time baby
     no_chaining = Formulation3(
@@ -70,7 +70,7 @@ def main() -> None:
     print("No-chaining routes plotted")
 
     print("Now doing chaining formulation...")
-    problem_data = setup("framingham", PLACE_NAME)
+    problem_data = setup_framingham()
     chaining = Formulation3(
         problem_data=problem_data,
         rounds=3,

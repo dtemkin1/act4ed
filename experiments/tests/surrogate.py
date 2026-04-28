@@ -10,7 +10,7 @@ from formulation.formulation_3.gurobipy import (
     plot_bus_routes,
     solve_problem,
 )
-from experiments.helpers import make_osm_in_km, setup_framingham
+from experiments.helpers import make_osm_in_km, setup
 
 
 CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
@@ -20,7 +20,7 @@ PLACE_NAME = "Framingham, Massachusetts, USA"
 
 
 def main() -> None:
-    problem_data_original = setup_framingham(True)
+    problem_data_original = setup("framingham", PLACE_NAME)
     osm_graph_km = make_osm_in_km(problem_data_original.osm_graph)
     print("Problem data loaded!")
 
@@ -89,67 +89,6 @@ def main() -> None:
     )
     print("No-chaining routes plotted")
     no_chaining_model.close()
-
-    print("Now doing chaining formulation...")
-    mcc = next(school for school in problem_data_original.schools if school.id == "MCC")
-
-    # only kids living relatively close
-    both_nearby_students: list[Student] = []
-    for student in problem_data_original.students:
-        distance_fuller = problem_data_original.service_graph.edges[
-            student.stop.node_id, fuller.node_id, 0
-        ]["length"]
-        distance_mcc = problem_data_original.service_graph.edges[
-            student.stop.node_id, mcc.node_id, 0
-        ]["length"]
-
-        # within 1 km of school
-        if distance_fuller <= 1.0 and student.school == fuller:
-            both_nearby_students.append(student)
-        if distance_mcc <= 1.0 and student.school == mcc:
-            both_nearby_students.append(student)
-
-    print(f"Number of both nearby students: {len(both_nearby_students)}")
-
-    stops_with_students = list(set(student.stop for student in both_nearby_students))
-
-    problem_data = ProblemDataToy(
-        "chaining_toy",
-        _base_graph=osm_graph_km,
-        _stops=stops_with_students,
-        _schools=[fuller, mcc],
-        _depots=problem_data_original.depots,
-        _students=both_nearby_students,
-        _buses=buses_to_use,
-    )
-    chaining = Formulation3(
-        problem_data=problem_data,
-        rounds=3,
-    )
-    print("Chaining formulation created")
-
-    chaining_model, chaining_vars = build_model_from_definition(chaining)
-    print("Chaining model built")
-
-    solve_problem(chaining_model)
-    print("Chaining problem solved!")
-
-    report_chaining = make_report(chaining_model, chaining, chaining_vars)
-
-    with open(
-        CURRENT_FILE_DIR / ".." / "outputs" / "report_chaining.txt",
-        "w+",
-        encoding="utf-8",
-    ) as f:
-        f.write(report_chaining)
-    plot_bus_routes(
-        chaining_model,
-        chaining,
-        chaining_vars,
-        CURRENT_FILE_DIR / ".." / "outputs" / "chaining_routes.png",
-    )
-
-    chaining_model.close()
 
 
 if __name__ == "__main__":

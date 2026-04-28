@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from typing import Literal, overload
 
 from networkx import MultiDiGraph
 import pandas as pd
@@ -7,7 +8,7 @@ import matplotlib.pyplot as plt
 from shapely import Point
 
 from formulation.common.classes import DemographicInfo, NodeId, Student
-from formulation.common.problems import ProblemDataReal
+from formulation.common.problems import ProblemDataReal, ProblemDataRealSurrogate
 
 
 CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
@@ -37,13 +38,36 @@ STUDENT_ASSIGN_CSV = CURRENT_FILE_DIR / "outputs" / "student_to_stop_or_school.c
 FRAMINGHAM_NAME = "Framingham, Massachusetts, USA"
 
 
+@overload
 def setup(
-    problem_name: str, place_name: str, prune: int | None = None
-) -> ProblemDataReal:
+    problem_name: str,
+    place_name: str,
+    prune: int | None = None,
+    hexagonal: Literal[False] = False,
+) -> ProblemDataReal: ...
+
+
+@overload
+def setup(
+    problem_name: str,
+    place_name: str,
+    hexagonal: Literal[True],
+    prune: None = None,
+) -> ProblemDataRealSurrogate: ...
+
+
+def setup(
+    problem_name: str,
+    place_name: str,
+    hexagonal: bool = False,
+    prune: int | None = None,
+) -> ProblemDataReal | ProblemDataRealSurrogate:
+    ProblemDataClass = ProblemDataRealSurrogate if hexagonal else ProblemDataReal
+
     try:
-        problem_data = ProblemDataReal.load(problem_name, prune)
+        problem_data = ProblemDataClass.load(problem_name, prune)
     except FileNotFoundError:
-        problem_data = ProblemDataReal(
+        problem_data = ProblemDataClass(
             name=problem_name,
             schools_path=SCHOOLS_CSV,
             stops_path=STOPS_CSV,
@@ -61,8 +85,22 @@ def setup(
     return problem_data
 
 
-def setup_framingham(prune: int | None = None) -> ProblemDataReal:
-    return setup("framingham", FRAMINGHAM_NAME, prune)
+@overload
+def setup_framingham(
+    hexagonal: Literal[False] = False, prune: int | None = None
+) -> ProblemDataReal: ...
+
+
+@overload
+def setup_framingham(
+    hexagonal: Literal[True], prune: None = None
+) -> ProblemDataRealSurrogate: ...
+
+
+def setup_framingham(
+    hexagonal: bool = False, prune: int | None = None
+) -> ProblemDataReal | ProblemDataRealSurrogate:
+    return setup("framingham", FRAMINGHAM_NAME, hexagonal=hexagonal, prune=prune)
 
 
 def get_assigned_students(problem_data: ProblemDataReal) -> tuple[Student, ...]:
