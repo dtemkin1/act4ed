@@ -32,7 +32,7 @@ from formulation.common.constants import (
 @dataclass_json
 @dataclass(frozen=True)
 class ExperimentConfig:
-    problem_data_pkl: str
+    problem_data_pkl: str | Path
     # vals
     rounds: int
 

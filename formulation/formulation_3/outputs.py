@@ -55,7 +55,7 @@ def make_report(
     else:
         for b, bus in enumerate(B):
             result_string += (
-                f"{bus} (capacity {C_b(bus)}, range {R_b(bus)} mi, "
+                f"{bus} (capacity {C_b(bus)}, range {R_b(bus)} km, "
                 f"wheelchair access {Wh_b(bus) == 1}, monitor needed: {r_bmon[b].X > 0.5})\n"
             )
             total_rounds = len(Q) if rounds is None else min(rounds, len(Q))
@@ -166,6 +166,9 @@ def plot_bus_routes(
     problem_data = formulation.problem_data
     graph = problem_data.base_graph
 
+    if "crs" not in graph.graph:
+        graph.graph["crs"] = "EPSG:3857"  # uses meters
+
     pos = {
         node: (
             graph.nodes[node]["x"],
@@ -179,17 +182,29 @@ def plot_bus_routes(
     else:
         # Visualize the routes on the graph
         if per_round:
-            fig, axes = plt.subplots(nrows=1, ncols=len(Q), figsize=(12, 8))
+            fig, axes = plt.subplots(
+                nrows=1,
+                ncols=len(Q),
+                figsize=(4 + (4 * len(Q)), 8),
+                dpi=300,
+                subplot_kw={"facecolor": "#111111"},
+            )
             if len(Q) == 1:
                 axes = [axes]
         else:
-            fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(12, 8))
+            fig, ax = plt.subplots(
+                nrows=1,
+                ncols=1,
+                figsize=(8, 8),
+                dpi=300,
+                subplot_kw={"facecolor": "#111111"},
+            )
             axes = [ax]
 
         # fig, ax = ox.plot_graph(graph, ax=ax, show=False)
         for q, ax in enumerate(axes):
             qs = range(len(Q)) if not per_round else [q]
-            _, ax = ox.plot_graph(graph, ax=ax, show=False, bbox=(0, 0, 4000, 1000))
+            _, ax = ox.plot_graph(graph, ax=ax, node_size=8, show=False)
             for b, _ in enumerate(B):
                 for q in qs:
                     if z_bq[b, q].X > 0.5:
@@ -213,7 +228,7 @@ def plot_bus_routes(
                     pos[school.node_id][1],
                     c=school_colors[school.type],
                     marker="s",
-                    label={school.name},
+                    label=school.name,
                 )
             for bus_stop in bus_stops:
                 ax.scatter(

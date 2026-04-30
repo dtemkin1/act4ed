@@ -33,13 +33,14 @@ def main() -> None:
     # only kids living relatively close
     nearby_students: list[Student] = []
     for student in problem_data_original.students:
-        distance = problem_data_original.service_graph.edges[
-            student.stop.node_id, fuller.node_id, 0
-        ]["length"]
+        if student.school == fuller:
+            distance = problem_data_original.service_graph.edges[
+                student.stop.node_id, fuller.node_id, 0
+            ]["length"]
 
-        # within 1 km of school
-        if distance <= 1.0 and student.school == fuller:
-            nearby_students.append(student)
+            # within 1 km of school
+            if distance <= 1.0:
+                nearby_students.append(student)
     print(f"Number of nearby students: {len(nearby_students)}")
 
     stops_with_students = list(set(student.stop for student in nearby_students))
@@ -66,13 +67,17 @@ def main() -> None:
     )
     print("No-chaining formulation created")
 
-    no_chaining_model, no_chaining_vars = build_model_from_definition(no_chaining)
+    no_chaining_bundle = build_model_from_definition(no_chaining)
     print("No-chaining model built")
 
-    solve_problem(no_chaining_model)
+    no_chaining_solution = solve_problem(no_chaining_bundle)
     print("No-chaining problem solved!")
 
-    report_no_chaining = make_report(no_chaining_model, no_chaining, no_chaining_vars)
+    if no_chaining_solution is None:
+        print("No solution found for no-chaining formulation.")
+        return
+
+    report_no_chaining = make_report(no_chaining_solution, no_chaining)
 
     with open(
         CURRENT_FILE_DIR / ".." / "outputs" / "report_no_chaining.txt",
@@ -83,13 +88,12 @@ def main() -> None:
     print("No-chaining report written")
 
     plot_bus_routes(
-        no_chaining_model,
+        no_chaining_solution,
         no_chaining,
-        no_chaining_vars,
-        CURRENT_FILE_DIR / ".." / "outputs" / "no_chaining_routes.png",
+        save_path=CURRENT_FILE_DIR / ".." / "outputs" / "no_chaining_routes.png",
     )
     print("No-chaining routes plotted")
-    no_chaining_model.close()
+    no_chaining_bundle.model.close()
 
     print("Now doing chaining formulation...")
     mcc = next(school for school in problem_data_original.schools if school.id == "MCC")
@@ -97,18 +101,24 @@ def main() -> None:
     # only kids living relatively close
     both_nearby_students: list[Student] = []
     for student in problem_data_original.students:
-        distance_fuller = problem_data_original.service_graph.edges[
-            student.stop.node_id, fuller.node_id, 0
-        ]["length"]
-        distance_mcc = problem_data_original.service_graph.edges[
-            student.stop.node_id, mcc.node_id, 0
-        ]["length"]
+        if student.school not in (fuller, mcc):
+            continue
+        elif student.school == fuller:
+            distance = problem_data_original.service_graph.edges[
+                student.stop.node_id, fuller.node_id, 0
+            ]["length"]
 
-        # within 1 km of school
-        if distance_fuller <= 1.0 and student.school == fuller:
-            both_nearby_students.append(student)
-        if distance_mcc <= 1.0 and student.school == mcc:
-            both_nearby_students.append(student)
+            # within 1 km of school
+            if distance <= 1.0:
+                both_nearby_students.append(student)
+        elif student.school == mcc:
+            distance = problem_data_original.service_graph.edges[
+                student.stop.node_id, mcc.node_id, 0
+            ]["length"]
+
+            # within 1 km of school
+            if distance <= 1.0:
+                both_nearby_students.append(student)
 
     print(f"Number of both nearby students: {len(both_nearby_students)}")
 
@@ -129,13 +139,13 @@ def main() -> None:
     )
     print("Chaining formulation created")
 
-    chaining_model, chaining_vars = build_model_from_definition(chaining)
+    chaining_bundle = build_model_from_definition(chaining)
     print("Chaining model built")
 
-    solve_problem(chaining_model)
+    chaining_solution = solve_problem(chaining_bundle)
     print("Chaining problem solved!")
 
-    report_chaining = make_report(chaining_model, chaining, chaining_vars)
+    report_chaining = make_report(chaining_solution, chaining)
 
     with open(
         CURRENT_FILE_DIR / ".." / "outputs" / "report_chaining.txt",
@@ -144,13 +154,12 @@ def main() -> None:
     ) as f:
         f.write(report_chaining)
     plot_bus_routes(
-        chaining_model,
+        chaining_solution,
         chaining,
-        chaining_vars,
-        CURRENT_FILE_DIR / ".." / "outputs" / "chaining_routes.png",
+        save_path=CURRENT_FILE_DIR / ".." / "outputs" / "chaining_routes.png",
     )
 
-    chaining_model.close()
+    chaining_bundle.model.close()
 
 
 if __name__ == "__main__":

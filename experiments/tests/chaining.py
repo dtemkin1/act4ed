@@ -43,6 +43,7 @@ def main() -> None:
     )
 
     bus = Bus(
+        id="1",
         name="Bus 1",
         capacity=41,
         range=1000,
