@@ -6,9 +6,7 @@ from typing import Any
 
 import numpy as np
 
-from formulation.common import (
-    TAU,
-    BusType,
+from formulation.common.utils import (
     C_b,
     R_b,
     Wh_b,
@@ -21,10 +19,12 @@ from formulation.common import (
     s_m,
     tau_m,
 )
+from formulation.common.classes import BusType
+from formulation.common.constants import METERS_PER_KM, TAU
+
 from formulation.formulation_3.definition import (
     Formulation3,
 )
-from formulation.common.constants import MILES_TO_KILOMETERS
 
 
 @dataclass(frozen=True, slots=True)
@@ -312,7 +312,7 @@ def build_formulation3_numeric_instance(
     capacity_b = np.asarray([C_b(bus) for bus in B], dtype=np.int64)
     cap_upper_b = np.asarray([problem.C_CAP_B(bus) for bus in B], dtype=np.float64)
     range_b = np.asarray(
-        [R_b(bus) * MILES_TO_KILOMETERS for bus in B],
+        [R_b(bus) * METERS_PER_KM for bus in B],
         dtype=np.float64,
     )
     wheelchair_ok_b = np.asarray([Wh_b(bus) for bus in B], dtype=np.int64)
