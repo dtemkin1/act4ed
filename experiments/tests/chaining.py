@@ -17,9 +17,12 @@ from formulation.common.problems import ProblemDataToy
 from formulation.common.toy import make_graph
 from formulation.formulation_3.definition import Formulation3
 from formulation.formulation_3.gurobipy import (
+    Formulation3Solution,
     build_model_from_definition,
-    make_report,
     solve_problem,
+)
+from formulation.formulation_3.outputs import (
+    make_report,
     plot_bus_routes,
 )
 
@@ -108,10 +111,11 @@ def main() -> None:
 
     toy_data = Formulation3(problem_data=problem_data, rounds=1)
 
-    model, vals = build_model_from_definition(toy_data)
+    bundle = build_model_from_definition(toy_data)
+    model = bundle.model
     print(f"Model built for problem: {toy_data.problem_data.name}")
 
-    solve_problem(model)
+    solution = solve_problem(bundle)
     print(f"Problem solved: {toy_data.problem_data.name}")
 
     objective_value = model.ObjVal if model.SolCount > 0 else None
@@ -136,16 +140,27 @@ def main() -> None:
         print(f"Wrote IIS to {iis_path}")
         return
 
+    if solution is None:
+        raise RuntimeError("expected a Formulation3Solution from solve_problem(bundle)")
+
+    solution_path = (
+        output_dir / f"{toy_data.problem_data.name}_rounds_{toy_data.rounds}.pkl"
+    )
+    solution.save(solution_path)
+    print(f"Wrote solution snapshot to {solution_path}")
+
+    loaded_solution = Formulation3Solution.load(solution_path)
+    print(f"Reloaded solution snapshot from {solution_path}")
+
     plot_bus_routes(
-        prob=model,
+        prob=loaded_solution,
         formulation=toy_data,
-        model_vars=vals,
         save_path=output_dir
         / f"{toy_data.problem_data.name}_rounds_{toy_data.rounds}_routes.png",
         per_round=True,
     )
 
-    report = make_report(model, toy_data, vals)
+    report = make_report(loaded_solution, toy_data)
     report_file = (
         output_dir / f"{toy_data.problem_data.name}_rounds_{toy_data.rounds}.txt"
     )

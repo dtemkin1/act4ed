@@ -10,7 +10,6 @@ from shapely import Point
 from formulation.common.classes import DemographicInfo, NodeId, Student
 from formulation.common.problems import ProblemDataReal, ProblemDataRealSurrogate
 
-
 CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 
 # where
@@ -44,6 +43,7 @@ def setup(
     place_name: str,
     prune: int | None = None,
     hexagonal: Literal[False] = False,
+    save_path: Path | None = None,
 ) -> ProblemDataReal: ...
 
 
@@ -53,6 +53,7 @@ def setup(
     place_name: str,
     hexagonal: Literal[True],
     prune: None = None,
+    save_path: Path | None = None,
 ) -> ProblemDataRealSurrogate: ...
 
 
@@ -61,6 +62,7 @@ def setup(
     place_name: str,
     hexagonal: bool = False,
     prune: int | None = None,
+    save_path: Path | None = None,
 ) -> ProblemDataReal | ProblemDataRealSurrogate:
     ProblemDataClass = ProblemDataRealSurrogate if hexagonal else ProblemDataReal
 
@@ -80,7 +82,7 @@ def setup(
         )
         problem_data.sanity_checks()
 
-        problem_data.save()
+        problem_data.save(cache_dir=save_path)
 
     return problem_data
 
@@ -222,7 +224,7 @@ def plot_special_education_students(problem_data: ProblemDataReal) -> None:
     ax.set_title("Location of Special Education Students")
     # add gradient legend
     cbar = plt.colorbar(sm, ax=ax)
-    cbar.set_label("Distance to School (m)")
+    cbar.set_label("Distance to School (km)")
 
     # remove axis borders and ticks
     ax.set_axis_off()

@@ -4,10 +4,11 @@ from functools import cached_property
 import os
 from pathlib import Path
 import warnings
-from typing import cast
+from typing import Any, Callable, cast
 
 import datetime as dt
 import pickle
+from collections.abc import Hashable, Iterable
 
 import geopandas as gpd
 import networkx as nx
@@ -27,7 +28,11 @@ from formulation.common.classes import (
     Student,
     Place,
 )
-from formulation.common.utils import get_shortest_path
+from formulation.common.utils import (
+    get_shortest_path,
+    ensure_service_graph_kilometers,
+    meters_to_kilometers,
+)
 
 try:
     import r5py
@@ -72,7 +77,7 @@ class ProblemData(ABC):
     @abstractmethod
     def service_graph(self) -> "nx.MultiDiGraph[NodeId]":
         """
-        network graph with edge weights corresponding to travel times in minutes and length in km,
+        network graph with edge weights corresponding to travel distances in kilometers,
         only containing nodes in N and edges corresponding to shortest paths between nodes in N.
         uses integer node_id
         """
@@ -112,11 +117,6 @@ class ProblemData(ABC):
     def all_nodes(self) -> tuple[Place, ...]:
         """all nodes in the problem, including stops, schools, and depots"""
         return self.stops + self.schools + self.depots
-
-    def _get_shortest_path_base(
-        self, start: NodeId, end: NodeId, weight: str = "length"
-    ) -> tuple[float, list[NodeId]]:
-        return get_shortest_path(self.base_graph, start, end, weight)
 
     def sanity_checks(self):
         """perform sanity checks on the transportation network."""
@@ -182,6 +182,135 @@ class ProblemData(ABC):
         # note for self: make sure only one node per intersection/dead end,
         # and that there are no duplicate edges or goofy artifacts
 
+    def restricted(
+        self,
+        *,
+        school_ids: Iterable[str | int] | None = None,
+        school_types: Iterable[SchoolType | str | int] | None = None,
+    ) -> "FilteredProblemData":
+        if not school_ids and not school_types:
+            raise ValueError("must provide at least one school id or school type")
+
+        allowed_school_ids = None if not school_ids else set(school_ids)
+        allowed_school_types = (
+            None
+            if not school_types
+            else {_coerce_school_type(value) for value in school_types}
+        )
+
+        selected_schools = [
+            school
+            for school in self.schools
+            if (allowed_school_ids is None or school.id in allowed_school_ids)
+            and (allowed_school_types is None or school.type in allowed_school_types)
+        ]
+        if not selected_schools:
+            raise ValueError("no schools matched the requested restriction")
+
+        selected_school_ids = {school.id for school in selected_schools}
+        selected_students = [
+            student
+            for student in self.students
+            if student.school.id in selected_school_ids
+        ]
+        if not selected_students:
+            raise ValueError("no students matched the requested school restriction")
+
+        selected_school_ids = {student.school.id for student in selected_students}
+        selected_schools = [
+            school for school in selected_schools if school.id in selected_school_ids
+        ]
+        selected_stops_set = {student.stop for student in selected_students}
+        selected_stops = [stop for stop in self.stops if stop in selected_stops_set]
+
+        return FilteredProblemData(
+            name=f"{self.name}_{_restriction_suffix(school_ids, school_types)}",
+            base_problem_data=self,
+            _stops=selected_stops,
+            _schools=selected_schools,
+            _depots=list(self.depots),
+            _students=selected_students,
+            _buses=list(self.buses),
+        )
+
+    def restrict_to_school(self, school: School | str | int) -> "FilteredProblemData":
+        school_id = school.id if isinstance(school, School) else school
+        return self.restricted(school_ids=[school_id])
+
+    def restrict_to_school_type(
+        self,
+        school_type: SchoolType | str | int,
+    ) -> "FilteredProblemData":
+        return self.restricted(school_types=[school_type])
+
+
+def _coerce_school_type(value: SchoolType | str | int) -> SchoolType:
+    if isinstance(value, SchoolType):
+        return value
+    if isinstance(value, str):
+        return SchoolType[value]
+    return SchoolType(value)
+
+
+def _restriction_suffix(
+    school_ids: Iterable[str | int] | None,
+    school_types: Iterable[SchoolType | str | int] | None,
+) -> str:
+    parts: list[str] = []
+    if school_ids:
+        parts.append("schools_" + "-".join(str(value) for value in school_ids))
+    if school_types:
+        parts.append(
+            "types_"
+            + "-".join(_coerce_school_type(value).name for value in school_types)
+        )
+    return "_".join(parts)
+
+
+@dataclass(frozen=True)
+class FilteredProblemData(ProblemData):
+    base_problem_data: ProblemData
+    _stops: tuple[Stop, ...]
+    _schools: tuple[School, ...]
+    _depots: tuple[Depot, ...]
+    _students: tuple[Student, ...]
+    _buses: tuple[Bus, ...]
+
+    @cached_property
+    def _service_graph_cached(self) -> "nx.MultiDiGraph[NodeId]":
+        node_ids = {node.node_id for node in self.all_nodes}
+        service_graph = self.base_problem_data.service_graph.subgraph(node_ids).copy()
+        service_graph.graph.update(self.base_problem_data.service_graph.graph)
+        ensure_service_graph_kilometers(service_graph)
+        return service_graph
+
+    @property
+    def service_graph(self) -> "nx.MultiDiGraph[NodeId]":
+        return self._service_graph_cached
+
+    @property
+    def stops(self) -> tuple[Stop, ...]:
+        return self._stops
+
+    @property
+    def schools(self) -> tuple[School, ...]:
+        return self._schools
+
+    @property
+    def depots(self) -> tuple[Depot, ...]:
+        return self._depots
+
+    @property
+    def students(self) -> tuple[Student, ...]:
+        return self._students
+
+    @property
+    def buses(self) -> tuple[Bus, ...]:
+        return self._buses
+
+    def __getattr__(self, name: str):
+        return getattr(self.base_problem_data, name)
+
 
 @dataclass(frozen=True)
 class ProblemDataToy(ProblemData):
@@ -222,9 +351,15 @@ class ProblemDataToy(ProblemData):
     def buses(self) -> tuple[Bus, ...]:
         return self._buses
 
-    @cached_property
-    def service_graph(self):
+    def _get_shortest_path_base(
+        self, start: NodeId, end: NodeId, weight: str = "length"
+    ) -> tuple[float, list[NodeId]]:
+        return get_shortest_path(self.base_graph, start, end, weight)
+
+    @property
+    def service_graph(self) -> "nx.MultiDiGraph[NodeId]":
         service_graph: "nx.MultiDiGraph[NodeId]" = nx.MultiDiGraph()
+        service_graph.graph["distance_unit"] = "km"
 
         def add_edge_if_path_exists(start: Place, end: Place):
             # check if edge in graph already, if so skip
@@ -242,7 +377,12 @@ class ProblemDataToy(ProblemData):
             try:
                 length, path_list = self._get_shortest_path_base(start_id, end_id)
                 path = tuple(path_list)
-                service_graph.add_edge(start_id, end_id, length=length, path=path)
+                service_graph.add_edge(
+                    start_id,
+                    end_id,
+                    length=meters_to_kilometers(length),
+                    path=path,
+                )
             except nx.NetworkXNoPath:
                 print(f"Warning: no path between {start} and {end} in the graph")
 
@@ -307,12 +447,16 @@ class ProblemDataReal(ProblemData):
 
     # post init data
     @cached_property
-    def service_graph(self):
+    def _service_graph_cached(self) -> "nx.MultiDiGraph[NodeId]":
         return self._make_service_graph()
 
     @property
     def base_graph(self) -> "nx.MultiDiGraph[NodeId]":
         return self.osm_graph
+
+    @property
+    def service_graph(self) -> "nx.MultiDiGraph[NodeId]":
+        return self._service_graph_cached
 
     @cached_property
     def osm_graph(self) -> "nx.MultiDiGraph[NodeId]":
@@ -320,30 +464,47 @@ class ProblemDataReal(ProblemData):
         return self._make_osm_graph()
 
     @cached_property
-    def stops(self) -> tuple[Stop, ...]:
+    def _stops_cached(self) -> tuple[Stop, ...]:
         return self._make_stops()
 
+    @property
+    def stops(self) -> tuple[Stop, ...]:
+        return self._stops_cached
+
     @cached_property
-    def schools(self) -> tuple[School, ...]:
+    def _schools_cached(self) -> tuple[School, ...]:
         return self._make_schools()
 
+    @property
+    def schools(self) -> tuple[School, ...]:
+        return self._schools_cached
+
     @cached_property
-    def depots(self) -> tuple[Depot, ...]:
+    def _depots_cached(self) -> tuple[Depot, ...]:
         return self._make_depots()
 
-    @cached_property
-    def students(self) -> tuple[Student, ...]:
-        return self._make_students()
+    @property
+    def depots(self) -> tuple[Depot, ...]:
+        return self._depots_cached
 
     @cached_property
-    def buses(self) -> tuple[Bus, ...]:
+    def _students_cached(self) -> tuple[Student, ...]:
+        return self._make_students()
+
+    @property
+    def students(self) -> tuple[Student, ...]:
+        return self._students_cached
+
+    @cached_property
+    def _buses_cached(self) -> tuple[Bus, ...]:
         return self._make_buses()
+
+    @property
+    def buses(self) -> tuple[Bus, ...]:
+        return self._buses_cached
 
     @cached_property
     def _transportation_network(self) -> "r5py.TransportNetwork":
-        assert (
-            r5py is not None
-        ), "r5py must be installed to use r5 for service graph construction"
         if not self.osm_pbf_path:
             raise ValueError("osm_pbf_path must be provided if use_r5 is True")
         return r5py.TransportNetwork(osm_pbf=self.osm_pbf_path)
@@ -380,129 +541,220 @@ class ProblemDataReal(ProblemData):
 
         return graph
 
+    def _get_shortest_path_osm(
+        self, start: NodeId, end: NodeId, weight: str = "length"
+    ) -> tuple[float, list[NodeId]]:
+        return get_shortest_path(self.osm_graph, start, end, weight)
+
+    def _stop_school_types(self) -> dict[Stop, set[SchoolType]]:
+        stop_school_types: dict[Stop, set[SchoolType]] = {}
+        for student in self.students:
+            stop_school_types.setdefault(student.stop, set()).add(student.school.type)
+        return stop_school_types
+
+    def _service_graph_pairs(self) -> tuple[tuple[Place, Place], ...]:
+        pairs: list[tuple[Place, Place]] = []
+
+        for depot in self.depots:
+            for stop in self.stops:
+                pairs.append((depot, stop))
+
+        for stop1 in self.stops:
+            for stop2 in self.stops:
+                if stop1 != stop2:
+                    pairs.append((stop1, stop2))
+
+            for school in self.schools:
+                pairs.append((stop1, school))
+
+        for school in self.schools:
+            for stop in self.stops:
+                pairs.append((school, stop))
+            for other_school in self.schools:
+                if school != other_school:
+                    pairs.append((school, other_school))
+            for depot in self.depots:
+                pairs.append((school, depot))
+
+        return tuple(pairs)
+
+    def _service_edge_allowed(
+        self,
+        start: Place,
+        end: Place,
+        stop_school_types: dict[Stop, set[SchoolType]],
+        length: float | None = None,
+    ) -> bool:
+        if isinstance(start, Stop) and isinstance(end, School):
+            return end.type in stop_school_types.get(start, set())
+
+        if isinstance(start, Stop) and isinstance(end, Stop):
+            if start.node_id == end.node_id:
+                return True
+            if stop_school_types.get(start, set()).isdisjoint(
+                stop_school_types.get(end, set())
+            ):
+                return False
+
+        if start.node_id == end.node_id:
+            return True
+
+        if (
+            length is not None
+            and self.prune is not None
+            and isinstance(start, Stop)
+            and isinstance(end, Stop)
+        ):
+            return length <= self.prune
+
+        return True
+
+    @staticmethod
+    def _r5_itinerary_lookup(
+        detailed_itineraries: pd.DataFrame,
+    ) -> dict[tuple[Hashable, Hashable], dict[str, object]]:
+        itinerary_lookup: dict[tuple[Hashable, Hashable], dict[str, object]] = {}
+        for row in detailed_itineraries.itertuples(index=False):
+            key = (row.from_id, row.to_id)
+            if key not in itinerary_lookup:
+                entry: dict[str, object] = {"distance": row.distance}
+                geometry = getattr(row, "geometry", None)
+                if geometry is not None:
+                    entry["geometry"] = geometry
+                itinerary_lookup[key] = entry
+        return itinerary_lookup
+
+    def _make_spatio_temporal_graph(self):
+        raise NotImplementedError(
+            "spatio-temporal graph construction not implemented yet"
+        )
+
     def _make_service_graph(self) -> "nx.MultiDiGraph[NodeId]":
         service_graph: "nx.MultiDiGraph[NodeId]" = nx.MultiDiGraph()
+        service_graph.graph["distance_unit"] = "km"
+        stop_school_types = self._stop_school_types()
+        pairs = self._service_graph_pairs()
 
-        def add_edge_if_path_exists(start: Place, end: Place):
-            # check if edge in graph already, if so skip
+        def add_edge(
+            start: Place,
+            end: Place,
+            edge_resolver: Callable[[Place, Place], tuple[float, list, dict[str, Any]]],
+        ):
             start_id = start.node_id
             end_id = end.node_id
 
             if service_graph.has_edge(start_id, end_id):
                 return
 
+            if not self._service_edge_allowed(start, end, stop_school_types):
+                return
+
             if start_id == end_id:
-                path = (start_id, end_id)
-                service_graph.add_edge(start_id, end_id, length=0.0, path=path)
+                service_graph.add_edge(
+                    start_id, end_id, length=0.0, path=[start_id, end_id]
+                )
                 return
 
             try:
-                # NOTE: length from osm is in meters, convert to km for service graph
-                length_m, path_list = self._get_shortest_path_base(start_id, end_id)
-                length_km = length_m / 1000.0
-                path = tuple(path_list)
-
-                if self.prune and isinstance(start, Stop) and isinstance(end, Stop):
-                    if length_km > self.prune:
-                        return
-
-                service_graph.add_edge(start_id, end_id, length=length_km, path=path)
-            except nx.NetworkXNoPath:
+                length, path, extra_attrs = edge_resolver(start, end)
+                if not self._service_edge_allowed(
+                    start, end, stop_school_types, length=length
+                ):
+                    return
+                service_graph.add_edge(
+                    start_id,
+                    end_id,
+                    length=meters_to_kilometers(length),
+                    path=path,
+                    **extra_attrs,
+                )
+            except (KeyError, nx.NetworkXNoPath):
                 print(f"Warning: no path between {start} and {end} in the graph")
 
         if not self.use_r5:
-            # Depots -> Stops
-            for depot in self.depots:
-                for stop in self.stops:
-                    add_edge_if_path_exists(depot, stop)
 
-            # Stops -> Stops
-            # Stops -> Schools
-            for stop1 in self.stops:
-                for stop2 in self.stops:
-                    if stop1 != stop2:
-                        add_edge_if_path_exists(stop1, stop2)
+            def edge_resolver(start: Place, end: Place):
+                length, path = self._get_shortest_path_osm(start.node_id, end.node_id)
+                return length, path, {}
 
-                for school in self.schools:
-                    add_edge_if_path_exists(stop1, school)
-
-            # Schools -> Stops
-            # Schools -> Schools
-            # Schools -> Depot
-            for school in self.schools:
-                for stop in self.stops:
-                    add_edge_if_path_exists(school, stop)
-                for other_school in self.schools:
-                    if school != other_school:
-                        add_edge_if_path_exists(school, other_school)
-                for depot in self.depots:
-                    add_edge_if_path_exists(school, depot)
+            for start, end in pairs:
+                add_edge(start, end, edge_resolver)
 
         else:
-            assert (
-                r5py is not None
-            ), "r5py must be installed to use r5 for service graph construction"
             if not self.osm_pbf_path:
                 raise ValueError("osm_pbf_path must be provided if use_r5 is True")
+            places = self.all_nodes
+            place_ids = {id(place): f"place_{idx}" for idx, place in enumerate(places)}
 
             nodes_gdf = gpd.GeoDataFrame(
                 {
-                    "id": [node.name for node in self.all_nodes],
-                    "geometry": [node.geographic_location for node in self.all_nodes],
+                    "id": [place_ids[id(place)] for place in places],
+                    "geometry": [place.geographic_location for place in places],
                 }
             )
 
-            detailed_itineraries = r5py.DetailedItineraries(
-                self._transportation_network,
-                origins=nodes_gdf,
-                destinations=nodes_gdf,
-                transport_modes=[r5py.TransportMode.CAR],
-                snap_to_network=True,
-                force_all_to_all=True,
+            itinerary_lookup = self._r5_itinerary_lookup(
+                r5py.DetailedItineraries(
+                    self._transportation_network,
+                    origins=nodes_gdf,
+                    destinations=nodes_gdf,
+                    transport_modes=[r5py.TransportMode.CAR],
+                    snap_to_network=True,
+                    force_all_to_all=True,
+                )
             )
 
-            for start_node in self.stops:
-                for end_node in self.all_nodes:
-                    if start_node != end_node:
-                        detailed_itineraries[
-                            detailed_itineraries["from_id"] == start_node.node_id
-                        ][detailed_itineraries["to_id"] == end_node.node_id]
-                        entry = detailed_itineraries[
-                            detailed_itineraries["from_id"] == start_node.node_id
-                        ][detailed_itineraries["to_id"] == end_node.node_id]
-                        service_graph.add_edge(
-                            start_node.node_id,
-                            end_node.node_id,
-                            length=(
-                                entry["distance"].iloc[0] / 1000.0
-                            ),  # convert m to km
-                            path=tuple(entry["geometry"].iloc[0]),
-                        )
+            def edge_resolver(start: Place, end: Place):
+                entry = itinerary_lookup[(place_ids[id(start)], place_ids[id(end)])]
+                extra_attrs: dict[str, object] = {}
+                geometry = entry.get("geometry")
+                if geometry is not None:
+                    extra_attrs["geometry"] = geometry
+                return float(entry["distance"]), [], extra_attrs
+
+            for start, end in pairs:
+                add_edge(start, end, edge_resolver)
 
         return service_graph
 
-    @property
-    def _file_name(self):
-        return f"{self.name}{'_' + str(self.prune) if self.prune else ''}_problem_data"
-
-    def save(self):
+    def save(self, cache_dir: Path | None = None):
         """save problem data to disk for later loading and use in formulation"""
-        with open(
-            CURRENT_FILE_DIR / ".." / "cache" / f"{self._file_name}.pkl",
-            "wb+",
-        ) as f:
+        cache_dir = cache_dir or (CURRENT_FILE_DIR / "cache")
+        cache_dir.mkdir(parents=True, exist_ok=True)
+
+        prob_name = (
+            f"{self.name}{'_' + str(self.prune) if self.prune else ''}_problem_data"
+        )
+        with open(cache_dir / f"{prob_name}.pkl", "wb+") as f:
             pickle.dump(self, f)
 
     @classmethod
     def load(cls, name: str, prune: int | None = None) -> "ProblemDataReal":
         """load problem data from disk"""
-        prob_name = f"{name}{'_' + str(prune) if prune else ''}_problem_data"
-        return cls.load_path(CURRENT_FILE_DIR / ".." / "cache" / f"{prob_name}.pkl")
+        cache_dir = CURRENT_FILE_DIR / ".." / "cache"
+
+        # Try the prune-specific cache first, then fall back to legacy unpruned naming.
+        candidate_names = [f"{name}{'_' + str(prune) if prune else ''}_problem_data"]
+        # if prune is None:
+        #     candidate_names.append(f"{name}_problem_data")
+
+        for candidate in candidate_names:
+            path = cache_dir / f"{candidate}.pkl"
+            if path.exists():
+                return cls.load_path(path)
+
+        raise FileNotFoundError(f"No cached problem data found in {cache_dir}")
 
     @classmethod
     def load_path(cls, path: Path) -> "ProblemDataReal":
         with open(path, "rb") as f:
-            return pickle.load(f)
+            problem_data = pickle.load(f)
+
+        cached_service_graph = getattr(problem_data, "_service_graph_cached", None)
+        if cached_service_graph is not None:
+            ensure_service_graph_kilometers(cached_service_graph)
+
+        return problem_data
 
     def _make_schools(self) -> tuple[School, ...]:
         schools_df = pd.read_csv(
@@ -641,9 +893,6 @@ class ProblemDataReal(ProblemData):
 
     def _get_nearest_stop(self, geo_location: Point) -> Stop:
         if self.use_r5:
-            assert (
-                r5py is not None
-            ), "r5py must be installed to use r5 for nearest stop calculation"
             nearest_stop_id = (
                 r5py.DetailedItineraries(
                     self._transportation_network,

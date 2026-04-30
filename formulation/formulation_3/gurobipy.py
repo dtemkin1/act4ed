@@ -1,12 +1,8 @@
 import math
-from typing import Any
 import datetime as dt
-from pathlib import Path
 
 import gurobipy as gp
-from gurobipy import GRB, GurobiError, tupledict, Var
-from matplotlib import pyplot as plt
-import osmnx as ox
+from gurobipy import GRB, GurobiError
 
 from loguru import logger
 
@@ -26,12 +22,18 @@ from formulation.common.utils import (
 )
 from formulation.formulation_3.definition import Formulation3
 
-METERS_PER_MILE = 1609.344
+from formulation.common.constants import METERS_PER_MILE
+
+from formulation.formulation_3.solution import (
+    Formulation3ModelBundle,
+    Formulation3Solution,
+    _gurobi_status_name,
+)
 
 
 def build_model_from_definition(
     problem: Formulation3,
-) -> tuple[gp.Model, dict[str, Any]]:
+) -> Formulation3ModelBundle:
     B = problem.B
     M = problem.M
     S = problem.S
@@ -159,7 +161,7 @@ def build_model_from_definition(
     logger.info("y_bqtau vars added")
     v_bqi = model.addVars(B_idx, Q_idx, N_idx, vtype=GRB.BINARY, name="v_bqi")
     logger.info("v_bqi vars added")
-    a_mbq = model.addVars(M_idx, B_idx, Q_idx, vtype=GRB.BINARY, name="a_mbq")
+    a_mbq = model.addVars(M_idx, B_idx, Q_idx, vtype=GRB.CONTINUOUS, name="a_mbq")
     logger.info("a_mbq vars added")
     T_bqi = model.addVars(
         B_idx,
@@ -553,22 +555,33 @@ def build_model_from_definition(
         "s_idx": s_idx,
     }
 
-    return model, {
-        "z_b": z_b,
-        "z_bq": z_bq,
-        "y_bqtau": y_bqtau,
-        "x_bqij": x_bqij,
-        "v_bqi": v_bqi,
-        "a_mbq": a_mbq,
-        "T_bqi": T_bqi,
-        "L_bqi": L_bqi,
-        "e_bqs": e_bqs,
-        "r_bmon": r_bmon,
-        "meta": meta,
-    }
+    return Formulation3ModelBundle(
+        model=model,
+        variables={
+            "z_b": z_b,
+            "z_bq": z_bq,
+            "y_bqtau": y_bqtau,
+            "x_bqij": x_bqij,
+            "v_bqi": v_bqi,
+            "a_mbq": a_mbq,
+            "T_bqi": T_bqi,
+            "L_bqi": L_bqi,
+            "e_bqs": e_bqs,
+            "r_bmon": r_bmon,
+        },
+        meta=meta,
+    )
 
 
-def solve_problem(model: gp.Model, mem_limit: float = float("inf")) -> None:
+def solve_problem(
+    model: gp.Model | Formulation3ModelBundle,
+) -> Formulation3Solution | None:
+    if isinstance(model, Formulation3ModelBundle):
+        bundle = model
+        model = bundle.model
+    else:
+        bundle = None
+
     print("Solving MILP")
     model.optimize()
 
@@ -579,241 +592,6 @@ def solve_problem(model: gp.Model, mem_limit: float = float("inf")) -> None:
     else:
         print("Objective: unavailable")
 
-
-def _gurobi_status_name(status: int) -> str:
-    status_names = {
-        GRB.LOADED: "LOADED",
-        GRB.OPTIMAL: "OPTIMAL",
-        GRB.INFEASIBLE: "INFEASIBLE",
-        GRB.INF_OR_UNBD: "INF_OR_UNBD",
-        GRB.UNBOUNDED: "UNBOUNDED",
-        GRB.CUTOFF: "CUTOFF",
-        GRB.ITERATION_LIMIT: "ITERATION_LIMIT",
-        GRB.NODE_LIMIT: "NODE_LIMIT",
-        GRB.TIME_LIMIT: "TIME_LIMIT",
-        GRB.SOLUTION_LIMIT: "SOLUTION_LIMIT",
-        GRB.INTERRUPTED: "INTERRUPTED",
-        GRB.NUMERIC: "NUMERIC",
-        GRB.SUBOPTIMAL: "SUBOPTIMAL",
-        GRB.USER_OBJ_LIMIT: "USER_OBJ_LIMIT",
-    }
-    return status_names.get(status, str(status))
-
-
-def make_report(prob: gp.Model, formulation: Formulation3, model_vars: dict[str, Any]):
-    # Extract and print the route
-
-    B = formulation.B
-    M = formulation.M
-    S = formulation.S
-    A = formulation.A
-    Q = formulation.Q
-
-    # z_b = model_vars["z_b"]
-    z_bq: tupledict[tuple[Any, ...], Var] = model_vars["z_bq"]
-    y_bqtau: tupledict[tuple[Any, ...], Var] = model_vars["y_bqtau"]
-    x_bqij: tupledict[tuple[Any, ...], Var] = model_vars["x_bqij"]
-    # v_bqi = model_vars["v_bqi"]
-    a_mbq: tupledict[tuple[Any, ...], Var] = model_vars["a_mbq"]
-    # T_bqi = model_vars["T_bqi"]
-    # L_bqi = model_vars["L_bqi"]
-    # e_bqs = model_vars["e_bqs"]
-    r_bmon: tupledict[tuple[Any, ...], Var] = model_vars["r_bmon"]
-
-    result_string = ""
-
-    if prob.status not in [GRB.OPTIMAL]:
-        result_string += (
-            f"⚠️ Solver did not find a feasible solution (status={prob.status}).\n"
-        )
-    else:
-        for b, bus in enumerate(B):
-            result_string += f"{bus} (capacity {C_b(bus)}, range {R_b(bus)}, wheelchair access {Wh_b(bus) == 1}, monitor needed: {r_bmon[b].X > 0.5})\n"
-            for q in range(len(Q)):
-                assert z_bq[b, q].X is not None
-                if z_bq[b, q].X > 0.5:
-                    result_string += f"  Round {q}:\n"
-                    route = []
-                    students_on_bus = []
-                    schools_served = []
-                    for ij, path in enumerate(A.keys()):
-                        if x_bqij[b, q, ij].X > 0.5:
-                            route.append(path)
-                            for node in path:
-                                if (
-                                    node in S
-                                    and node not in schools_served
-                                    and any(
-                                        a_mbq[m, b, q].X > 0.5 and s_m(M[m]) == node
-                                        for m in range(len(M))
-                                    )
-                                ):
-                                    schools_served.append(node)
-                    route_by_start = {path[0]: path for path in route}
-                    route_destinations = {path[1] for path in route}
-                    route_start = next(
-                        (
-                            path[0]
-                            for path in route
-                            if path[0] not in route_destinations
-                        ),
-                        route[0][0] if route else None,
-                    )
-                    ordered_route = []
-                    current_node = route_start
-                    while current_node in route_by_start:
-                        next_path = route_by_start[current_node]
-                        ordered_route.append(next_path)
-                        current_node = next_path[1]
-
-                    for m, student in enumerate(M):
-                        if a_mbq[m, b, q].X > 0.5:
-                            students_on_bus.append(student)
-                    result_string += f"    Total travel distance: {sum(formulation.d_ij(*path) for path in ordered_route):.2f} meters\n"
-                    school_type = TAU[
-                        max(
-                            (tau for tau in range(len(TAU))),
-                            key=lambda tau: (
-                                y_bqtau[b, q, tau].X
-                                if y_bqtau[b, q, tau].X is not None
-                                else 0
-                            ),
-                        )
-                    ]
-                    result_string += f"    Bus type: {school_type.name}\n"
-                    result_string += f"    Students on bus this round:\n      {'\n      '.join(str(student) for student in students_on_bus)}\n"
-                    result_string += f"    Schools served:\n      {'\n      '.join(str(school) for school in schools_served)}\n"
-
-                    # Sort route by travel time from depot start
-                    # depot_start = make_depot_start_copy(depot_b(bus))
-
-                    # make sure route is in right order, where end of one path is the start of the next
-                    # ordered_route = []
-                    # current_node = depot_start
-                    # while len(ordered_route) < len(route):
-                    #     for path in route:
-                    #         if path[0] == current_node:
-                    #             ordered_route.append(path)
-                    #             current_node = path[1]
-                    #             break
-
-                    result_string += "    Route:\n"
-                    for path in ordered_route:
-                        result_string += f"      {path[0]} -> {path[1]}\n"
-
-    return result_string
-
-
-def plot_bus_routes(
-    prob: gp.Model,
-    formulation: Formulation3,
-    model_vars: dict[str, Any],
-    save_path: Path | None = None,
-    per_round: bool = False,
-):
-    # raise NotImplementedError("plotting not implemented yet :(")
-
-    B = formulation.B
-    A = formulation.A
-    A_PATH = formulation.A_PATH
-    Q = formulation.Q
-
-    schools = formulation.problem_data.schools
-    bus_stops = formulation.problem_data.stops
-    depots = formulation.problem_data.depots
-    school_colors = {
-        school.type: color for school, color in zip(schools, ["green", "blue", "red"])
-    }
-
-    z_bq: tupledict[tuple[Any, ...], Var] = model_vars["z_bq"]
-    x_bqij: tupledict[tuple[Any, ...], Var] = model_vars["x_bqij"]
-
-    problem_data = formulation.problem_data
-
-    graph = problem_data.base_graph
-    if "crs" not in graph.graph:
-        graph.graph["crs"] = "EPSG:3857"  # uses meters
-
-    pos = {
-        node: (
-            graph.nodes[node]["x"],
-            graph.nodes[node]["y"],
-        )
-        for node in graph.nodes()
-    }
-
-    if prob.status not in [GRB.OPTIMAL]:
-        print("No feasible solution to visualize.")
-    else:
-        # Visualize the routes on the graph
-        if per_round:
-            fig, axes = plt.subplots(
-                nrows=1,
-                ncols=len(Q),
-                figsize=(4 + (4 * len(Q)), 8),
-                dpi=300,
-                subplot_kw={"facecolor": "#111111"},
-            )
-            if len(Q) == 1:
-                axes = [axes]
-        else:
-            fig, ax = plt.subplots(
-                nrows=1,
-                ncols=1,
-                figsize=(8, 8),
-                dpi=300,
-                subplot_kw={"facecolor": "#111111"},
-            )
-            axes = [ax]
-
-        for q, ax in enumerate(axes):
-            qs = range(len(Q)) if not per_round else [q]
-            _, ax = ox.plot_graph(graph, ax=ax, node_size=8, show=False)
-            for b, _ in enumerate(B):
-                for q in qs:
-                    if z_bq[b, q].X > 0.5:
-                        for ij, path in enumerate(A.keys()):
-                            if x_bqij[b, q, ij].X > 0.5:
-                                path_edges = A_PATH[path]
-                                if path_edges:
-                                    ox.plot_graph_route(
-                                        graph,
-                                        path_edges,
-                                        ax=ax,
-                                        orig_dest_size=0,
-                                        show=False,
-                                        # route_color="r"
-                                    )
-
-            # plot schools, students, and bus stops
-            for school in schools:
-                ax.scatter(
-                    pos[school.node_id][0],
-                    pos[school.node_id][1],
-                    c=school_colors[school.type],
-                    marker="s",
-                    label={school.name},
-                )
-            for bus_stop in bus_stops:
-                ax.scatter(
-                    pos[bus_stop.node_id][0],
-                    pos[bus_stop.node_id][1],
-                    c="yellow",
-                    marker="^",
-                    label=bus_stop.name,
-                )
-            for depot in depots:
-                ax.scatter(
-                    pos[depot.node_id][0],
-                    pos[depot.node_id][1],
-                    c="purple",
-                    marker="X",
-                    label=depot.name,
-                )
-
-            ax.title.set_text("Optimized School Bus Routes")
-            ax.legend(loc="upper right", fontsize="small")
-
-        if save_path is not None:
-            fig.savefig(save_path, bbox_inches="tight")
-        # plt.show()
+    if bundle is None:
+        return None
+    return bundle.snapshot()

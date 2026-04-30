@@ -4,7 +4,8 @@ from collections.abc import Hashable
 
 import networkx as nx
 
-from formulation.common.classes import Place, School, Bus, Student, Depot
+from formulation.common.classes import NodeId, Place, School, Bus, Student, Depot
+from formulation.common.constants import METERS_PER_KM
 
 
 @cache
@@ -33,6 +34,32 @@ def get_shortest_path[T: Hashable](
 ) -> tuple[float, list[T]]:
     """returns the length and path of the shortest path between start and end"""
     return nx.bidirectional_dijkstra(graph, source=start, target=end, weight=weight)
+
+
+def meters_to_kilometers(distance_meters: float) -> float:
+    return float(distance_meters) / METERS_PER_KM
+
+
+def ensure_service_graph_kilometers(graph: "nx.MultiDiGraph[NodeId]") -> None:
+    unit = graph.graph.get("distance_unit")
+    if unit == "km":
+        return
+
+    lengths = [
+        float(data["length"])
+        for _, _, _, data in graph.edges(keys=True, data=True)
+        if "length" in data
+    ]
+    needs_conversion = unit == "m" or (
+        unit is None and any(length > 100.0 for length in lengths)
+    )
+
+    if needs_conversion:
+        for _, _, _, data in graph.edges(keys=True, data=True):
+            if "length" in data:
+                data["length"] = meters_to_kilometers(float(data["length"]))
+
+    graph.graph["distance_unit"] = "km"
 
 
 def p_m(m: Student):

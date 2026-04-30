@@ -582,7 +582,10 @@ def solve_problem(prob: cp.Problem):
 
 
 def make_report(
-    prob: cp.Problem, formulation: Formulation3, model_vars: dict[str, cp.Variable]
+    prob: cp.Problem,
+    formulation: Formulation3,
+    model_vars: dict[str, cp.Variable],
+    rounds: int | None = None,
 ):
     # Extract and print the route
 
@@ -611,8 +614,12 @@ def make_report(
         )
     else:
         for b, bus in enumerate(B):
-            result_string += f"{bus} (capacity {C_b(bus)}, range {R_b(bus)}, wheelchair access {Wh_b(bus) == 1}, monitor needed: {r_bmon[b].value > 0.5})\n"
-            for q in range(len(Q)):
+            result_string += (
+                f"{bus} (capacity {C_b(bus)}, range {R_b(bus)} mi, "
+                f"wheelchair access {Wh_b(bus) == 1}, monitor needed: {r_bmon[b].value > 0.5})\n"
+            )
+            total_rounds = len(Q) if rounds is None else min(rounds, len(Q))
+            for q in range(total_rounds):
                 assert z_bq[b, q].value is not None
                 if z_bq[b, q].value > 0.5:
                     result_string += f"  Round {q}:\n"
@@ -635,7 +642,10 @@ def make_report(
                     for m, student in enumerate(M):
                         if a_mbq[m, b, q].value > 0.5:
                             students_on_bus.append(student)
-                    result_string += f"    Total travel time (excluding dwell): {sum(formulation.d_ij(*path) for path in route):.2f} minutes\n"
+                    result_string += (
+                        f"    Total travel distance: "
+                        f"{sum(formulation.d_ij(*path) for path in route):.2f} km\n"
+                    )
                     school_type = TAU[
                         max(
                             (tau for tau in range(len(TAU))),

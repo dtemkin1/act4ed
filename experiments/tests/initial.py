@@ -6,12 +6,13 @@ from formulation.common.problems import ProblemDataToy
 from formulation.formulation_3.definition import Formulation3
 from formulation.formulation_3.gurobipy import (
     build_model_from_definition,
-    make_report,
-    plot_bus_routes,
     solve_problem,
 )
+from formulation.formulation_3.outputs import (
+    make_report,
+    plot_bus_routes,
+)
 from experiments.helpers import make_osm_in_km, setup_framingham
-
 
 CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 
@@ -20,7 +21,7 @@ PLACE_NAME = "Framingham, Massachusetts, USA"
 
 
 def main() -> None:
-    problem_data_original = setup_framingham(True)
+    problem_data_original = setup_framingham()
     osm_graph_km = make_osm_in_km(problem_data_original.osm_graph)
     print("Problem data loaded!")
 
