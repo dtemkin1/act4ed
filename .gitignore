@@ -228,5 +228,8 @@ logs/
 
 # Local data file
 rico_data
+
 # For when you run git clone https://github.com/mitschoolbus/SchoolBusRouting ./bird
 bird/
+
+out-*
