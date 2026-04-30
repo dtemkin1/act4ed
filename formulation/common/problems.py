@@ -656,15 +656,16 @@ class ProblemDataReal(ProblemData):
                 return
 
             try:
-                length, path, extra_attrs = edge_resolver(start, end)
+                length_m, path, extra_attrs = edge_resolver(start, end)
+                length_km = meters_to_kilometers(length_m)
                 if not self._service_edge_allowed(
-                    start, end, stop_school_types, length=length
+                    start, end, stop_school_types, length=length_km
                 ):
                     return
                 service_graph.add_edge(
                     start_id,
                     end_id,
-                    length=meters_to_kilometers(length),
+                    length=length_km,
                     path=path,
                     **extra_attrs,
                 )
@@ -719,7 +720,7 @@ class ProblemDataReal(ProblemData):
 
     def save(self, cache_dir: Path | None = None):
         """save problem data to disk for later loading and use in formulation"""
-        cache_dir = cache_dir or (CURRENT_FILE_DIR / "cache")
+        cache_dir = cache_dir or (CURRENT_FILE_DIR / ".." / "cache")
         cache_dir.mkdir(parents=True, exist_ok=True)
 
         prob_name = (
