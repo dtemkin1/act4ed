@@ -10,7 +10,6 @@ import datetime as dt
 import pickle
 
 import geopandas as gpd
-from matplotlib import pyplot as plt
 import networkx as nx
 import osmnx as ox
 import pandas as pd

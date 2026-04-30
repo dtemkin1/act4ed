@@ -1,3 +1,4 @@
+import math
 from typing import Any
 import datetime as dt
 from pathlib import Path
@@ -243,7 +244,7 @@ def build_model_from_definition(
     # STUDENT ASSIGNMENT
     model.addConstrs((a_mbq.sum(m, "*", "*") <= 1 for m in M_idx))
 
-    model.addConstr(a_mbq.sum("*", "*", "*") >= PHI * len(M))
+    model.addConstr(a_mbq.sum("*", "*", "*") >= math.floor(PHI * len(M)))
 
     model.addConstrs(
         (a_mbq[m, b, q] <= z_bq[b, q] for m in M_idx for b in B_idx for q in Q_idx)

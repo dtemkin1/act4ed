@@ -1,6 +1,12 @@
 from dataclasses import dataclass
 from enum import IntEnum
+from functools import cached_property
+import os
 from typing import NamedTuple
+
+from dotenv import load_dotenv
+import censusgeocode as cg
+from census import Census
 
 try:
     from shapely.geometry import Point
@@ -9,6 +15,8 @@ except Exception as exc:
         "Shapely not found. Please install it with 'pip install shapely'"
         " and ensure Java is properly configured."
     ) from exc
+
+load_dotenv()  # load environment variables from .env file
 
 type NodeId = int
 """node id in OSM and service graph"""
@@ -41,6 +49,15 @@ class DemographicInfo(NamedTuple):
     wheelchair_user: bool
 
 
+class CensusTractInfo(NamedTuple):
+    """demographic info for a student"""
+
+    total_population: int
+    not_english_proficient: int
+    english_proficient: int
+    car_owning_households: int
+
+
 @dataclass(frozen=True)
 class Base:
     """base class for all entities in the problem, just has a name for now"""
@@ -59,6 +76,41 @@ class LocationData(Base):
     """
 
     geographic_location: Point
+
+    @cached_property
+    def census_geo(self) -> str:
+        """get the census tract info for this location"""
+        geo: cg.censusgeocode.GeographyResult = cg.coordinates(
+            self.geographic_location.x, self.geographic_location.y
+        )
+        return geo
+
+    @cached_property
+    def census_data(self) -> dict[str, str | int | float]:
+        """get relevant census data for this location"""
+
+        # get census tract info for this location
+        geo = self.census_geo
+
+        census_api_key = os.getenv("CENSUS_API_KEY")
+        if census_api_key is None:
+            raise ValueError("CENSUS_API_KEY not found in environment variables")
+
+        # get census data for this tract
+        c = Census(census_api_key)
+        _tract_data = c.acs5.state_county_tract(
+            fields=[
+                "B01001_001E",  # total population
+                "B02001_002E",  # not english proficient
+                "B02001_003E",  # english proficient
+                "B02001_004E",  # car owning households
+            ],
+            state_fips=geo.statefp,
+            county_fips=geo.countyfp,
+            tract=geo.tract,
+        )
+
+        raise NotImplementedError("census_data method not fully implemented yet")
 
 
 @dataclass(frozen=True)
