@@ -6,6 +6,7 @@ from typing import NamedTuple
 
 from dotenv import load_dotenv
 import censusgeocode as cg
+import re
 from census import Census
 
 try:
@@ -178,6 +179,10 @@ class Bus(Base):
     def range_km(self) -> float:
         """range in kilometers"""
         return self.range * 1.60934  # convert miles to km
+
+    @property
+    def has_monitor(self) -> bool:
+        return re.fullmatch(r"M\d{2}", self.name) is not None
 
     def __str__(self):
         return self.name

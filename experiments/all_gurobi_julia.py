@@ -31,8 +31,7 @@ from formulation.normalized_result import (
     RoutingSolutionJson,
     routing_solution_json_from_formulation3_solution,
 )
-from experiments.helpers import setup
-from helpers import ProblemDataReal
+from experiments.helpers import setup, ProblemDataReal
 
 CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 PROJECT_ROOT = CURRENT_FILE_DIR.parent
@@ -335,7 +334,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--prune",
         type=int,
-        default=DEFAULT_PRUNE,
+        default=None,
     )
     parser.add_argument(
         "--no-chaining-rounds",
@@ -360,7 +359,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--bird-cohort",
-        choices=("conventional", "sped_no_wheelchair"),
+        choices=("all", "conventional", "sped_and_wheelchair", "sped_no_wheelchair"),
         default="conventional",
         help="Student cohort to export when running the Bird backend.",
     )

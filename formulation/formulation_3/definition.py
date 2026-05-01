@@ -267,7 +267,7 @@ class Formulation3:
                 )
                 if ij_edge_data is not None:
                     self.A[i, j] = ij_edge_data["length"]
-                    self.A_PATH[i, j] = ij_edge_data["path"]
+                    self.A_PATH[i, j] = tuple(ij_edge_data["path"])
 
         self.T_horizon = self._time_horizon()
 
@@ -322,7 +322,7 @@ def get_paths_between_nodes(
             nodes[k], nodes[k + 1], key=0, default=None
         )
         if edge_data is not None:
-            paths.append(edge_data["path"])
+            paths.append(tuple(edge_data["path"]))
 
     return paths
 
@@ -342,8 +342,11 @@ def get_travel_time(
         if edge_data is not None:
             is_school_zone: bool = edge_data.get("hazard", "") == "school_zone"
             is_highway: bool = edge_data.get("highway", "") == "motorway"
+            maxspeed = edge_data.get("maxspeed", "40 mph")
+            if isinstance(maxspeed, list):
+                maxspeed = maxspeed[0]
             speed_limit_mph: str = float(
-                edge_data.get("maxspeed", "40 mph").split()[0]
+                maxspeed.split()[0]
             )  # in the format '30 mph'
             speed_limit = speed_limit_mph / MPH_TO_KM_PER_MIN
 

@@ -741,8 +741,9 @@ class ProblemDataReal(ProblemData):
         for candidate in candidate_names:
             path = cache_dir / f"{candidate}.pkl"
             if path.exists():
+                print(f"Loading {path}")
                 return cls.load_path(path)
-
+        print(f"No cached version found")
         raise FileNotFoundError(f"No cached problem data found in {cache_dir}")
 
     @classmethod
