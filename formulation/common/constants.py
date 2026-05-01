@@ -1,4 +1,9 @@
+import os
+from pathlib import Path
+
 from formulation.common.classes import SchoolType
+
+CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 
 NETWORK_TYPE = "drive"
 
@@ -14,3 +19,5 @@ METERS_PER_MILE = 1609.344
 # https://malegislature.gov/Laws/GeneralLaws/PartI/TitleXIV/Chapter90/Section17
 BUS_SPEED_NOT_HIGHWAY: float = 40.0 / MPH_TO_KM_PER_MIN
 BUS_SPEED_SCHOOL_ZONE: float = 20.0 / MPH_TO_KM_PER_MIN
+
+CACHE_DIR = CURRENT_FILE_DIR / ".." / "cache"

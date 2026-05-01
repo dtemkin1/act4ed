@@ -8,8 +8,8 @@ from formulation.formulation_3.cvxpy import (
     plot_bus_routes,
     solve_problem,
 )
+from formulation.common.constants import CACHE_DIR
 from experiments.helpers import setup_framingham
-
 
 CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 
@@ -19,14 +19,7 @@ PLACE_NAME = "Framingham, Massachusetts, USA"
 
 def experimental_config():
     no_chaining = ExperimentConfig(
-        problem_data_pkl=str(
-            CURRENT_FILE_DIR
-            / ".."
-            / ".."
-            / "formulation"
-            / "cache"
-            / "framingham_problem_data.pkl"
-        ),
+        problem_data_pkl=CACHE_DIR / "framingham_problem_data.pkl",
         rounds=1,
     )
 

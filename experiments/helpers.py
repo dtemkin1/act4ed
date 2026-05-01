@@ -44,6 +44,7 @@ def setup(
     prune: int | None = None,
     hexagonal: Literal[False] = False,
     save_path: Path | None = None,
+    sanity_check: bool = False,
 ) -> ProblemDataReal: ...
 
 
@@ -54,6 +55,7 @@ def setup(
     hexagonal: Literal[True],
     prune: None = None,
     save_path: Path | None = None,
+    sanity_check: bool = False,
 ) -> ProblemDataRealSurrogate: ...
 
 
@@ -63,6 +65,7 @@ def setup(
     hexagonal: bool = False,
     prune: int | None = None,
     save_path: Path | None = None,
+    sanity_check: bool = False,
 ) -> ProblemDataReal | ProblemDataRealSurrogate:
     ProblemDataClass = ProblemDataRealSurrogate if hexagonal else ProblemDataReal
 
@@ -80,7 +83,9 @@ def setup(
             boundary_buffer_km=BOUNDARY_BUFFER_KM,
             prune=prune,
         )
-        problem_data.sanity_checks()
+
+        if sanity_check:
+            problem_data.sanity_checks()
 
         problem_data.save(cache_dir=save_path)
 

@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from functools import cached_property
-import os
 from pathlib import Path
 import warnings
 from typing import Any, Callable, cast
@@ -15,7 +14,7 @@ import networkx as nx
 import osmnx as ox
 import pandas as pd
 
-from formulation.common.constants import NETWORK_TYPE
+from formulation.common.constants import CACHE_DIR, NETWORK_TYPE
 from formulation.common.classes import (
     DemographicInfo,
     NodeId,
@@ -52,7 +51,15 @@ except Exception as exc:
         " and ensure Java is properly configured."
     ) from exc
 
-CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
+try:
+    from osmnx import settings
+
+    settings.use_cache = True
+    settings.cache_folder = CACHE_DIR
+except Exception:
+    warnings.warn(
+        "Warning: osmnx cache settings could not be configured. Please ensure you have the latest version of osmnx installed."
+    )
 
 
 @dataclass(frozen=True)
@@ -69,7 +76,8 @@ class ProblemData(ABC):
     @abstractmethod
     def base_graph(self) -> "nx.MultiDiGraph[NodeId]":
         """
-        base network, e.g. road network graph for real data or grid graph for toy data
+        base network, e.g. road network graph for real data or grid graph for toy data.
+        length is assumed to be in meters.
         """
         ...
 
@@ -638,7 +646,9 @@ class ProblemDataReal(ProblemData):
         def add_edge(
             start: Place,
             end: Place,
-            edge_resolver: Callable[[Place, Place], tuple[float, list, dict[str, Any]]],
+            edge_resolver: Callable[
+                [Place, Place], tuple[float, list[NodeId], dict[str, Any]]
+            ],
         ):
             start_id = start.node_id
             end_id = end.node_id
@@ -656,15 +666,16 @@ class ProblemDataReal(ProblemData):
                 return
 
             try:
-                length, path, extra_attrs = edge_resolver(start, end)
+                length_m, path, extra_attrs = edge_resolver(start, end)
+                length_km = meters_to_kilometers(length_m)
                 if not self._service_edge_allowed(
-                    start, end, stop_school_types, length=length
+                    start, end, stop_school_types, length=length_km
                 ):
                     return
                 service_graph.add_edge(
                     start_id,
                     end_id,
-                    length=meters_to_kilometers(length),
+                    length=length_km,
                     path=path,
                     **extra_attrs,
                 )
@@ -719,7 +730,7 @@ class ProblemDataReal(ProblemData):
 
     def save(self, cache_dir: Path | None = None):
         """save problem data to disk for later loading and use in formulation"""
-        cache_dir = cache_dir or (CURRENT_FILE_DIR / "cache")
+        cache_dir = cache_dir or CACHE_DIR
         cache_dir.mkdir(parents=True, exist_ok=True)
 
         prob_name = (
@@ -731,20 +742,18 @@ class ProblemDataReal(ProblemData):
     @classmethod
     def load(cls, name: str, prune: int | None = None) -> "ProblemDataReal":
         """load problem data from disk"""
-        cache_dir = CURRENT_FILE_DIR / ".." / "cache"
-
         # Try the prune-specific cache first, then fall back to legacy unpruned naming.
         candidate_names = [f"{name}{'_' + str(prune) if prune else ''}_problem_data"]
         # if prune is None:
         #     candidate_names.append(f"{name}_problem_data")
 
         for candidate in candidate_names:
-            path = cache_dir / f"{candidate}.pkl"
+            path = CACHE_DIR / f"{candidate}.pkl"
             if path.exists():
                 print(f"Loading {path}")
                 return cls.load_path(path)
-        print(f"No cached version found")
-        raise FileNotFoundError(f"No cached problem data found in {cache_dir}")
+
+        raise FileNotFoundError(f"No cached problem data found in {CACHE_DIR}")
 
     @classmethod
     def load_path(cls, path: Path) -> "ProblemDataReal":
@@ -957,7 +966,7 @@ class ProblemDataRealSurrogate(ProblemDataReal):
     def load(cls, name: str, prune: None = None) -> "ProblemDataReal":
         """load problem data from disk"""
         prob_name = f"{name}_hex_problem_data"
-        return cls.load_path(CURRENT_FILE_DIR / ".." / "cache" / f"{prob_name}.pkl")
+        return cls.load_path(CACHE_DIR / f"{prob_name}.pkl")
 
     @property
     def hex_graph(self) -> "nx.MultiDiGraph[tuple[int, int]]":

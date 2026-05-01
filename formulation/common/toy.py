@@ -15,7 +15,6 @@ from formulation.common.classes import (
 )
 from formulation.common.problems import ProblemDataToy
 
-
 try:
     from shapely.geometry import Point
 except Exception as exc:
@@ -32,7 +31,7 @@ def make_graph(size: tuple[int, int] = (10, 10)) -> "nx.MultiDiGraph[NodeId]":
     graph_2d = cast("nx.MultiDiGraph[tuple[int, int]]", graph_2d)
     # Add weights to the edges
     for u, v in graph_2d.edges():
-        graph_2d.edges[u, v, 0]["length"] = 1.0  # 1 km between adjacent nodes
+        graph_2d.edges[u, v, 0]["length"] = 1000.0  # 1 km between adjacent nodes
 
     graph: "nx.MultiDiGraph[NodeId]" = nx.MultiDiGraph()
     mapping: dict[tuple[int, int], NodeId] = {}
