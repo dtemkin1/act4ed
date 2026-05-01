@@ -45,6 +45,7 @@ def setup(
     hexagonal: Literal[False] = False,
     save_path: Path | None = None,
     sanity_check: bool = False,
+    precompute_cache: bool = True,
 ) -> ProblemDataReal: ...
 
 
@@ -56,6 +57,7 @@ def setup(
     prune: None = None,
     save_path: Path | None = None,
     sanity_check: bool = False,
+    precompute_cache: bool = True,
 ) -> ProblemDataRealSurrogate: ...
 
 
@@ -66,8 +68,10 @@ def setup(
     prune: int | None = None,
     save_path: Path | None = None,
     sanity_check: bool = False,
+    precompute_cache: bool = True,
 ) -> ProblemDataReal | ProblemDataRealSurrogate:
     ProblemDataClass = ProblemDataRealSurrogate if hexagonal else ProblemDataReal
+    should_save = False
 
     try:
         problem_data = ProblemDataClass.load(problem_name, prune)
@@ -87,6 +91,14 @@ def setup(
         if sanity_check:
             problem_data.sanity_checks()
 
+        should_save = True
+
+    if precompute_cache and "_service_graph_cached" not in vars(problem_data):
+        print(f"Precomputing service graph for cache: {problem_data.name}")
+        _ = problem_data.service_graph
+        should_save = True
+
+    if should_save:
         problem_data.save(cache_dir=save_path)
 
     return problem_data
@@ -161,6 +173,11 @@ def get_assigned_students(problem_data: ProblemDataReal) -> tuple[Student, ...]:
         special_ed = "SPED" in row["Student_Program"]
         # am not sure this is how they mark it, follow up
         wheelchair_user = "WHEELCHAIR" in row["Student_Program"]
+        grade = None
+        for grade_column in ("Student_Grade", "Grade", "grade"):
+            if grade_column in assigned_students.columns and not pd.isna(row[grade_column]):
+                grade = str(row[grade_column])
+                break
         stop = next(stop for stop in problem_data.stops if stop.name == row["BUS STOP"])
 
         student = Student(
@@ -177,6 +194,7 @@ def get_assigned_students(problem_data: ProblemDataReal) -> tuple[Student, ...]:
             demographics=DemographicInfo(
                 special_ed=special_ed, wheelchair_user=wheelchair_user
             ),
+            grade=grade,
         )
         students.append(student)
 

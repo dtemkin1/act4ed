@@ -60,13 +60,69 @@ function get_school_scenario_nodes!(data::BirdData, school_idx::Int, current_nod
 end
 
 
-function is_feasible_in_time(data::BirdData, school1::Int, school2::Int, route::BirdRoute, route_time::Float64)
+function school_route_arrival_times(
+    data::BirdData,
+    schools::Vector{Int},
+    first_stops::Vector{Int},
+    route_times::Vector{Float64},
+)
+    length(schools) == length(first_stops) == length(route_times) || error("inconsistent route timing data")
+    arrivals = Float64[]
+    for idx in eachindex(schools)
+        school_idx = schools[idx]
+        school = data.schools[school_idx]
+        earliest_candidate =
+            idx == 1 ?
+            earliest_arrival_time(school) :
+            arrivals[end] +
+            travel_time(data, data.schools[schools[idx - 1]], data.stops[school_idx][first_stops[idx]]) +
+            route_times[idx]
+        isfinite(earliest_candidate) || return nothing
+        arrival = max(earliest_arrival_time(school), earliest_candidate)
+        arrival <= latest_arrival_time(school) + BIRD_TIMING_EPS || return nothing
+        push!(arrivals, arrival)
+    end
+    return arrivals
+end
+
+
+function route_assignment_arrival_times(data::BirdData, schools::Vector{Int}, routes::Vector{Int})
+    first_stops = Int[]
+    route_times = Float64[]
+    for (idx, school_idx) in enumerate(schools)
+        route = data.routes[school_idx][routes[idx]]
+        push!(first_stops, route.stops[1])
+        push!(route_times, service_time(data, school_idx, route))
+    end
+    return school_route_arrival_times(data, schools, first_stops, route_times)
+end
+
+
+function is_feasible_in_time_original(data::BirdData, school1::Int, school2::Int, route::BirdRoute, route_time::Float64)
     first_stop = data.stops[school2][route.stops[1]]
     start_school = data.schools[school1]
     end_school = data.schools[school2]
     transfer_time = travel_time(data, start_school.node_index, first_stop.node_index)
     isfinite(transfer_time) || return false
     return start_school.start_time + transfer_time + route_time + end_school.dwell_time <= end_school.start_time
+end
+
+
+function is_feasible_in_time_window(data::BirdData, school1::Int, school2::Int, route::BirdRoute, route_time::Float64)
+    first_stop = data.stops[school2][route.stops[1]]
+    start_school = data.schools[school1]
+    end_school = data.schools[school2]
+    transfer_time = travel_time(data, start_school.node_index, first_stop.node_index)
+    isfinite(transfer_time) || return false
+    return latest_arrival_time(start_school) + transfer_time + route_time <= latest_arrival_time(end_school) + BIRD_TIMING_EPS
+end
+
+
+function is_feasible_in_time(data::BirdData, school1::Int, school2::Int, route::BirdRoute, route_time::Float64)
+    if uses_original_dwell_timing(data)
+        return is_feasible_in_time_original(data, school1, school2, route, route_time)
+    end
+    return is_feasible_in_time_window(data, school1, school2, route, route_time)
 end
 
 
@@ -165,6 +221,7 @@ struct BusNode <: FullRoutingNode
     route::BirdRoute
     school::Int
     service_time::Float64
+    grade_id::Int
 end
 
 
@@ -193,7 +250,17 @@ function build_full_routing_graph(data::BirdData, used_scenario::Vector{Int})
         for route_id in scenario.route_ids
             route = data.routes[school_idx][route_id]
             for depot in data.depots
-                push!(nodes, BusNode(current_id, depot.id, route, school_idx, service_time(data, school_idx, route)))
+                push!(
+                    nodes,
+                    BusNode(
+                        current_id,
+                        depot.id,
+                        route,
+                        school_idx,
+                        service_time(data, school_idx, route),
+                        route_grade_id(data, school_idx, route),
+                    ),
+                )
                 current_id += 1
             end
         end
@@ -236,7 +303,12 @@ end
 
 
 function create_edge!(data::BirdData, graph::DirectedGraph, node1::BusNode, node2::BusNode)
-    if node1.depot_id == node2.depot_id && node1.school != node2.school && is_feasible_in_time(data, node1.school, node2.school, node2.route, node2.service_time)
+    if (
+        node1.depot_id == node2.depot_id &&
+        node1.grade_id == node2.grade_id &&
+        node1.school != node2.school &&
+        is_feasible_in_time(data, node1.school, node2.school, node2.route, node2.service_time)
+    )
         school = data.schools[node1.school]
         first_stop = data.stops[node2.school][node2.route.stops[1]]
         return add_edge!(graph, node1.id, node2.id), travel_time(data, school, first_stop)
@@ -321,7 +393,9 @@ function interpret_flows!(data::BirdData, graph::FullRoutingGraph, flows::Dict{D
         while true
             schools, routes = follow_bus_along_route!(graph, flows, yard_node)
             isempty(schools) && break
-            push!(final_buses, BirdBus(current_bus_id, depot.id, schools, routes))
+            arrival_times = route_assignment_arrival_times(data, schools, routes)
+            arrival_times === nothing && error("full routing produced an infeasible arrival schedule")
+            push!(final_buses, BirdBus(current_bus_id, depot.id, schools, routes, arrival_times))
             current_bus_id += 1
         end
     end

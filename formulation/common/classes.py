@@ -198,6 +198,7 @@ class Student(LocationData):
     school: School
     stop: Stop
     demographics: DemographicInfo
+    grade: str | None = None
 
     def __str__(self):
         return self.name

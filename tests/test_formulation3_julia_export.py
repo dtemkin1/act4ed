@@ -12,6 +12,7 @@ from shapely import Point
 from formulation.common import (
     Bus,
     BusType,
+    DemographicInfo,
     Depot,
     ProblemData,
     School,
@@ -19,16 +20,16 @@ from formulation.common import (
     Stop,
     Student,
 )
-from formulation.formulation_3.formulation3_gurobipy import build_model_from_definition
+from formulation.common.constants import MPH_TO_KM_PER_MIN
+from formulation.formulation_3.gurobipy import build_model_from_definition
 from formulation.formulation_3.julia_export import (
     build_formulation3_numeric_instance,
     export_formulation3_instance,
 )
-from formulation.formulation_3.problem3_definition import (
-    MILES_TO_KILOMETERS,
-    MPH_TO_KILOMETERS_PER_MINUTE,
-    Formulation3,
-)
+from formulation.formulation_3.definition import Formulation3
+
+MILES_TO_KILOMETERS = 1.60934
+MPH_TO_KILOMETERS_PER_MINUTE = 1.0 / MPH_TO_KM_PER_MIN
 
 
 @dataclass(frozen=True)
@@ -39,6 +40,10 @@ class TinyProblemData(ProblemData):
     _depots: list[Depot]
     _students: list[Student]
     _buses: list[Bus]
+
+    @property
+    def base_graph(self) -> nx.MultiDiGraph:
+        return self._service_graph
 
     @property
     def service_graph(self) -> nx.MultiDiGraph:
@@ -82,19 +87,18 @@ def _make_tiny_problem(rounds: int = 2) -> Formulation3:
         geographic_location=Point(1, 1),
         school=school,
         stop=stop,
-        requires_monitor=False,
-        requires_wheelchair=False,
+        demographics=DemographicInfo(special_ed=False, wheelchair_user=False),
     )
     student_b = Student(
         name="student-b",
         geographic_location=Point(1, -1),
         school=school,
         stop=stop,
-        requires_monitor=True,
-        requires_wheelchair=True,
+        demographics=DemographicInfo(special_ed=True, wheelchair_user=True),
     )
 
     bus = Bus(
+        id="bus-a",
         name="bus-a",
         capacity=40,
         range=25,
@@ -138,11 +142,11 @@ def _make_tiny_problem_no_sped_with_mixed_bus_types() -> Formulation3:
         geographic_location=Point(1, 1),
         school=school,
         stop=stop,
-        requires_monitor=False,
-        requires_wheelchair=False,
+        demographics=DemographicInfo(special_ed=False, wheelchair_user=False),
     )
 
     standard_bus = Bus(
+        id="bus-c",
         name="bus-c",
         capacity=40,
         range=25,
@@ -151,6 +155,7 @@ def _make_tiny_problem_no_sped_with_mixed_bus_types() -> Formulation3:
         type=BusType.C,
     )
     nonstandard_bus = Bus(
+        id="bus-b",
         name="bus-b",
         capacity=30,
         range=25,

@@ -18,6 +18,7 @@ from formulation.bird_adapter import (
 from formulation.common import (
     Bus,
     BusType,
+    DemographicInfo,
     Depot,
     ProblemData,
     School,
@@ -25,7 +26,7 @@ from formulation.common import (
     Stop,
     Student,
 )
-from formulation.formulation_3.problem3_definition import Formulation3
+from formulation.formulation_3.definition import Formulation3
 from formulation.formulation_3.solution import Formulation3Solution
 from formulation.normalized_result import (
     RoutingSolutionJson,
@@ -41,6 +42,10 @@ class TinyProblemData(ProblemData):
     _depots: list[Depot]
     _students: list[Student]
     _buses: list[Bus]
+
+    @property
+    def base_graph(self) -> nx.MultiDiGraph:
+        return self._service_graph
 
     @property
     def service_graph(self) -> nx.MultiDiGraph:
@@ -93,20 +98,19 @@ def _build_bird_problem() -> TinyProblemData:
             geographic_location=Point(1, 0),
             school=school_a,
             stop=stop_a,
-            requires_monitor=False,
-            requires_wheelchair=False,
+            demographics=DemographicInfo(special_ed=False, wheelchair_user=False),
         ),
         Student(
             name="bird-student-b",
             geographic_location=Point(2, 0),
             school=school_b,
             stop=stop_b,
-            requires_monitor=False,
-            requires_wheelchair=False,
+            demographics=DemographicInfo(special_ed=False, wheelchair_user=False),
         ),
     ]
     buses = [
         Bus(
+            id="bird-bus-1",
             name="bird-bus-1",
             capacity=40,
             range=25,
@@ -141,6 +145,67 @@ def _build_bird_problem() -> TinyProblemData:
     )
 
 
+def _build_fleet_aware_bird_problem() -> TinyProblemData:
+    depot_a = Depot(name="Depot A", geographic_location=Point(0, 0), node_id=100)
+    depot_b = Depot(name="Depot B", geographic_location=Point(0, 1), node_id=150)
+    stop = Stop(name="Stop A", geographic_location=Point(1, 0), node_id=101)
+    school = School(
+        name="School A",
+        geographic_location=Point(2, 0),
+        node_id=201,
+        id="school-a",
+        type=SchoolType.E,
+        start_time=8 * 60,
+    )
+    students = [
+        Student(
+            name="bird-student-a",
+            geographic_location=Point(1, 0),
+            school=school,
+            stop=stop,
+            demographics=DemographicInfo(special_ed=False, wheelchair_user=False),
+        )
+    ]
+    buses = [
+        Bus(
+            id="c-1",
+            name="C01",
+            capacity=40,
+            range=25,
+            has_wheelchair_access=False,
+            depot=depot_a,
+            type=BusType.C,
+        ),
+        Bus(
+            id="m-1",
+            name="M01",
+            capacity=30,
+            range=25,
+            has_wheelchair_access=False,
+            depot=depot_b,
+            type=BusType.B,
+        ),
+    ]
+    graph = nx.MultiDiGraph()
+    for (src, dst), length in {
+        (100, 101): 5.0,
+        (150, 101): 8.0,
+        (101, 201): 4.0,
+        (201, 100): 5.0,
+        (201, 150): 8.0,
+    }.items():
+        graph.add_edge(src, dst, key=0, length=length, path=[src, dst])
+    return TinyProblemData(
+        name="bird-json-fleet-aware",
+        _service_graph=graph,
+        _stops=[stop],
+        _schools=[school],
+        _depots=[depot_a, depot_b],
+        _students=students,
+        _buses=buses,
+    )
+
+
 def _build_formulation_problem() -> TinyProblemData:
     depot = Depot(name="Depot A", geographic_location=Point(0, 0), node_id=100)
     stop = Stop(name="Stop A", geographic_location=Point(1, 0), node_id=101)
@@ -157,10 +222,10 @@ def _build_formulation_problem() -> TinyProblemData:
         geographic_location=Point(1, 0),
         school=school,
         stop=stop,
-        requires_monitor=False,
-        requires_wheelchair=False,
+        demographics=DemographicInfo(special_ed=False, wheelchair_user=False),
     )
     bus = Bus(
+        id="formulation-bus-1",
         name="formulation-bus-1",
         capacity=40,
         range=25,
@@ -234,6 +299,37 @@ class RoutingSolutionJsonTests(unittest.TestCase):
             report.save(path)
             loaded = RoutingSolutionJson.load(path)
         self.assertEqual(loaded.solution[1].school_name, "School B")
+
+    def test_fleet_aware_bird_solution_json_uses_original_bus_and_depot(self) -> None:
+        instance = build_bird_export_instance(
+            _build_fleet_aware_bird_problem(),
+            BirdAdapterConfig(cohort="conventional", fleet_aware=True, speed_km_per_minute=1.0),
+        )
+        solution = BirdBackendSolution(
+            status="OPTIMAL",
+            objective_value=1.0,
+            runtime_seconds=1.5,
+            buses_used=1,
+            total_distance_km=20.0,
+            total_service_time_min=4.0,
+            assignment_bus_ids=np.asarray([2], dtype=np.int64),
+            assignment_orders=np.asarray([0], dtype=np.int64),
+            assignment_school_indices=np.asarray([1], dtype=np.int64),
+            assignment_arrival_times=np.asarray([50.0], dtype=np.float64),
+            assignment_distance_km=np.asarray([12.0], dtype=np.float64),
+            assignment_service_time_min=np.asarray([4.0], dtype=np.float64),
+            assignment_stop_ptr=np.asarray([0, 1], dtype=np.int64),
+            assignment_stop_values=np.asarray([1], dtype=np.int64),
+        )
+
+        report = routing_solution_json_from_bird_solution(instance, solution)
+
+        self.assertEqual(report.solution[0].bus_name, "M01")
+        self.assertEqual(report.solution[0].origin_node_id, 150)
+        self.assertEqual(report.solution[0].stop_node_ids, [101])
+        self.assertEqual(report.solution[0].student_names, ["bird-student-a"])
+        self.assertEqual(report.solution[0].start_time, 38.0)
+        self.assertEqual(report.solution[0].time_spent, 12.0)
 
     def test_formulation3_solution_json_contains_route_details(self) -> None:
         formulation = Formulation3(problem_data=_build_formulation_problem(), rounds=1)

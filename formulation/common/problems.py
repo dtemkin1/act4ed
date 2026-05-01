@@ -293,6 +293,10 @@ class FilteredProblemData(ProblemData):
         return service_graph
 
     @property
+    def base_graph(self) -> "nx.MultiDiGraph[NodeId]":
+        return self.base_problem_data.base_graph
+
+    @property
     def service_graph(self) -> "nx.MultiDiGraph[NodeId]":
         return self._service_graph_cached
 
@@ -760,7 +764,7 @@ class ProblemDataReal(ProblemData):
         with open(path, "rb") as f:
             problem_data = pickle.load(f)
 
-        cached_service_graph = getattr(problem_data, "_service_graph_cached", None)
+        cached_service_graph = vars(problem_data).get("_service_graph_cached")
         if cached_service_graph is not None:
             ensure_service_graph_kilometers(cached_service_graph)
 
@@ -835,6 +839,7 @@ class ProblemDataReal(ProblemData):
                 "lon": float,
                 "lat": float,
                 "school_id": str,
+                "grade": str,
                 "is_sp_ed": bool,
                 "is_wheelchair_user": bool,
             },
@@ -856,6 +861,11 @@ class ProblemDataReal(ProblemData):
                 demographics=DemographicInfo(
                     special_ed=bool(row["is_sp_ed"]),
                     wheelchair_user=bool(row["is_wheelchair_user"]),
+                ),
+                grade=(
+                    str(row["grade"])
+                    if "grade" in students_df.columns and not pd.isna(row["grade"])
+                    else None
                 ),
             )
             return_students.append(this_student)
