@@ -37,7 +37,7 @@ _DEFAULT_STOP_ASSIGNMENT_LAMBDA = 1.0e4
 
 BirdCohort = Literal[
     "all",
-    "conventional", 
+    "conventional",
     "sped_no_wheelchair",
     "sped_and_wheelchair",
     "wheelchair_no_sped",
@@ -453,7 +453,7 @@ def _filter_students_for_cohort(
     cohort: BirdCohort,
 ) -> list[Student]:
     #     "all",
-    # "conventional", 
+    # "conventional",
     # "sped_no_wheelchair",
     # "sped_and_wheelchair",
     # "wheelchair_no_sped",
@@ -463,27 +463,29 @@ def _filter_students_for_cohort(
         return [
             student
             for student in students
-            if not student.requires_monitor and not student.requires_wheelchair
+            if not student.attributes.special_ed
+            and not student.attributes.wheelchair_user
         ]
     if cohort == "sped_no_wheelchair":
         return [
             student
             for student in students
-            if student.requires_monitor and not student.requires_wheelchair
+            if student.attributes.special_ed and not student.attributes.wheelchair_user
         ]
     if cohort == "sped_and_wheelchair":
         return [
             student
             for student in students
-            if student.requires_monitor or student.requires_wheelchair
+            if student.attributes.special_ed and student.attributes.wheelchair_user
         ]
     if cohort == "wheelchair_no_sped":
         return [
             student
             for student in students
-            if student.requires_monitor and student.requires_wheelchair
+            if student.attributes.special_ed and student.attributes.wheelchair_user
         ]
     raise ValueError("Don't know what cohort you're looking for")
+
 
 def _distance_km(
     problem_data: ProblemData, start_node_id: int, end_node_id: int

@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from functools import cached_property
 from pathlib import Path
 import warnings
-from typing import Any, Callable, cast
+from typing import Any, Callable, Optional, cast
 
 import datetime as dt
 import pickle
@@ -286,11 +286,11 @@ def _restriction_suffix(
 @dataclass(frozen=True)
 class FilteredProblemData(ProblemData):
     base_problem_data: ProblemData
-    _stops: tuple[Stop, ...]
-    _schools: tuple[School, ...]
-    _depots: tuple[Depot, ...]
-    _students: tuple[Student, ...]
-    _buses: tuple[Bus, ...]
+    _stops: Optional[tuple[Stop, ...]] = None
+    _schools: Optional[tuple[School, ...]] = None
+    _depots: Optional[tuple[Depot, ...]] = None
+    _students: Optional[tuple[Student, ...]] = None
+    _buses: Optional[tuple[Bus, ...]] = None
 
     @cached_property
     def _service_graph_cached(self) -> "nx.MultiDiGraph[NodeId]":
@@ -301,28 +301,32 @@ class FilteredProblemData(ProblemData):
         return service_graph
 
     @property
+    def base_graph(self) -> "nx.MultiDiGraph[NodeId]":
+        return self.base_problem_data.base_graph
+
+    @property
     def service_graph(self) -> "nx.MultiDiGraph[NodeId]":
         return self._service_graph_cached
 
     @property
     def stops(self) -> tuple[Stop, ...]:
-        return self._stops
+        return self._stops or self.base_problem_data.stops
 
     @property
     def schools(self) -> tuple[School, ...]:
-        return self._schools
+        return self._schools or self.base_problem_data.schools
 
     @property
     def depots(self) -> tuple[Depot, ...]:
-        return self._depots
+        return self._depots or self.base_problem_data.depots
 
     @property
     def students(self) -> tuple[Student, ...]:
-        return self._students
+        return self._students or self.base_problem_data.students
 
     @property
     def buses(self) -> tuple[Bus, ...]:
-        return self._buses
+        return self._buses or self.base_problem_data.buses
 
     def __getattr__(self, name: str):
         return getattr(self.base_problem_data, name)
@@ -850,12 +854,23 @@ class ProblemDataReal(ProblemData):
         )
         return_students: list[Student] = []
 
+        outside_boundary = 0
+        no_stop = 0
         for _, row in students_df.iterrows():
             school = next(s for s in self.schools if s.id == row["school_id"])
             geographic_location = Point(row["lon"], row["lat"])
 
+            # check if in gdf bounds
+            if not self.gdf.geometry.iloc[0].contains(geographic_location):
+                outside_boundary += 1
+                continue
+
             # find nearest stop to student
             nearest_stop = self._get_nearest_stop(geographic_location)
+
+            if nearest_stop is None:
+                no_stop += 1
+                continue
 
             this_student = Student(
                 id=row["id"],
@@ -869,6 +884,15 @@ class ProblemDataReal(ProblemData):
                 ),
             )
             return_students.append(this_student)
+
+        if outside_boundary > 0:
+            print(
+                f"{outside_boundary} student(s) were located outside the boundary and excluded from the problem."
+            )
+
+        if no_stop > 0:
+            print(f"{no_stop} student(s) could not be assigned stops.")
+
         return tuple(return_students)
 
     def _make_buses(
@@ -911,7 +935,7 @@ class ProblemDataReal(ProblemData):
             self.osm_graph, geographic_location.x, geographic_location.y
         )
 
-    def _get_nearest_stop(self, geo_location: Point) -> Stop:
+    def _get_nearest_stop(self, geo_location: Point) -> Stop | None:
         if self.use_r5:
             nearest_stop_id = (
                 r5py.DetailedItineraries(
@@ -940,17 +964,29 @@ class ProblemDataReal(ProblemData):
             return next(stop for stop in self.stops if stop.node_id == nearest_stop_id)
         else:
             # Get nearest node in the OSM graph to the student's location
-            nearest_node = self._get_nearest_node_id(geo_location)
-            distances = nx.single_source_dijkstra_path_length(
-                self.osm_graph, source=nearest_node, weight="length"
-            )
-            all_stop_distances = {
-                stop: distances.get(stop.node_id, float("inf")) for stop in self.stops
-            }
+            # https://networkx.org/documentation/stable/reference/algorithms/shortest_paths.html#sentinel-node-trick-for-multi-target-queries
 
-            # find the stop with the minimum distance to the student
-            nearest_stop = min(all_stop_distances.items(), key=lambda item: item[1])[0]
-            return nearest_stop
+            source = self._get_nearest_node_id(geo_location)
+            targets = {stop.node_id for stop in self.stops}
+            sentinel: NodeId = -1  # sentinel node id that is not used in the graph
+
+            self.osm_graph.add_node(sentinel)
+            for target in targets:
+                self.osm_graph.add_edge(target, sentinel, length=0.0)
+
+            try:
+                path = nx.shortest_path(
+                    self.osm_graph, source=source, target=sentinel, weight="length"
+                )
+            except nx.NetworkXNoPath:
+                self.osm_graph.remove_node(sentinel)
+                return None
+
+            closest_target = path[-2]
+            stop = next(stop for stop in self.stops if stop.node_id == closest_target)
+            self.osm_graph.remove_node(sentinel)
+
+            return stop
 
 
 @dataclass(frozen=True)
