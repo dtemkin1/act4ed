@@ -3,13 +3,14 @@ from pathlib import Path
 from typing import NamedTuple
 import json
 
-from experiments.helpers import get_assigned_students, setup_framingham
+from experiments.helpers import OUTPUTS_FOLDER, setup_framingham
+from experiments.existing_data.utils import get_assigned_students
 from formulation.common.classes import Stop, Student
 from formulation.common.problems import ProblemDataReal
 
 CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 
-DUMP_FILE = CURRENT_FILE_DIR / ".." / "outputs" / "demographics_of_stops.json"
+DUMP_FILE = OUTPUTS_FOLDER / "demographics_of_stops.json"
 
 
 class DemographicOfStop(NamedTuple):

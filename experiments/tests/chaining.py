@@ -80,6 +80,7 @@ def main() -> None:
 
     students_1 = tuple(
         Student(
+            id=f"{i}",
             name=f"Student {i}",
             geographic_location=make_point_from_node_id(graph, stop_node),
             stop=stop,
@@ -91,6 +92,7 @@ def main() -> None:
 
     students_2 = tuple(
         Student(
+            id=f"{i+20}",
             name=f"Student {i+20}",
             geographic_location=make_point_from_node_id(graph, stop_node),
             stop=stop,

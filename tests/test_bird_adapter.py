@@ -87,6 +87,7 @@ def _make_problem_data() -> TinyProblemData:
 
     students = [
         Student(
+            id="conv-a",
             name="conv-a",
             geographic_location=Point(1, 0),
             school=school_a,
@@ -95,6 +96,7 @@ def _make_problem_data() -> TinyProblemData:
             requires_wheelchair=False,
         ),
         Student(
+            id="conv-b",
             name="conv-b",
             geographic_location=Point(1, 0),
             school=school_b,
@@ -103,6 +105,7 @@ def _make_problem_data() -> TinyProblemData:
             requires_wheelchair=False,
         ),
         Student(
+            id="sped-a",
             name="sped-a",
             geographic_location=Point(1, 0),
             school=school_a,
@@ -111,6 +114,7 @@ def _make_problem_data() -> TinyProblemData:
             requires_wheelchair=False,
         ),
         Student(
+            id="wheelchair-a",
             name="wheelchair-a",
             geographic_location=Point(1, 0),
             school=school_a,
@@ -189,6 +193,7 @@ def _make_reassignment_problem_data() -> TinyProblemData:
     )
     students = [
         Student(
+            id="student-near-a",
             name="student-near-a",
             geographic_location=Point(0.0000, 0.0000),
             school=school,
@@ -197,6 +202,7 @@ def _make_reassignment_problem_data() -> TinyProblemData:
             requires_wheelchair=False,
         ),
         Student(
+            id="student-near-b",
             name="student-near-b",
             geographic_location=Point(0.0200, 0.0000),
             school=school,
@@ -253,7 +259,10 @@ class BirdAdapterTests(unittest.TestCase):
         self.assertEqual(instance.bus_capacity, 40)
         self.assertEqual(len(instance.demand_rows), 2)
         self.assertEqual(
-            [(row.source_stop_id, row.school_id, row.students) for row in instance.demand_rows],
+            [
+                (row.source_stop_id, row.school_id, row.students)
+                for row in instance.demand_rows
+            ],
             [
                 ("Shared Stop", "school-a", 1),
                 ("Shared Stop", "school-b", 1),
@@ -282,7 +291,9 @@ class BirdAdapterTests(unittest.TestCase):
         self.assertEqual(instance.bus_capacity, 30)
         self.assertEqual(instance.fleet_size, 1)
 
-    @unittest.skipUnless(importlib.util.find_spec("gurobipy") is not None, "gurobipy not installed")
+    @unittest.skipUnless(
+        importlib.util.find_spec("gurobipy") is not None, "gurobipy not installed"
+    )
     def test_optional_stop_reassignment_uses_student_locations(self) -> None:
         problem_data = _make_reassignment_problem_data()
 
@@ -328,13 +339,22 @@ class BirdAdapterTests(unittest.TestCase):
             instance.save(instance_path)
             loaded_instance = BirdExportInstance.load(instance_path)
 
-            self.assertEqual([school.id for school in loaded_instance.schools], ["school-a", "school-b"])
-            self.assertEqual([row.external_stop_id for row in loaded_instance.demand_rows], ["school-a:Shared Stop", "school-b:Shared Stop"])
+            self.assertEqual(
+                [school.id for school in loaded_instance.schools],
+                ["school-a", "school-b"],
+            )
+            self.assertEqual(
+                [row.external_stop_id for row in loaded_instance.demand_rows],
+                ["school-a:Shared Stop", "school-b:Shared Stop"],
+            )
             self.assertEqual(loaded_instance.lambda_value, 4321.0)
             self.assertFalse(loaded_instance.stop_assignment_enabled)
             self.assertEqual(loaded_instance.stop_assignment_lambda, 1.0e4)
             self.assertIsNone(loaded_instance.max_walking_distance_km)
-            self.assertEqual([row.student_names for row in loaded_instance.demand_rows], [["conv-a"], ["conv-b"]])
+            self.assertEqual(
+                [row.student_names for row in loaded_instance.demand_rows],
+                [["conv-a"], ["conv-b"]],
+            )
 
             solution = BirdBackendSolution(
                 status="OPTIMAL",
@@ -358,8 +378,13 @@ class BirdAdapterTests(unittest.TestCase):
         self.assertEqual(normalized.backend, "bird")
         self.assertEqual(normalized.buses_used, 1)
         self.assertEqual(normalized.total_distance_km, 20.0)
-        self.assertEqual([route.school_id for route in normalized.routes], ["school-a", "school-b"])
-        self.assertEqual([route.stop_ids for route in normalized.routes], [["Shared Stop"], ["Shared Stop"]])
+        self.assertEqual(
+            [route.school_id for route in normalized.routes], ["school-a", "school-b"]
+        )
+        self.assertEqual(
+            [route.stop_ids for route in normalized.routes],
+            [["Shared Stop"], ["Shared Stop"]],
+        )
         self.assertEqual(len(normalized.itineraries), 1)
         self.assertEqual(normalized.itineraries[0].route_orders, [0, 1])
 

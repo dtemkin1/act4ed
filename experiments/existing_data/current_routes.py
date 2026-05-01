@@ -1,50 +1,32 @@
-"""
-This file contains code to load the existing bus routes from the data, and plot them on a map.
-The main function is `get_existing_routes`, which returns a list of `RouteResult` objects,
-each representing a bus route with the depot, stops, and school.
-
-The `plot_existing_routes` function takes these routes and plots them on a map using OSMnx and Matplotlib.
-"""
-
 import json
-import os
-from pathlib import Path
 from datetime import time
-from typing import NamedTuple, TypedDict
+from typing import TypedDict
 
-import pandas as pd
 import osmnx as ox
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 
-from experiments.helpers import setup_framingham
+from experiments.helpers import (
+    OUTPUTS_FOLDER,
+    setup_framingham,
+)
+from experiments.existing_data.utils import RawBusRoutes, get_raw_assigned_buses
 from formulation.common.problems import ProblemData
-from formulation.common.classes import Stop
+from formulation.common.classes import NodeId, Stop
 
-CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
-
-ASSIGNED_STUDENTS = CURRENT_FILE_DIR / ".." / "data" / "assigned_students.csv"
-BUSES = CURRENT_FILE_DIR / ".." / "data" / "buses.csv"
-
-OUTPUT_ROUTES = CURRENT_FILE_DIR / ".." / "outputs" / "existing_routes.json"
-
-
-class RawBusRoutes(NamedTuple):
-    bus_name: str
-    stop_name: str
-    time: time
+OUTPUT_ROUTES = OUTPUTS_FOLDER / "existing_routes.json"
 
 
 class RouteResult(TypedDict):
     bus_name: str
-    destination_node_id: int
+    destination_node_id: NodeId
     distance_km: float
     end_time: float
-    origin_node_id: int
+    origin_node_id: NodeId
     round: int
     school_name: str
     start_time: float
-    stop_node_ids: list[int]
+    stop_node_ids: list[NodeId]
     student_names: list[str]
     students_served: int
     time_spent: float
@@ -58,68 +40,6 @@ class SolutionMetadata(TypedDict):
     status: str
     total_distance_km: float
     total_students_served: int
-
-
-def get_raw_assigned_buses() -> tuple[set[RawBusRoutes], dict[str, str]]:
-    """
-    Gets the raw assigned buses from the data, without filtering for only those that are in our problem data.
-
-    Returns: A two-element tuple of the following:
-            A set of tuples of the form (bus_id, stop_id, time).
-            A dictionary of the form {bus_id: school_id}.
-    """
-    assigned_students = pd.read_csv(
-        ASSIGNED_STUDENTS,
-        encoding="utf-8",
-        dtype={
-            "Student_District ID": str,
-            "Student_First Name": str,
-            "Student_Last Name": str,
-            "Student_Program": str,
-            "Student_School": str,
-            "BUS": str,
-            "P/U D/O TIME": str,
-            "BUS STOP": str,
-        },
-    )
-
-    # filter if no id
-    assigned_students = assigned_students[
-        assigned_students["Student_District ID"] != ""
-    ]
-
-    # filter if no bus stop
-    assigned_students = assigned_students[assigned_students["BUS STOP"] != ""]
-
-    # filter for only morning times (each student has morning and afternoon) (in 24 hr time)
-    assigned_students = assigned_students[
-        assigned_students["P/U D/O TIME"].str.split(":").str[0].astype(int) < 12
-    ]
-
-    schools_to_bus = {
-        (
-            row["BUS"]
-            if row["BUS"].startswith("M")
-            else ("FRAM" + (len(row["BUS"]) < 2 and "0" or "") + row["BUS"])
-        ): row["Student_School"]
-        for _, row in assigned_students.iterrows()
-    }
-
-    return {
-        RawBusRoutes(
-            bus_name=(
-                row["BUS"]
-                if row["BUS"].startswith("M")
-                else ("FRAM" + (len(row["BUS"]) < 2 and "0" or "") + row["BUS"])
-            ),
-            stop_name=row["BUS STOP"],
-            time=time(
-                int(row["P/U D/O TIME"].split(":")[0]),
-                int(row["P/U D/O TIME"].split(":")[1]),
-            ),
-        )
-        for _, row in assigned_students.iterrows()
-    }, schools_to_bus
 
 
 def ordered_routes(raw_buses: set[RawBusRoutes]) -> dict[str, list[str]]:
@@ -274,8 +194,10 @@ def get_existing_routes(
 def plot_existing_routes(
     routes: list[RouteResult], problem_data: ProblemData
 ) -> tuple[plt.Figure, plt.Axes]:
+
     graph = problem_data.base_graph
     service_graph = problem_data.service_graph
+
     if "crs" not in graph.graph:
         graph.graph["crs"] = "EPSG:3857"  # uses meters
 
@@ -362,9 +284,7 @@ def plot_existing_routes(
     ax.title.set_text("Existing School Bus Routes")
     ax.legend(loc="upper right", fontsize="small")
 
-    fig.savefig(
-        CURRENT_FILE_DIR / "outputs" / "existing_routes.png", bbox_inches="tight"
-    )
+    fig.savefig(OUTPUTS_FOLDER / "existing_routes.png", bbox_inches="tight")
     return fig, ax
 
 
