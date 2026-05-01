@@ -75,6 +75,7 @@ function school_route_arrival_times(
             idx == 1 ?
             earliest_arrival_time(school) :
             arrivals[end] +
+            data.schools[schools[idx - 1]].dwell_time +
             travel_time(data, data.schools[schools[idx - 1]], data.stops[school_idx][first_stops[idx]]) +
             route_times[idx]
         isfinite(earliest_candidate) || return nothing
@@ -114,7 +115,7 @@ function is_feasible_in_time_window(data::BirdData, school1::Int, school2::Int, 
     end_school = data.schools[school2]
     transfer_time = travel_time(data, start_school.node_index, first_stop.node_index)
     isfinite(transfer_time) || return false
-    return latest_arrival_time(start_school) + transfer_time + route_time <= latest_arrival_time(end_school) + BIRD_TIMING_EPS
+    return earliest_arrival_time(start_school) + start_school.dwell_time + transfer_time + route_time <= latest_arrival_time(end_school) + BIRD_TIMING_EPS
 end
 
 

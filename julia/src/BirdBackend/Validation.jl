@@ -70,6 +70,7 @@ function test_feasibility(data::BirdData)
                         first_stop = data.stops[bus.schools[idx]][route.stops[1]]
                         earliest_feasible_arrival =
                             bus.arrival_times[idx - 1] +
+                            previous_school.dwell_time +
                             travel_time(data, previous_school, first_stop) +
                             service_time(data, bus.schools[idx], route)
                         arrival_time + BIRD_TIMING_EPS >= earliest_feasible_arrival || error("bus $(bus.id) has an infeasible school-to-school transfer")

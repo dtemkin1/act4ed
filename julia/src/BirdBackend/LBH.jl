@@ -625,7 +625,13 @@ function solve_with_scenarios!(
     optimizer = Gurobi.Optimizer,
     optimizer_attributes = Pair{String, Any}[],
 )
-    data.fleet_aware && return error("Scenarios not implemented for fleet aware")
+    data.fleet_aware && return solve_fleet_aware_with_scenarios!(
+        data;
+        scenario_params = scenario_params,
+        seed = seed,
+        optimizer = optimizer,
+        optimizer_attributes = optimizer_attributes,
+    )
 
     compute_scenarios!(data, scenario_params; seed = seed, optimizer = optimizer, optimizer_attributes = optimizer_attributes)
     route_buses!(data; optimizer = optimizer, optimizer_attributes = optimizer_attributes)

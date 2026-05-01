@@ -27,6 +27,7 @@ from formulation.common import (
     BusType,
     DemographicInfo,
     Depot,
+    MPH_TO_KM_PER_MIN,
     ProblemData,
     School,
     SchoolType,
@@ -465,6 +466,12 @@ def _make_arrival_window_problem_data() -> TinyProblemData:
 
 
 class BirdAdapterTests(unittest.TestCase):
+    def test_default_speed_is_km_per_minute(self) -> None:
+        self.assertAlmostEqual(
+            BirdAdapterConfig().speed_km_per_minute,
+            40 / MPH_TO_KM_PER_MIN,
+        )
+
     def test_conventional_export_duplicates_shared_stop_by_school(self) -> None:
         problem_data = _make_problem_data()
 
@@ -879,6 +886,50 @@ class BirdAdapterTests(unittest.TestCase):
         )
         self.assertTrue(normalized.metadata["fleet_aware"])
 
+    def test_julia_scenario_driver_respects_fleet_aware_bus_budget(self) -> None:
+        julia = shutil.which("julia")
+        if julia is None:
+            self.skipTest("julia executable not available")
+
+        problem_data = _make_fleet_aware_problem_data()
+        instance = build_bird_export_instance(
+            problem_data,
+            BirdAdapterConfig(cohort="all", fleet_aware=True),
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            instance_path = Path(tmpdir) / "bird_instance.npz"
+            solution_path = Path(tmpdir) / "bird_solution.npz"
+            instance.save(instance_path)
+
+            subprocess.run(
+                [
+                    julia,
+                    "--project=julia",
+                    "experiments/solve_bird_backend_julia.jl",
+                    "--instance",
+                    str(instance_path),
+                    "--solution",
+                    str(solution_path),
+                    "--method",
+                    "scenario",
+                ],
+                check=True,
+                cwd=Path(__file__).resolve().parents[1],
+            )
+
+            solution = BirdBackendSolution.load(solution_path)
+            normalized = normalized_result_from_bird_solution(instance, solution)
+
+        self.assertEqual(solution.status, "OPTIMAL")
+        self.assertEqual(solution.buses_used, 3)
+        self.assertEqual(set(solution.assignment_bus_ids.tolist()), {1, 2, 3})
+        self.assertEqual(
+            {itinerary.bus_id for itinerary in normalized.itineraries},
+            {"C01", "M01", "M02"},
+        )
+        self.assertTrue(normalized.metadata["fleet_aware"])
+
     def test_julia_lbh_driver_reports_partial_fleet_aware_assignments(self) -> None:
         julia = shutil.which("julia")
         if julia is None:
@@ -936,6 +987,61 @@ class BirdAdapterTests(unittest.TestCase):
             ["sped", "conventional"],
         )
 
+    def test_julia_scenario_driver_reports_partial_fleet_aware_assignments(self) -> None:
+        julia = shutil.which("julia")
+        if julia is None:
+            self.skipTest("julia executable not available")
+
+        problem_data = _make_fleet_aware_problem_data()
+        instance = build_bird_export_instance(
+            problem_data,
+            BirdAdapterConfig(
+                cohort="all",
+                bus_type="BWC",
+                fleet_aware=True,
+                allow_partial=True,
+            ),
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            instance_path = Path(tmpdir) / "bird_instance.npz"
+            solution_path = Path(tmpdir) / "bird_solution.npz"
+            instance.save(instance_path)
+
+            subprocess.run(
+                [
+                    julia,
+                    "--project=julia",
+                    "experiments/solve_bird_backend_julia.jl",
+                    "--instance",
+                    str(instance_path),
+                    "--solution",
+                    str(solution_path),
+                    "--method",
+                    "scenario",
+                ],
+                check=True,
+                cwd=Path(__file__).resolve().parents[1],
+            )
+
+            solution = BirdBackendSolution.load(solution_path)
+            normalized = normalized_result_from_bird_solution(instance, solution)
+
+        self.assertEqual(solution.status, "PARTIAL")
+        self.assertEqual(solution.buses_used, 1)
+        self.assertEqual(normalized.metadata["unassigned_student_count"], 2)
+        self.assertEqual(
+            normalized.metadata["unassigned_students"],
+            ["conv-a", "sped-a"],
+        )
+        self.assertEqual(
+            [
+                row["service_group"]
+                for row in normalized.metadata["unassigned_demand_rows"]
+            ],
+            ["sped", "conventional"],
+        )
+
     def test_julia_lbh_driver_does_not_mix_grades_on_one_bus(self) -> None:
         julia = shutil.which("julia")
         if julia is None:
@@ -967,6 +1073,60 @@ class BirdAdapterTests(unittest.TestCase):
                     str(solution_path),
                     "--method",
                     "lbh",
+                    "--seed",
+                    "1",
+                ],
+                check=True,
+                cwd=Path(__file__).resolve().parents[1],
+            )
+
+            solution = BirdBackendSolution.load(solution_path)
+            stop_assignments = bird_stop_assignments(instance, solution)
+            normalized = normalized_result_from_bird_solution(instance, solution)
+
+        self.assertEqual(solution.status, "PARTIAL")
+        self.assertEqual(solution.buses_used, 1)
+        self.assertEqual(len(stop_assignments), 1)
+        self.assertEqual(normalized.metadata["unassigned_student_count"], 1)
+        served_grades = {row["grade"] for row in stop_assignments}
+        unassigned_grades = {
+            row["grade"] for row in normalized.metadata["unassigned_demand_rows"]
+        }
+        self.assertEqual(len(served_grades), 1)
+        self.assertEqual(len(unassigned_grades), 1)
+        self.assertTrue(served_grades.isdisjoint(unassigned_grades))
+
+    def test_julia_scenario_driver_does_not_mix_grades_on_one_bus(self) -> None:
+        julia = shutil.which("julia")
+        if julia is None:
+            self.skipTest("julia executable not available")
+
+        problem_data = _make_grade_split_problem_data(bus_count=1)
+        instance = build_bird_export_instance(
+            problem_data,
+            BirdAdapterConfig(
+                cohort="conventional",
+                fleet_aware=True,
+                allow_partial=True,
+            ),
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            instance_path = Path(tmpdir) / "bird_instance.npz"
+            solution_path = Path(tmpdir) / "bird_solution.npz"
+            instance.save(instance_path)
+
+            subprocess.run(
+                [
+                    julia,
+                    "--project=julia",
+                    "experiments/solve_bird_backend_julia.jl",
+                    "--instance",
+                    str(instance_path),
+                    "--solution",
+                    str(solution_path),
+                    "--method",
+                    "scenario",
                     "--seed",
                     "1",
                 ],
@@ -1074,6 +1234,10 @@ class BirdAdapterTests(unittest.TestCase):
         self.assertLess(
             wide_solution.assignment_arrival_times[0],
             wide_solution.assignment_arrival_times[1],
+        )
+        self.assertGreaterEqual(
+            wide_solution.assignment_arrival_times[1],
+            wide_solution.assignment_arrival_times[0] + 10.0 + 5.0 + 20.0 - 1e-6,
         )
 
 
