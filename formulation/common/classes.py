@@ -43,8 +43,8 @@ class BusType(IntEnum):
     """4 wheelchair access"""
 
 
-class DemographicInfo(NamedTuple):
-    """demographic info for a student"""
+class Attributes(NamedTuple):
+    """attributes for a student"""
 
     special_ed: bool
     wheelchair_user: bool
@@ -198,7 +198,7 @@ class Student(LocationData):
     id: str
     school: School
     stop: Stop
-    demographics: DemographicInfo
+    attributes: Attributes
 
     def __str__(self):
         return self.name

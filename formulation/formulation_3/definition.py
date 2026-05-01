@@ -81,14 +81,14 @@ class ExperimentConfig:
             filtered_students = [
                 student
                 for student in filtered_students
-                if not student.demographics.wheelchair_user
+                if not student.attributes.wheelchair_user
             ]
 
         if not self.consider_monitor_students:
             filtered_students = [
                 student
                 for student in filtered_students
-                if not student.demographics.special_ed
+                if not student.attributes.special_ed
             ]
 
         filtered_schools = problem_data.schools
@@ -243,12 +243,12 @@ class Formulation3:
         self.F = tuple(
             student
             for student in self.problem_data.students
-            if student.demographics.special_ed or student.demographics.wheelchair_user
+            if student.attributes.special_ed or student.attributes.wheelchair_user
         )
         self.W = tuple(
             student
             for student in self.problem_data.students
-            if student.demographics.wheelchair_user
+            if student.attributes.wheelchair_user
         )
 
         self.Q = tuple(range(self.rounds))
@@ -345,9 +345,7 @@ def get_travel_time(
             maxspeed = edge_data.get("maxspeed", "40 mph")
             if isinstance(maxspeed, list):
                 maxspeed = maxspeed[0]
-            speed_limit_mph: str = float(
-                maxspeed.split()[0]
-            )  # in the format '30 mph'
+            speed_limit_mph: str = float(maxspeed.split()[0])  # in the format '30 mph'
             speed_limit = speed_limit_mph / MPH_TO_KM_PER_MIN
 
             if is_school_zone:

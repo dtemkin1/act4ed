@@ -21,7 +21,7 @@ PLACE_NAME = "Framingham, Massachusetts, USA"
 
 
 def main() -> None:
-    problem_data_original = setup_framingham()
+    problem_data_original = setup_framingham(sanity_check=True)
     osm_graph_km = make_osm_in_km(problem_data_original.osm_graph)
     print("Problem data loaded!")
 

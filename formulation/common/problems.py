@@ -16,7 +16,7 @@ import pandas as pd
 
 from formulation.common.constants import CACHE_DIR, NETWORK_TYPE
 from formulation.common.classes import (
-    DemographicInfo,
+    Attributes,
     NodeId,
     SchoolType,
     BusType,
@@ -131,7 +131,7 @@ class ProblemData(ABC):
         return tuple(
             student
             for student in self.students
-            if student.demographics.special_ed and student.stop == stop
+            if student.attributes.special_ed and student.stop == stop
         )
 
     def sanity_checks(self):
@@ -840,6 +840,7 @@ class ProblemDataReal(ProblemData):
             self.students_path,
             dtype={
                 "id": str,
+                "name": str,
                 "lon": float,
                 "lat": float,
                 "school_id": str,
@@ -858,11 +859,11 @@ class ProblemDataReal(ProblemData):
 
             this_student = Student(
                 id=row["id"],
-                name=f"Student {row['id']}",
+                name=row["name"],
                 geographic_location=geographic_location,
                 school=school,
                 stop=nearest_stop,
-                demographics=DemographicInfo(
+                attributes=Attributes(
                     special_ed=bool(row["is_sp_ed"]),
                     wheelchair_user=bool(row["is_wheelchair_user"]),
                 ),

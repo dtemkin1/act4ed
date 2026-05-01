@@ -147,8 +147,8 @@ def make_students_csv(students: tuple[Student, ...], path: Path | None = None) -
                 "lon": student.geographic_location.x,
                 "lat": student.geographic_location.y,
                 "school_id": student.school.id,
-                "is_sp_ed": student.demographics.special_ed,
-                "is_wheelchair_user": student.demographics.wheelchair_user,
+                "is_sp_ed": student.attributes.special_ed,
+                "is_wheelchair_user": student.attributes.wheelchair_user,
             }
             for student in students
         ]

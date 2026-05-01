@@ -1,4 +1,5 @@
 from datetime import time
+from functools import cache
 from typing import NamedTuple
 
 
@@ -6,7 +7,7 @@ import pandas as pd
 
 from experiments.helpers import DATA_FOLDER
 from formulation.common.problems import ProblemDataReal
-from formulation.common.classes import DemographicInfo, Student
+from formulation.common.classes import Attributes, Student
 
 ASSIGNED_STUDENTS = DATA_FOLDER / "assigned_students.csv"
 
@@ -17,6 +18,7 @@ class RawBusRoutes(NamedTuple):
     time: time
 
 
+@cache
 def get_raw_assigned_students() -> pd.DataFrame:
     """
     Gets the raw assigned students from the data, without filtering for only those that are in our problem data.
@@ -118,6 +120,7 @@ def get_assigned_students(problem_data: ProblemDataReal) -> tuple[Student, ...]:
         stop = next(stop for stop in problem_data.stops if stop.name == row["BUS STOP"])
 
         student = Student(
+            id=row["Student_District ID"],
             name=f"{row['Student_First Name']} {row['Student_Last Name']}",
             geographic_location=stop.geographic_location,
             school=next(
@@ -128,7 +131,7 @@ def get_assigned_students(problem_data: ProblemDataReal) -> tuple[Student, ...]:
             stop=next(
                 stop for stop in problem_data.stops if stop.name == row["BUS STOP"]
             ),
-            demographics=DemographicInfo(
+            attributes=Attributes(
                 special_ed=special_ed, wheelchair_user=wheelchair_user
             ),
         )

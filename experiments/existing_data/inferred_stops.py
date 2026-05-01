@@ -1,3 +1,4 @@
+from dataclasses import replace
 from random import random
 
 import matplotlib.pyplot as plt
@@ -13,7 +14,7 @@ from experiments.existing_data.utils import (
     get_raw_assigned_students,
 )
 from formulation.common.problems import ProblemDataReal
-from formulation.common.classes import DemographicInfo, Student
+from formulation.common.classes import Attributes, Student
 
 ASSIGNED_STUDENTS = DATA_FOLDER / "assigned_students.csv"
 BUSES = DATA_FOLDER / "buses.csv"
@@ -45,14 +46,11 @@ def more_realistic_students(problem_data: ProblemDataReal) -> tuple[Student, ...
         stop_name = student.stop.name
         if stop_name in stop_name_to_special_ed_ratio:
             ratio = stop_name_to_special_ed_ratio[stop_name]
-            new_student = Student(
-                name=student.name,
-                geographic_location=student.geographic_location,
-                school=student.school,
-                stop=student.stop,
-                demographics=DemographicInfo(
+            new_student = replace(
+                student,
+                attributes=Attributes(
                     special_ed=random() < ratio,
-                    wheelchair_user=student.demographics.wheelchair_user,
+                    wheelchair_user=student.attributes.wheelchair_user,
                 ),
             )
             new_students.append(new_student)
@@ -72,7 +70,7 @@ def plot_special_education_students(problem_data: ProblemDataReal) -> None:
     special_education_students = [
         student
         for student in students
-        if student.demographics.special_ed or student.demographics.wheelchair_user
+        if student.attributes.special_ed or student.attributes.wheelchair_user
     ]
 
     # plot framingham graph with special education students highlighted
@@ -122,7 +120,7 @@ def plot_special_education_students(problem_data: ProblemDataReal) -> None:
 def main() -> None:
     problem_data = setup_framingham()
 
-    print("Number of assigned students: ", len(get_raw_assigned_students(problem_data)))
+    print("Number of assigned students: ", len(get_raw_assigned_students()))
 
     make_students_csv(
         more_realistic_students(problem_data),
