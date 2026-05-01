@@ -122,7 +122,7 @@ def plot_special_education_students(problem_data: ProblemDataReal) -> None:
 def main() -> None:
     problem_data = setup_framingham()
 
-    print("Number of assigned students: ", len(get_assigned_students(problem_data)))
+    print("Number of assigned students: ", len(get_raw_assigned_students(problem_data)))
 
     make_students_csv(
         more_realistic_students(problem_data),

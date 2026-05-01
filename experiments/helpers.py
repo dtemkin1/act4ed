@@ -95,20 +95,28 @@ def setup(
 
 @overload
 def setup_framingham(
-    hexagonal: Literal[False] = False, prune: int | None = None
+    hexagonal: Literal[False] = False,
+    prune: int | None = None,
+    sanity_check: bool = False,
 ) -> ProblemDataReal: ...
 
 
 @overload
 def setup_framingham(
-    hexagonal: Literal[True], prune: None = None
+    hexagonal: Literal[True], prune: None = None, sanity_check: bool = False
 ) -> ProblemDataRealSurrogate: ...
 
 
 def setup_framingham(
-    hexagonal: bool = False, prune: int | None = None
+    hexagonal: bool = False, prune: int | None = None, sanity_check: bool = False
 ) -> ProblemDataReal | ProblemDataRealSurrogate:
-    return setup("framingham", FRAMINGHAM_NAME, hexagonal=hexagonal, prune=prune)
+    return setup(
+        "framingham",
+        FRAMINGHAM_NAME,
+        hexagonal=hexagonal,
+        prune=prune,
+        sanity_check=sanity_check,
+    )
 
 
 def make_osm_in_km(graph: "MultiDiGraph[NodeId]") -> "MultiDiGraph[NodeId]":
