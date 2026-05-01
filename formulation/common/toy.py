@@ -4,6 +4,7 @@ import random
 import networkx as nx
 
 from formulation.common.classes import (
+    Attributes,
     Bus,
     Depot,
     NodeId,
@@ -11,7 +12,6 @@ from formulation.common.classes import (
     SchoolType,
     Stop,
     Student,
-    DemographicInfo,
 )
 from formulation.common.problems import ProblemDataToy
 
@@ -128,11 +128,12 @@ def make_students(
         )
         random_school = schools[random.randint(0, num_schools - 1)]
         student = Student(
+            id=str(i),
             name=f"Student {i}",
             geographic_location=home_location,
             school=random_school,
             stop=stop,
-            demographics=DemographicInfo(
+            attributes=Attributes(
                 special_ed=(i % 4 == 0), wheelchair_user=(i % 5 == 0)
             ),
         )

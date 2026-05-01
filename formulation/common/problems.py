@@ -16,7 +16,7 @@ import pandas as pd
 
 from formulation.common.constants import CACHE_DIR, NETWORK_TYPE
 from formulation.common.classes import (
-    DemographicInfo,
+    Attributes,
     NodeId,
     SchoolType,
     BusType,
@@ -125,6 +125,14 @@ class ProblemData(ABC):
     def all_nodes(self) -> tuple[Place, ...]:
         """all nodes in the problem, including stops, schools, and depots"""
         return self.stops + self.schools + self.depots
+
+    def special_ed_students_in_stop(self, stop: Stop) -> tuple[Student, ...]:
+        """Return students with special educational needs who are assigned to a specific stop."""
+        return tuple(
+            student
+            for student in self.students
+            if student.attributes.special_ed and student.stop == stop
+        )
 
     def sanity_checks(self):
         """perform sanity checks on the transportation network."""
@@ -836,6 +844,7 @@ class ProblemDataReal(ProblemData):
             self.students_path,
             dtype={
                 "id": str,
+                "name": str,
                 "lon": float,
                 "lat": float,
                 "school_id": str,
@@ -854,11 +863,12 @@ class ProblemDataReal(ProblemData):
             nearest_stop = self._get_nearest_stop(geographic_location)
 
             this_student = Student(
-                name=f"Student {row['id']}",
+                id=row["id"],
+                name=row["name"],
                 geographic_location=geographic_location,
                 school=school,
                 stop=nearest_stop,
-                demographics=DemographicInfo(
+                attributes=Attributes(
                     special_ed=bool(row["is_sp_ed"]),
                     wheelchair_user=bool(row["is_wheelchair_user"]),
                 ),

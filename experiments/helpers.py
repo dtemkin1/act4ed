@@ -4,10 +4,9 @@ from typing import Literal, overload
 
 from networkx import MultiDiGraph
 import pandas as pd
-import matplotlib.pyplot as plt
 from shapely import Point
 
-from formulation.common.classes import DemographicInfo, NodeId, Student
+from formulation.common.classes import NodeId, Student
 from formulation.common.problems import ProblemDataReal, ProblemDataRealSurrogate
 
 CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
@@ -16,11 +15,12 @@ CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 BOUNDARY_BUFFER_KM = 1.0
 
 # data files
-DEPOT_CSV = CURRENT_FILE_DIR / "data" / "depot.csv"
-SCHOOLS_CSV = CURRENT_FILE_DIR / "data" / "schools.csv"
-STOPS_CSV = CURRENT_FILE_DIR / "data" / "stops.csv"
-STUDENTS_CSV = CURRENT_FILE_DIR / "data" / "students.csv"
-BUSES_CSV = CURRENT_FILE_DIR / "data" / "buses.csv"
+DATA_FOLDER = CURRENT_FILE_DIR / "data"
+DEPOT_CSV = DATA_FOLDER / "depot.csv"
+SCHOOLS_CSV = DATA_FOLDER / "schools.csv"
+STOPS_CSV = DATA_FOLDER / "stops.csv"
+STUDENTS_CSV = DATA_FOLDER / "students.csv"
+BUSES_CSV = DATA_FOLDER / "buses.csv"
 
 # thresholds
 MAX_WALK_TIME_S = 15 * 60  # 15 mins
@@ -30,9 +30,10 @@ MAX_WALK_DIST_KM = 1.0  # 1 km
 NETWORK_TYPE = "drive"
 
 # outputs
-GRAPHML_FILE = CURRENT_FILE_DIR / "outputs" / "framingham_graph.graphml"
-PAIRWISE_CSV = CURRENT_FILE_DIR / "outputs" / "depot_schools_stops_pairwise.csv"
-STUDENT_ASSIGN_CSV = CURRENT_FILE_DIR / "outputs" / "student_to_stop_or_school.csv"
+OUTPUTS_FOLDER = CURRENT_FILE_DIR / "outputs"
+GRAPHML_FILE = OUTPUTS_FOLDER / "framingham_graph.graphml"
+PAIRWISE_CSV = OUTPUTS_FOLDER / "depot_schools_stops_pairwise.csv"
+STUDENT_ASSIGN_CSV = OUTPUTS_FOLDER / "student_to_stop_or_school.csv"
 
 FRAMINGHAM_NAME = "Framingham, Massachusetts, USA"
 
@@ -106,21 +107,28 @@ def setup(
 
 @overload
 def setup_framingham(
-    hexagonal: Literal[False] = False, prune: int | None = None
+    hexagonal: Literal[False] = False,
+    prune: int | None = None,
+    sanity_check: bool = False,
 ) -> ProblemDataReal: ...
 
 
 @overload
 def setup_framingham(
-    hexagonal: Literal[True], prune: None = None
+    hexagonal: Literal[True], prune: None = None, sanity_check: bool = False
 ) -> ProblemDataRealSurrogate: ...
 
 
 def setup_framingham(
-    hexagonal: bool = False, prune: int | None = None
+    hexagonal: bool = False, prune: int | None = None, sanity_check: bool = False
 ) -> ProblemDataReal | ProblemDataRealSurrogate:
-    return setup("framingham", FRAMINGHAM_NAME, hexagonal=hexagonal, prune=prune)
-
+    return setup(
+        problem_name="framingham",
+        place_name=FRAMINGHAM_NAME,
+        hexagonal=hexagonal,
+        prune=prune,
+        sanity_check=sanity_check,
+    )
 
 def get_assigned_students(problem_data: ProblemDataReal) -> tuple[Student, ...]:
     """
@@ -274,6 +282,30 @@ def make_point_from_node_id(graph: "MultiDiGraph[NodeId]", node_id: NodeId) -> P
     return Point(graph.nodes[node_id]["x"], graph.nodes[node_id]["y"])
 
 
+def make_students_csv(students: tuple[Student, ...], path: Path | None = None) -> None:
+    """Helper function to create a CSV file of students from the problem data"""
+
+    # id,lon,lat,school_id,is_sp_ed,is_wheelchair_user
+    df = pd.DataFrame(
+        [
+            {
+                "id": student.id,
+                "name": student.name,
+                "lon": student.geographic_location.x,
+                "lat": student.geographic_location.y,
+                "school_id": student.school.id,
+                "is_sp_ed": student.attributes.special_ed,
+                "is_wheelchair_user": student.attributes.wheelchair_user,
+            }
+            for student in students
+        ]
+    )
+
+    if path is not None:
+        df.to_csv(path, index=False)
+
+    return df
+
+
 if __name__ == "__main__":
     problem_data = setup_framingham()
-    print("Number of assigned students: ", len(get_assigned_students(problem_data)))

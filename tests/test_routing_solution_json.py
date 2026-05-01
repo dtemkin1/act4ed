@@ -94,6 +94,7 @@ def _build_bird_problem() -> TinyProblemData:
     )
     students = [
         Student(
+            id="student-near-a",
             name="bird-student-a",
             geographic_location=Point(1, 0),
             school=school_a,
@@ -101,6 +102,7 @@ def _build_bird_problem() -> TinyProblemData:
             demographics=DemographicInfo(special_ed=False, wheelchair_user=False),
         ),
         Student(
+            id="student-near-b",
             name="bird-student-b",
             geographic_location=Point(2, 0),
             school=school_b,
@@ -254,7 +256,9 @@ class RoutingSolutionJsonTests(unittest.TestCase):
     def test_bird_solution_json_uses_school_local_stop_ids(self) -> None:
         instance = build_bird_export_instance(
             _build_bird_problem(),
-            BirdAdapterConfig(cohort="conventional", bus_type="C", speed_km_per_minute=1.0),
+            BirdAdapterConfig(
+                cohort="conventional", bus_type="C", speed_km_per_minute=1.0
+            ),
         )
         solution = BirdBackendSolution(
             status="OPTIMAL",
