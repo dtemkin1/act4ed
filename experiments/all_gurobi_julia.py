@@ -208,6 +208,9 @@ def _solve_with_bird(
     reassign_stops: bool,
     stop_assignment_lambda: float,
     max_walking_distance_km: float | None,
+    fleet_aware: bool,
+    conventional_spillover: bool,
+    allow_partial: bool,
     method: str,
 ) -> NormalizedRoutingResult:
     adapter_config = BirdAdapterConfig(
@@ -217,6 +220,9 @@ def _solve_with_bird(
         reassign_stops=reassign_stops,
         stop_assignment_lambda=stop_assignment_lambda,
         max_walking_distance_km=max_walking_distance_km,
+        fleet_aware=fleet_aware,
+        conventional_spillover=conventional_spillover,
+        allow_partial=allow_partial,
     )
     instance_path = export_bird_instance(
         problem_data,
@@ -366,7 +372,22 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--bird-bus-type",
         default=None,
-        help="Homogeneous bus type slice for Bird runs, e.g. C, B, BWC, WC, or an enum value.",
+        help="Bus type slice for Bird runs, e.g. C, B, BWC, WC, or an enum value.",
+    )
+    parser.add_argument(
+        "--bird-fleet-aware",
+        action="store_true",
+        help="Export and solve the Bird run with concrete heterogeneous fleet buses.",
+    )
+    parser.add_argument(
+        "--bird-conventional-spillover",
+        action="store_true",
+        help="Allow conventional Bird demand to use remaining monitor buses after non-monitor buses are exhausted.",
+    )
+    parser.add_argument(
+        "--bird-allow-partial",
+        action="store_true",
+        help="Allow fleet-aware Bird runs to route as much demand as possible and report unassigned demand rows.",
     )
     parser.add_argument(
         "--bird-method",
@@ -420,7 +441,7 @@ def main() -> None:
         if args.backend == "bird":
             label = _scoped_label("bird", scope)
             print(
-                f"{label}: Bird backend run ({scope.description}, cohort={args.bird_cohort}, bus_type={args.bird_bus_type}, method={args.bird_method}, lambda={args.bird_lambda}, reassign_stops={args.bird_reassign_stops})"
+                f"{label}: Bird backend run ({scope.description}, cohort={args.bird_cohort}, bus_type={args.bird_bus_type}, method={args.bird_method}, lambda={args.bird_lambda}, reassign_stops={args.bird_reassign_stops}, fleet_aware={args.bird_fleet_aware}, conventional_spillover={args.bird_conventional_spillover}, allow_partial={args.bird_allow_partial})"
             )
             _solve_with_bird(
                 scope.problem_data,
@@ -432,6 +453,9 @@ def main() -> None:
                 reassign_stops=args.bird_reassign_stops,
                 stop_assignment_lambda=args.bird_stop_assignment_lambda,
                 max_walking_distance_km=args.bird_max_walking_km,
+                fleet_aware=args.bird_fleet_aware,
+                conventional_spillover=args.bird_conventional_spillover,
+                allow_partial=args.bird_allow_partial,
                 method=args.bird_method,
             )
             continue

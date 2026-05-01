@@ -199,6 +199,7 @@ class Student(LocationData):
     school: School
     stop: Stop
     attributes: Attributes
+    grade: str | None = None
 
     def __str__(self):
         return self.name

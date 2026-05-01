@@ -20,7 +20,7 @@ from formulation.common.utils import (
     tau_m,
 )
 from formulation.common.classes import BusType
-from formulation.common.constants import METERS_PER_KM, TAU
+from formulation.common.constants import TAU
 
 from formulation.formulation_3.definition import (
     Formulation3,
@@ -210,7 +210,10 @@ def _triplet_from_single_mapping(
 
 def _active_buses_for_julia(problem: Formulation3) -> list[Any]:
     buses = list(problem.B)
-    if not any(student.requires_monitor for student in problem.M):
+    if not any(
+        student.attributes.special_ed or student.attributes.wheelchair_user
+        for student in problem.M
+    ):
         return [bus for bus in buses if bus.type == BusType.C]
     return buses
 
@@ -220,11 +223,13 @@ def build_formulation3_numeric_instance(
 ) -> Formulation3NumericInstance:
     B = _active_buses_for_julia(problem)
     M = problem.M
-    S = problem.S
-    P = problem.P
+    S = list(problem.S)
+    P = list(problem.P)
     A = problem.A
-    S_PLUS = problem.S_PLUS if problem.rounds > 1 else []
-    N = P + S + S_PLUS + problem.D_PLUS + problem.D_MINUS
+    S_PLUS = list(problem.S_PLUS) if problem.rounds > 1 else []
+    D_PLUS = list(problem.D_PLUS)
+    D_MINUS = list(problem.D_MINUS)
+    N = P + S + S_PLUS + D_PLUS + D_MINUS
 
     included_nodes = set(N)
     A_list = [
@@ -282,7 +287,7 @@ def build_formulation3_numeric_instance(
         tau_index = school_type_to_idx[school_type]
         tau_of_m.append(tau_index)
         is_flagged_m.append(f_m(student))
-        needs_wheelchair_m.append(int(student.requires_wheelchair))
+        needs_wheelchair_m.append(int(student.attributes.wheelchair_user))
         pickup_row_for_student.append(stop_to_idx[pickup_stop])
         school_row_for_student.append(school_index)
         tau_row_for_student.append(tau_index)
@@ -312,7 +317,7 @@ def build_formulation3_numeric_instance(
     capacity_b = np.asarray([C_b(bus) for bus in B], dtype=np.int64)
     cap_upper_b = np.asarray([problem.C_CAP_B(bus) for bus in B], dtype=np.float64)
     range_b = np.asarray(
-        [R_b(bus) * METERS_PER_KM for bus in B],
+        [R_b(bus) for bus in B],
         dtype=np.float64,
     )
     wheelchair_ok_b = np.asarray([Wh_b(bus) for bus in B], dtype=np.int64)

@@ -1,7 +1,11 @@
 const MOI = MathOptInterface
-const BIRD_INSTANCE_SCHEMA_VERSION = 4
+const BIRD_INSTANCE_SCHEMA_VERSION = 9
 const BIRD_SOLUTION_SCHEMA_VERSION = 1
 const DEFAULT_LAMBDA_VALUE = 1.0e4
+const BIRD_TIMING_EPS = 1.0e-6
+const SERVICE_GROUP_WHEELCHAIR = 1
+const SERVICE_GROUP_SPED = 2
+const SERVICE_GROUP_CONVENTIONAL = 3
 
 
 struct BirdParameters
@@ -9,6 +13,7 @@ struct BirdParameters
     max_time_on_bus::Float64
     constant_stop_time::Float64
     stop_time_per_student::Float64
+    stop_time_per_wheelchair_student::Float64
 end
 
 
@@ -18,8 +23,19 @@ struct BirdSchool
     name::String
     start_time::Float64
     dwell_time::Float64
+    earliest_arrival_buffer::Float64
+    latest_arrival_buffer::Float64
     node_index::Int
 end
+
+BirdSchool(
+    id::Int,
+    external_id::String,
+    name::String,
+    start_time::Float64,
+    dwell_time::Float64,
+    node_index::Int,
+) = BirdSchool(id, external_id, name, start_time, dwell_time, dwell_time, dwell_time, node_index)
 
 
 struct BirdDepot
@@ -38,6 +54,9 @@ struct BirdDemandStop
     school_id::Int
     node_index::Int
     n_students::Int
+    n_wheelchair::Int
+    group_id::Int
+    grade_id::Int
 end
 
 
@@ -59,6 +78,21 @@ struct BirdBus
     depot::Int
     schools::Vector{Int}
     routes::Vector{Int}
+    arrival_times::Vector{Float64}
+end
+
+BirdBus(id::Int, depot::Int, schools::Vector{Int}, routes::Vector{Int}) =
+    BirdBus(id, depot, schools, routes, Float64[])
+
+
+struct BirdFleetBus
+    id::Int
+    name::String
+    depot::Int
+    capacity::Int
+    has_monitor::Bool
+    wheelchair_capacity::Int
+    bus_type::String
 end
 
 
@@ -73,11 +107,16 @@ mutable struct BirdData
     fleet_size::Int
     cohort::String
     bus_type::String
+    fleet_aware::Bool
+    conventional_spillover::Bool
+    allow_partial::Bool
+    fleet::Vector{BirdFleetBus}
     default_lambda_value::Float64
     scenarios::Vector{Vector{BirdScenario}}
     routes::Vector{Vector{BirdRoute}}
     used_scenario::Vector{Int}
     buses::Vector{BirdBus}
+    unassigned_stops::Vector{Tuple{Int, Int}}
 end
 
 
@@ -105,6 +144,8 @@ struct BirdBackendSolution
     assignment_service_time_min::Vector{Float64}
     assignment_stop_ptr::Vector{Int}
     assignment_stop_values::Vector{Int}
+    unassigned_school_indices::Vector{Int}
+    unassigned_stop_indices::Vector{Int}
 end
 
 
@@ -192,9 +233,20 @@ travel_distance(data::BirdData, src::BirdDemandStop, dst::BirdSchool) = travel_d
 travel_distance(data::BirdData, src::BirdSchool, dst::BirdDepot) = travel_distance(data, src.node_index, dst.node_index)
 
 
+earliest_arrival_time(school::BirdSchool) = school.start_time - school.earliest_arrival_buffer
+latest_arrival_time(school::BirdSchool) = school.start_time - school.latest_arrival_buffer
+uses_original_dwell_timing(school::BirdSchool) =
+    abs(school.earliest_arrival_buffer - school.dwell_time) <= BIRD_TIMING_EPS &&
+    abs(school.latest_arrival_buffer - school.dwell_time) <= BIRD_TIMING_EPS
+uses_original_dwell_timing(data::BirdData) = all(uses_original_dwell_timing, data.schools)
 n_students(stop::BirdDemandStop) = stop.n_students
-stop_time(data::BirdData, stop::BirdDemandStop) = data.params.constant_stop_time + data.params.stop_time_per_student * stop.n_students
+stop_time(data::BirdData, stop::BirdDemandStop) =
+    data.params.constant_stop_time +
+    data.params.stop_time_per_student * stop.n_students +
+    data.params.stop_time_per_wheelchair_student * stop.n_wheelchair
 max_travel_time(data::BirdData, _stop::BirdDemandStop) = data.params.max_time_on_bus
+route_grade_id(data::BirdData, school_idx::Int, route::BirdRoute) =
+    isempty(route.stops) ? 0 : data.stops[school_idx][route.stops[1]].grade_id
 
 
 function _school_start_time(text::AbstractString)

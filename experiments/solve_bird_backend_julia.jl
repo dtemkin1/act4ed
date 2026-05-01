@@ -52,10 +52,11 @@ function main(args = ARGS)
     runtime_seconds = time() - start_time
 
     test_feasibility(data)
+    status_name = data.allow_partial && !isempty(data.unassigned_stops) ? "PARTIAL" : "OPTIMAL"
     solution = snapshot_solution(
         data;
         runtime_seconds = runtime_seconds,
-        status_name = "OPTIMAL",
+        status_name = status_name,
         objective_value = float(length(data.buses)),
     )
     save_solution(solution_path, solution)

@@ -13,6 +13,7 @@ export BirdParameters,
     BirdRoute,
     BirdScenario,
     BirdBus,
+    BirdFleetBus,
     BirdData,
     BirdScenarioParameters,
     BirdBackendSolution,
@@ -20,6 +21,8 @@ export BirdParameters,
     load_legacy_benchmark,
     compute_scenarios!,
     route_buses!,
+    solve_fleet_aware!,
+    solve_fleet_aware_with_scenarios!,
     solve_with_scenarios!,
     solve_lbh!,
     snapshot_solution,
@@ -30,6 +33,7 @@ include("BirdBackend/Core.jl")
 include("BirdBackend/Loading.jl")
 include("BirdBackend/Scenarios.jl")
 include("BirdBackend/Routing.jl")
+include("BirdBackend/FleetScenarios.jl")
 include("BirdBackend/LBH.jl")
 include("BirdBackend/Validation.jl")
 include("BirdBackend/SolutionIO.jl")

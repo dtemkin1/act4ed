@@ -37,9 +37,16 @@ function snapshot_solution(data::BirdData; runtime_seconds::Float64 = 0.0, statu
     assignment_service_time_min = Float64[]
     assignment_stop_ptr = Int[0]
     assignment_stop_values = Int[]
+    unassigned_school_indices = [school_idx for (school_idx, _stop_idx) in data.unassigned_stops]
+    unassigned_stop_indices = [stop_idx for (_school_idx, stop_idx) in data.unassigned_stops]
 
     for bus in data.buses
         current_node = data.depots[bus.depot]
+        arrival_times =
+            isempty(bus.arrival_times) ?
+            route_assignment_arrival_times(data, bus.schools, bus.routes) :
+            bus.arrival_times
+        arrival_times === nothing && error("bus $(bus.id) has an infeasible arrival schedule")
         for (order, school_idx) in enumerate(bus.schools)
             route = data.routes[school_idx][bus.routes[order]]
             first_stop = data.stops[school_idx][route.stops[1]]
@@ -47,7 +54,7 @@ function snapshot_solution(data::BirdData; runtime_seconds::Float64 = 0.0, statu
             push!(assignment_bus_ids, bus.id)
             push!(assignment_orders, order - 1)
             push!(assignment_school_indices, school_idx)
-            push!(assignment_arrival_times, data.schools[school_idx].start_time - data.schools[school_idx].dwell_time)
+            push!(assignment_arrival_times, arrival_times[order])
             push!(assignment_distance_km, route_distance_with_deadhead)
             push!(assignment_service_time_min, service_time(data, school_idx, route))
             append!(assignment_stop_values, route.stops)
@@ -74,6 +81,8 @@ function snapshot_solution(data::BirdData; runtime_seconds::Float64 = 0.0, statu
         assignment_service_time_min,
         assignment_stop_ptr,
         assignment_stop_values,
+        unassigned_school_indices,
+        unassigned_stop_indices,
     )
 end
 
@@ -96,6 +105,8 @@ function save_solution(path::AbstractString, solution::BirdBackendSolution)
         "assignment_service_time_min" => Float64.(solution.assignment_service_time_min),
         "assignment_stop_ptr" => Int64.(solution.assignment_stop_ptr),
         "assignment_stop_values" => Int64.(solution.assignment_stop_values),
+        "unassigned_school_indices" => Int64.(solution.unassigned_school_indices),
+        "unassigned_stop_indices" => Int64.(solution.unassigned_stop_indices),
     )
     NPZ.npzwrite(path, payload)
     return path

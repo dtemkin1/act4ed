@@ -109,7 +109,7 @@ def h_s(s: School):
 
 def slack_s(s: School):
     """required slack time for school s in minutes, same in our case"""
-    return 30
+    return 0
 
 
 def l_s(s: School):

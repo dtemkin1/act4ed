@@ -1,6 +1,7 @@
 struct GreedyState
     route::BirdRoute
     n_students::Int
+    grade_id::Int
     slack_times::Vector{Float64}
     stop_times::Vector{Float64}
     route_time::Float64
@@ -14,7 +15,7 @@ function initial_route(data::BirdData, school_idx::Int, stop_idx::Int, route_id:
     slack_times = [max_travel_time(data, stop) - time_on_bus]
     stop_times = [time_on_bus]
     route_time = time_on_bus + stop_time(data, stop)
-    return GreedyState(BirdRoute(route_id, [stop_idx]), stop.n_students, slack_times, stop_times, route_time)
+    return GreedyState(BirdRoute(route_id, [stop_idx]), stop.n_students, stop.grade_id, slack_times, stop_times, route_time)
 end
 
 
@@ -115,6 +116,7 @@ function build_route(data::BirdData, state::GreedyState, school_idx::Int, new_st
     return GreedyState(
         BirdRoute(state.route.id, new_stops),
         state.n_students + new_stop.n_students,
+        state.grade_id,
         new_slack,
         new_stop_times,
         route_time,
@@ -135,7 +137,10 @@ function greedy_routes(data::BirdData, school_idx::Int, max_route_time::Float64;
             best_insert_idx = -1
             best_time_diff = Inf
             for stop_idx in findall(identity, available)
-                if data.stops[school_idx][stop_idx].n_students + state.n_students <= data.params.bus_capacity
+                if (
+                    data.stops[school_idx][stop_idx].grade_id == state.grade_id &&
+                    data.stops[school_idx][stop_idx].n_students + state.n_students <= data.params.bus_capacity
+                )
                     insert_idx, time_diff = best_insertion(data, school_idx, stop_idx, state, max_route_time)
                     if time_diff < best_time_diff
                         best_time_diff = time_diff

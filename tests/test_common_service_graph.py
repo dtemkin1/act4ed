@@ -6,6 +6,7 @@ import pandas as pd
 from shapely import Point
 
 from formulation.common import (
+    Attributes,
     Depot,
     ProblemDataReal,
     School,
@@ -41,8 +42,7 @@ def _make_student(name: str, stop: Stop, school: School) -> Student:
         geographic_location=Point(stop.node_id, school.node_id),
         school=school,
         stop=stop,
-        requires_monitor=False,
-        requires_wheelchair=False,
+        attributes=Attributes(special_ed=False, wheelchair_user=False),
     )
 
 
@@ -274,10 +274,10 @@ class CommonServiceGraphTests(unittest.TestCase):
             students=students,
             prune=5,
             lengths={
-                (stop_a.node_id, stop_b.node_id): 10.0,
-                (stop_b.node_id, stop_a.node_id): 10.0,
-                (stop_a.node_id, school_e.node_id): 10.0,
-                (school_e.node_id, stop_a.node_id): 10.0,
+                (stop_a.node_id, stop_b.node_id): 10_000.0,
+                (stop_b.node_id, stop_a.node_id): 10_000.0,
+                (stop_a.node_id, school_e.node_id): 10_000.0,
+                (school_e.node_id, stop_a.node_id): 10_000.0,
             },
         )._make_service_graph()
 
