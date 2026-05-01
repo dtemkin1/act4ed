@@ -128,6 +128,7 @@ def make_students(
         )
         random_school = schools[random.randint(0, num_schools - 1)]
         student = Student(
+            id=str(i),
             name=f"Student {i}",
             geographic_location=home_location,
             school=random_school,

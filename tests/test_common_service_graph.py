@@ -36,6 +36,7 @@ def _make_depot(name: str, node_id: int) -> Depot:
 
 def _make_student(name: str, stop: Stop, school: School) -> Student:
     return Student(
+        id=name,
         name=name,
         geographic_location=Point(stop.node_id, school.node_id),
         school=school,
@@ -74,7 +75,9 @@ def _make_problem_data(
 
 
 class CommonServiceGraphTests(unittest.TestCase):
-    def test_restrict_to_school_uses_cached_graph_and_keeps_only_relevant_nodes(self) -> None:
+    def test_restrict_to_school_uses_cached_graph_and_keeps_only_relevant_nodes(
+        self,
+    ) -> None:
         stop_a = _make_stop("Stop A", 1)
         stop_b = _make_stop("Stop B", 2)
         stop_c = _make_stop("Stop C", 3)
@@ -96,7 +99,9 @@ class CommonServiceGraphTests(unittest.TestCase):
         _ = problem_data.service_graph
 
         def should_not_recompute(*args, **kwargs):
-            raise AssertionError("restricted view should reuse the cached service graph")
+            raise AssertionError(
+                "restricted view should reuse the cached service graph"
+            )
 
         object.__setattr__(problem_data, "_get_shortest_path_osm", should_not_recompute)
 

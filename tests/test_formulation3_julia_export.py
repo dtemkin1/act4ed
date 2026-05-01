@@ -19,12 +19,12 @@ from formulation.common import (
     Stop,
     Student,
 )
-from formulation.formulation_3.formulation3_gurobipy import build_model_from_definition
+from formulation.formulation_3.gurobipy import build_model_from_definition
 from formulation.formulation_3.julia_export import (
     build_formulation3_numeric_instance,
     export_formulation3_instance,
 )
-from formulation.formulation_3.problem3_definition import (
+from formulation.formulation_3.definition import (
     MILES_TO_KILOMETERS,
     MPH_TO_KILOMETERS_PER_MINUTE,
     Formulation3,
@@ -78,6 +78,7 @@ def _make_tiny_problem(rounds: int = 2) -> Formulation3:
     )
 
     student_a = Student(
+        id="student-a",
         name="student-a",
         geographic_location=Point(1, 1),
         school=school,
@@ -86,6 +87,7 @@ def _make_tiny_problem(rounds: int = 2) -> Formulation3:
         requires_wheelchair=False,
     )
     student_b = Student(
+        id="student-b",
         name="student-b",
         geographic_location=Point(1, -1),
         school=school,
@@ -134,6 +136,7 @@ def _make_tiny_problem_no_sped_with_mixed_bus_types() -> Formulation3:
     )
 
     student = Student(
+        id="student-a",
         name="student-a",
         geographic_location=Point(1, 1),
         school=school,
@@ -178,7 +181,9 @@ def _make_tiny_problem_no_sped_with_mixed_bus_types() -> Formulation3:
 
 
 class Formulation3JuliaExportTests(unittest.TestCase):
-    def test_numeric_instance_has_expected_dimensions_and_one_based_indices(self) -> None:
+    def test_numeric_instance_has_expected_dimensions_and_one_based_indices(
+        self,
+    ) -> None:
         problem = _make_tiny_problem(rounds=2)
 
         instance = build_formulation3_numeric_instance(problem)
@@ -225,8 +230,12 @@ class Formulation3JuliaExportTests(unittest.TestCase):
             self.assertEqual(int(payload["nM"]), 2)
             self.assertEqual(int(payload["nQ"]), 2)
             self.assertEqual(payload["arc_src"].shape, (problem.A.__len__(),))
-            self.assertEqual(payload["bus_start_arc_rows"].shape, payload["bus_start_arc_cols"].shape)
-            self.assertEqual(payload["node_out_arc_rows"].shape, payload["node_out_arc_cols"].shape)
+            self.assertEqual(
+                payload["bus_start_arc_rows"].shape, payload["bus_start_arc_cols"].shape
+            )
+            self.assertEqual(
+                payload["node_out_arc_rows"].shape, payload["node_out_arc_cols"].shape
+            )
             self.assertTrue(np.all(payload["bus_start_arc_rows"] >= 1))
             self.assertTrue(np.all(payload["bus_start_arc_cols"] >= 1))
             self.assertEqual(payload["pickup_node_p"].tolist(), [1])
@@ -259,12 +268,20 @@ class Formulation3JuliaExportTests(unittest.TestCase):
         variables = bundle.variables
         meta = bundle.meta
 
-        self.assertEqual(instance.pickup_node_of_m.tolist(), [idx + 1 for idx in meta["p_idx"]])
-        self.assertEqual(instance.school_node_of_m.tolist(), [idx + 1 for idx in meta["s_idx"]])
+        self.assertEqual(
+            instance.pickup_node_of_m.tolist(), [idx + 1 for idx in meta["p_idx"]]
+        )
+        self.assertEqual(
+            instance.school_node_of_m.tolist(), [idx + 1 for idx in meta["s_idx"]]
+        )
         self.assertEqual(len(variables["z_b"]), instance.nB)
         self.assertEqual(len(variables["z_bq"]), instance.nB * instance.nQ)
-        self.assertEqual(len(variables["x_bqij"]), instance.nB * instance.nQ * instance.nA)
-        self.assertEqual(len(variables["a_mbq"]), instance.nM * instance.nB * instance.nQ)
+        self.assertEqual(
+            len(variables["x_bqij"]), instance.nB * instance.nQ * instance.nA
+        )
+        self.assertEqual(
+            len(variables["a_mbq"]), instance.nM * instance.nB * instance.nQ
+        )
         model.dispose()
 
 

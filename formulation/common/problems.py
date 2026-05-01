@@ -126,6 +126,14 @@ class ProblemData(ABC):
         """all nodes in the problem, including stops, schools, and depots"""
         return self.stops + self.schools + self.depots
 
+    def special_ed_students_in_stop(self, stop: Stop) -> tuple[Student, ...]:
+        """Return students with special educational needs who are assigned to a specific stop."""
+        return tuple(
+            student
+            for student in self.students
+            if student.demographics.special_ed and student.stop == stop
+        )
+
     def sanity_checks(self):
         """perform sanity checks on the transportation network."""
 
@@ -848,6 +856,7 @@ class ProblemDataReal(ProblemData):
             nearest_stop = self._get_nearest_stop(geographic_location)
 
             this_student = Student(
+                id=row["id"],
                 name=f"Student {row['id']}",
                 geographic_location=geographic_location,
                 school=school,

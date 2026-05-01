@@ -190,6 +190,7 @@ class Student(LocationData):
     has a school, stop, and specific needs
     """
 
+    id: str
     school: School
     stop: Stop
     demographics: DemographicInfo
