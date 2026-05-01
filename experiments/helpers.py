@@ -6,7 +6,7 @@ from networkx import MultiDiGraph
 import pandas as pd
 from shapely import Point
 
-from formulation.common.classes import NodeId, Student
+from formulation.common.classes import Attributes, NodeId, Student
 from formulation.common.problems import ProblemDataReal, ProblemDataRealSurrogate
 
 CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
@@ -19,7 +19,7 @@ DATA_FOLDER = CURRENT_FILE_DIR / "data"
 DEPOT_CSV = DATA_FOLDER / "depot.csv"
 SCHOOLS_CSV = DATA_FOLDER / "schools.csv"
 STOPS_CSV = DATA_FOLDER / "stops.csv"
-STUDENTS_CSV = DATA_FOLDER / "students.csv"
+STUDENTS_CSV = DATA_FOLDER / "students_with_special_ed_inferred_w_grades.csv"
 BUSES_CSV = DATA_FOLDER / "buses.csv"
 
 # thresholds
@@ -181,6 +181,12 @@ def get_assigned_students(problem_data: ProblemDataReal) -> tuple[Student, ...]:
         special_ed = "SPED" in row["Student_Program"]
         # am not sure this is how they mark it, follow up
         wheelchair_user = "WHEELCHAIR" in row["Student_Program"]
+        student_id = str(
+            row.get(
+                "Student_District ID",
+                f"{row['Student_First Name']} {row['Student_Last Name']}",
+            )
+        )
         grade = None
         for grade_column in ("Student_Grade", "Grade", "grade"):
             if grade_column in assigned_students.columns and not pd.isna(row[grade_column]):
@@ -189,6 +195,7 @@ def get_assigned_students(problem_data: ProblemDataReal) -> tuple[Student, ...]:
         stop = next(stop for stop in problem_data.stops if stop.name == row["BUS STOP"])
 
         student = Student(
+            id=student_id,
             name=f"{row['Student_First Name']} {row['Student_Last Name']}",
             geographic_location=stop.geographic_location,
             school=next(
@@ -199,7 +206,7 @@ def get_assigned_students(problem_data: ProblemDataReal) -> tuple[Student, ...]:
             stop=next(
                 stop for stop in problem_data.stops if stop.name == row["BUS STOP"]
             ),
-            demographics=DemographicInfo(
+            attributes=Attributes(
                 special_ed=special_ed, wheelchair_user=wheelchair_user
             ),
             grade=grade,
@@ -219,7 +226,7 @@ def plot_special_education_students(problem_data: ProblemDataReal) -> None:
     special_education_students = [
         student
         for student in students
-        if student.demographics.special_ed or student.demographics.wheelchair_user
+        if student.attributes.special_ed or student.attributes.wheelchair_user
     ]
 
     # plot framingham graph with special education students highlighted

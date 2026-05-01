@@ -18,7 +18,7 @@ from formulation.bird_adapter import (
 from formulation.common import (
     Bus,
     BusType,
-    DemographicInfo,
+    Attributes,
     Depot,
     ProblemData,
     School,
@@ -99,7 +99,7 @@ def _build_bird_problem() -> TinyProblemData:
             geographic_location=Point(1, 0),
             school=school_a,
             stop=stop_a,
-            demographics=DemographicInfo(special_ed=False, wheelchair_user=False),
+            attributes=Attributes(special_ed=False, wheelchair_user=False),
         ),
         Student(
             id="student-near-b",
@@ -107,7 +107,7 @@ def _build_bird_problem() -> TinyProblemData:
             geographic_location=Point(2, 0),
             school=school_b,
             stop=stop_b,
-            demographics=DemographicInfo(special_ed=False, wheelchair_user=False),
+            attributes=Attributes(special_ed=False, wheelchair_user=False),
         ),
     ]
     buses = [
@@ -161,11 +161,12 @@ def _build_fleet_aware_bird_problem() -> TinyProblemData:
     )
     students = [
         Student(
+            id="bird-student-a",
             name="bird-student-a",
             geographic_location=Point(1, 0),
             school=school,
             stop=stop,
-            demographics=DemographicInfo(special_ed=False, wheelchair_user=False),
+            attributes=Attributes(special_ed=False, wheelchair_user=False),
         )
     ]
     buses = [
@@ -220,11 +221,12 @@ def _build_formulation_problem() -> TinyProblemData:
         start_time=8 * 60,
     )
     student = Student(
+        id="formulation-student-a",
         name="formulation-student-a",
         geographic_location=Point(1, 0),
         school=school,
         stop=stop,
-        demographics=DemographicInfo(special_ed=False, wheelchair_user=False),
+        attributes=Attributes(special_ed=False, wheelchair_user=False),
     )
     bus = Bus(
         id="formulation-bus-1",

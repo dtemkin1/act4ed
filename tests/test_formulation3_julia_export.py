@@ -12,7 +12,7 @@ from shapely import Point
 from formulation.common import (
     Bus,
     BusType,
-    DemographicInfo,
+    Attributes,
     Depot,
     ProblemData,
     School,
@@ -88,7 +88,7 @@ def _make_tiny_problem(rounds: int = 2) -> Formulation3:
         geographic_location=Point(1, 1),
         school=school,
         stop=stop,
-        demographics=DemographicInfo(special_ed=False, wheelchair_user=False),
+        attributes=Attributes(special_ed=False, wheelchair_user=False),
     )
     student_b = Student(
         id="student-b",
@@ -96,7 +96,7 @@ def _make_tiny_problem(rounds: int = 2) -> Formulation3:
         geographic_location=Point(1, -1),
         school=school,
         stop=stop,
-        demographics=DemographicInfo(special_ed=True, wheelchair_user=True),
+        attributes=Attributes(special_ed=True, wheelchair_user=True),
     )
 
     bus = Bus(
@@ -145,7 +145,7 @@ def _make_tiny_problem_no_sped_with_mixed_bus_types() -> Formulation3:
         geographic_location=Point(1, 1),
         school=school,
         stop=stop,
-        demographics=DemographicInfo(special_ed=False, wheelchair_user=False),
+        attributes=Attributes(special_ed=False, wheelchair_user=False),
     )
 
     standard_bus = Bus(

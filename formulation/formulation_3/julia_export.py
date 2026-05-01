@@ -211,7 +211,7 @@ def _triplet_from_single_mapping(
 def _active_buses_for_julia(problem: Formulation3) -> list[Any]:
     buses = list(problem.B)
     if not any(
-        student.demographics.special_ed or student.demographics.wheelchair_user
+        student.attributes.special_ed or student.attributes.wheelchair_user
         for student in problem.M
     ):
         return [bus for bus in buses if bus.type == BusType.C]
@@ -287,7 +287,7 @@ def build_formulation3_numeric_instance(
         tau_index = school_type_to_idx[school_type]
         tau_of_m.append(tau_index)
         is_flagged_m.append(f_m(student))
-        needs_wheelchair_m.append(int(student.demographics.wheelchair_user))
+        needs_wheelchair_m.append(int(student.attributes.wheelchair_user))
         pickup_row_for_student.append(stop_to_idx[pickup_stop])
         school_row_for_student.append(school_index)
         tau_row_for_student.append(tau_index)

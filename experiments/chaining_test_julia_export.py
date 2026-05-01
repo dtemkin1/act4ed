@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 
 from formulation.common.classes import (
+    Attributes,
     Bus,
     Depot,
     School,
@@ -63,24 +64,24 @@ def build_problem(rounds: int = 1) -> Formulation3:
 
     students_1 = [
         Student(
+            id=f"{i}",
             name=f"Student {i}",
             geographic_location=graph.nodes[stop_node]["location"],
             stop=stop,
             school=school_1,
-            requires_monitor=False,
-            requires_wheelchair=False,
+            attributes=Attributes(special_ed=False, wheelchair_user=False),
         )
         for i in range(20)
     ]
 
     students_2 = [
         Student(
+            id=f"{i + 20}",
             name=f"Student {i + 20}",
             geographic_location=graph.nodes[stop_node]["location"],
             stop=stop,
             school=school_2,
-            requires_monitor=False,
-            requires_wheelchair=False,
+            attributes=Attributes(special_ed=False, wheelchair_user=False),
         )
         for i in range(20)
     ]

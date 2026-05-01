@@ -25,7 +25,7 @@ from formulation.bird_adapter import (
 from formulation.common import (
     Bus,
     BusType,
-    DemographicInfo,
+    Attributes,
     Depot,
     MPH_TO_KM_PER_MIN,
     ProblemData,
@@ -101,7 +101,7 @@ def _make_problem_data() -> TinyProblemData:
             geographic_location=Point(1, 0),
             school=school_a,
             stop=shared_stop,
-            demographics=DemographicInfo(special_ed=False, wheelchair_user=False),
+            attributes=Attributes(special_ed=False, wheelchair_user=False),
         ),
         Student(
             id="conv-b",
@@ -109,7 +109,7 @@ def _make_problem_data() -> TinyProblemData:
             geographic_location=Point(1, 0),
             school=school_b,
             stop=shared_stop,
-            demographics=DemographicInfo(special_ed=False, wheelchair_user=False),
+            attributes=Attributes(special_ed=False, wheelchair_user=False),
         ),
         Student(
             id="sped-a",
@@ -117,7 +117,7 @@ def _make_problem_data() -> TinyProblemData:
             geographic_location=Point(1, 0),
             school=school_a,
             stop=shared_stop,
-            demographics=DemographicInfo(special_ed=True, wheelchair_user=False),
+            attributes=Attributes(special_ed=True, wheelchair_user=False),
         ),
         Student(
             id="wheelchair-a",
@@ -125,7 +125,7 @@ def _make_problem_data() -> TinyProblemData:
             geographic_location=Point(1, 0),
             school=school_a,
             stop=shared_stop,
-            demographics=DemographicInfo(special_ed=True, wheelchair_user=True),
+            attributes=Attributes(special_ed=True, wheelchair_user=True),
         ),
     ]
 
@@ -206,7 +206,7 @@ def _make_reassignment_problem_data() -> TinyProblemData:
             geographic_location=Point(0.0000, 0.0000),
             school=school,
             stop=stop_b,
-            demographics=DemographicInfo(special_ed=False, wheelchair_user=False),
+            attributes=Attributes(special_ed=False, wheelchair_user=False),
         ),
         Student(
             id="student-near-b",
@@ -214,7 +214,7 @@ def _make_reassignment_problem_data() -> TinyProblemData:
             geographic_location=Point(0.0200, 0.0000),
             school=school,
             stop=stop_b,
-            demographics=DemographicInfo(special_ed=False, wheelchair_user=False),
+            attributes=Attributes(special_ed=False, wheelchair_user=False),
         ),
     ]
     buses = [
@@ -266,25 +266,28 @@ def _make_fleet_aware_problem_data() -> TinyProblemData:
     )
     students = [
         Student(
+            id="wheelchair-a",
             name="wheelchair-a",
             geographic_location=Point(1, 0),
             school=school,
             stop=shared_stop,
-            demographics=DemographicInfo(special_ed=True, wheelchair_user=True),
+            attributes=Attributes(special_ed=True, wheelchair_user=True),
         ),
         Student(
+            id="sped-a",
             name="sped-a",
             geographic_location=Point(1, 0),
             school=school,
             stop=shared_stop,
-            demographics=DemographicInfo(special_ed=True, wheelchair_user=False),
+            attributes=Attributes(special_ed=True, wheelchair_user=False),
         ),
         Student(
+            id="conv-a",
             name="conv-a",
             geographic_location=Point(1, 0),
             school=school,
             stop=shared_stop,
-            demographics=DemographicInfo(special_ed=False, wheelchair_user=False),
+            attributes=Attributes(special_ed=False, wheelchair_user=False),
         ),
     ]
     buses = [
@@ -352,19 +355,21 @@ def _make_grade_split_problem_data(bus_count: int = 2) -> TinyProblemData:
     )
     students = [
         Student(
+            id="conv-k",
             name="conv-k",
             geographic_location=Point(1, 0),
             school=school,
             stop=shared_stop,
-            demographics=DemographicInfo(special_ed=False, wheelchair_user=False),
+            attributes=Attributes(special_ed=False, wheelchair_user=False),
             grade="K",
         ),
         Student(
+            id="conv-1",
             name="conv-1",
             geographic_location=Point(1, 0),
             school=school,
             stop=shared_stop,
-            demographics=DemographicInfo(special_ed=False, wheelchair_user=False),
+            attributes=Attributes(special_ed=False, wheelchair_user=False),
             grade="1",
         ),
     ]
@@ -422,18 +427,20 @@ def _make_arrival_window_problem_data() -> TinyProblemData:
     )
     students = [
         Student(
+            id="conv-a",
             name="conv-a",
             geographic_location=Point(1, 0),
             school=school_a,
             stop=stop_a,
-            demographics=DemographicInfo(special_ed=False, wheelchair_user=False),
+            attributes=Attributes(special_ed=False, wheelchair_user=False),
         ),
         Student(
+            id="conv-b",
             name="conv-b",
             geographic_location=Point(2, 0),
             school=school_b,
             stop=stop_b,
-            demographics=DemographicInfo(special_ed=False, wheelchair_user=False),
+            attributes=Attributes(special_ed=False, wheelchair_user=False),
         ),
     ]
     buses = [

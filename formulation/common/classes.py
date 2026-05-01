@@ -50,6 +50,9 @@ class Attributes(NamedTuple):
     wheelchair_user: bool
 
 
+DemographicInfo = Attributes
+
+
 class CensusTractInfo(NamedTuple):
     """demographic info for a student"""
 

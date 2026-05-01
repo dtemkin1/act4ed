@@ -6,7 +6,7 @@ import pandas as pd
 from shapely import Point
 
 from formulation.common import (
-    DemographicInfo,
+    Attributes,
     Depot,
     ProblemDataReal,
     School,
@@ -42,7 +42,7 @@ def _make_student(name: str, stop: Stop, school: School) -> Student:
         geographic_location=Point(stop.node_id, school.node_id),
         school=school,
         stop=stop,
-        demographics=DemographicInfo(special_ed=False, wheelchair_user=False),
+        attributes=Attributes(special_ed=False, wheelchair_user=False),
     )
 
 
