@@ -213,6 +213,40 @@ end
 FeasibleRoute(data::BirdData, school_idx::Int, route::BirdRoute) = FeasibleRoute(route.stops, sum_individual_travel_times(data, school_idx, route))
 
 
+function route_is_assignable(data::BirdData, school_idx::Int, route::FeasibleRoute)
+    isempty(route.stop_ids) && return false
+    isfinite(route.cost) || return false
+    stops = data.stops[school_idx]
+    school = data.schools[school_idx]
+    sum(stops[stop_idx].n_students for stop_idx in route.stop_ids) <= data.params.bus_capacity || return false
+
+    time_on_bus = travel_time(data, stops[route.stop_ids[end]], school)
+    isfinite(time_on_bus) || return false
+    time_on_bus <= max_travel_time(data, stops[route.stop_ids[end]]) || return false
+    time_on_bus += stop_time(data, stops[route.stop_ids[end]])
+    isfinite(time_on_bus) || return false
+
+    next_stop = route.stop_ids[end]
+    for reverse_pos in (length(route.stop_ids) - 1):-1:1
+        stop_idx = route.stop_ids[reverse_pos]
+        time_on_bus += travel_time(data, stops[stop_idx], stops[next_stop])
+        isfinite(time_on_bus) || return false
+        time_on_bus <= max_travel_time(data, stops[stop_idx]) || return false
+        time_on_bus += stop_time(data, stops[stop_idx])
+        isfinite(time_on_bus) || return false
+        next_stop = stop_idx
+    end
+    return true
+end
+
+
+function mark_unassigned_stop!(data::BirdData, school_idx::Int, stop_idx::Int)
+    stop_key = (school_idx, stop_idx)
+    stop_key in data.unassigned_stops || push!(data.unassigned_stops, stop_key)
+    return data
+end
+
+
 mutable struct FeasibleRouteSet
     list::Vector{FeasibleRoute}
     seen::Set{Tuple{Vararg{Int}}}
@@ -223,7 +257,8 @@ end
 FeasibleRouteSet(data::BirdData, school_idx::Int) = FeasibleRouteSet(FeasibleRoute[], Set{Tuple{Vararg{Int}}}(), [Int[] for _ in 1:length(data.stops[school_idx])])
 
 
-function add_route!(routes::FeasibleRouteSet, route::FeasibleRoute)
+function add_route!(data::BirdData, school_idx::Int, routes::FeasibleRouteSet, route::FeasibleRoute)
+    route_is_assignable(data, school_idx, route) || return routes
     key = Tuple(route.stop_ids)
     key in routes.seen && return routes
     push!(routes.seen, key)
@@ -264,10 +299,24 @@ function best_routes(
     optimizer = Gurobi.Optimizer,
     optimizer_attributes = Pair{String, Any}[],
 )
+    constrained_stops = Int[]
+    for stop_idx in 1:length(data.stops[school_idx])
+        if isempty(routes.at_stop[stop_idx])
+            if data.allow_partial
+                mark_unassigned_stop!(data, school_idx, stop_idx)
+            else
+                error("no feasible route candidate covers stop $(stop_idx) for school $(school_idx)")
+            end
+        else
+            push!(constrained_stops, stop_idx)
+        end
+    end
+    isempty(constrained_stops) && return Int[]
+
     model = _make_model(; optimizer = optimizer, optimizer_attributes = optimizer_attributes)
     @variable(model, route_used[1:length(routes.list)], Bin)
     @objective(model, Min, sum(route_used[idx] * (lambda_value + routes.list[idx].cost) for idx in eachindex(routes.list)))
-    @constraint(model, [stop_idx in 1:length(data.stops[school_idx])], sum(route_used[idx] for idx in routes.at_stop[stop_idx]) >= 1)
+    @constraint(model, [stop_idx in constrained_stops], sum(route_used[idx] for idx in routes.at_stop[stop_idx]) >= 1)
     optimize!(model)
     status = termination_status(model)
     status == MOI.OPTIMAL || error("best_routes solve failed with $(status)")
@@ -351,7 +400,7 @@ function greedy_combined(
 )
     routes = FeasibleRouteSet(data, school_idx)
     for route in generate_routes(data, school_idx, n_routes, max_route_time_lower, max_route_time_upper; rng = rng)
-        add_route!(routes, route)
+        add_route!(data, school_idx, routes, route)
     end
     selected = best_routes(data, school_idx, routes, lambda_value; optimizer = optimizer, optimizer_attributes = optimizer_attributes)
     return build_solution(data, school_idx, routes, selected)
@@ -372,10 +421,10 @@ function greedy_combined(
 )
     routes = FeasibleRouteSet(data, school_idx)
     for route in generate_routes(data, school_idx, n_routes, max_route_time_lower, max_route_time_upper; rng = rng)
-        add_route!(routes, route)
+        add_route!(data, school_idx, routes, route)
     end
     for route in start_routes
-        add_route!(routes, FeasibleRoute(data, school_idx, route))
+        add_route!(data, school_idx, routes, FeasibleRoute(data, school_idx, route))
     end
     selected = best_routes(data, school_idx, routes, lambda_value; optimizer = optimizer, optimizer_attributes = optimizer_attributes)
     return build_solution(data, school_idx, routes, selected)

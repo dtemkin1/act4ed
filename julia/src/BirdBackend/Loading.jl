@@ -138,12 +138,13 @@ function load_legacy_benchmark(
         false,
         BirdFleetBus[],
         DEFAULT_LAMBDA_VALUE,
-        [BirdScenario[] for _ in schools],
-        [BirdRoute[] for _ in schools],
-        zeros(Int, length(schools)),
-        BirdBus[],
-        Tuple{Int, Int}[],
-    )
+	        [BirdScenario[] for _ in schools],
+	        [BirdRoute[] for _ in schools],
+	        zeros(Int, length(schools)),
+	        BirdBus[],
+	        Tuple{Int, Int}[],
+	        "lbh",
+	    )
 end
 
 
@@ -196,8 +197,13 @@ function load_instance(path::AbstractString)
     if schema_version >= 9
         push!(keys, "demand_grade_ids")
     end
+    if schema_version >= 12
+        push!(keys, "method_id")
+    end
     data = NPZ.npzread(path, keys)
     default_lambda_value = schema_version >= 2 ? _scalar(data, "lambda_value", Float64) : DEFAULT_LAMBDA_VALUE
+    method_id = schema_version >= 12 ? _scalar(data, "method_id", Int) : 1
+    method = method_id == 1 ? "lbh" : method_id == 2 ? "scenario" : error("unknown Bird solve method id: $(method_id)")
 
     school_start_times = _fvec(data, "school_start_times")
     school_dwell_times = _fvec(data, "school_dwell_times")
@@ -303,8 +309,9 @@ function load_instance(path::AbstractString)
         default_lambda_value,
         [BirdScenario[] for _ in schools],
         [BirdRoute[] for _ in schools],
-        zeros(Int, length(schools)),
-        BirdBus[],
-        Tuple{Int, Int}[],
-    )
+	        zeros(Int, length(schools)),
+	        BirdBus[],
+	        Tuple{Int, Int}[],
+	        method,
+	    )
 end

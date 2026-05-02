@@ -38,35 +38,17 @@ STUDENT_ASSIGN_CSV = OUTPUTS_FOLDER / "student_to_stop_or_school.csv"
 FRAMINGHAM_NAME = "Framingham, Massachusetts, USA"
 
 
-@overload
 def setup(
     problem_name: str,
     place_name: str,
     prune: int | None = None,
-    hexagonal: Literal[False] = False,
-    save_path: Path | None = None,
-    sanity_check: bool = False,
-    precompute_cache: bool = True,
-) -> ProblemDataReal: ...
-
-
-@overload
-def setup(
-    problem_name: str,
-    place_name: str,
-    hexagonal: Literal[True],
-    prune: None = None,
-    save_path: Path | None = None,
-    sanity_check: bool = False,
-    precompute_cache: bool = True,
-) -> ProblemDataRealSurrogate: ...
-
-
-def setup(
-    problem_name: str,
-    place_name: str,
+    schools_path: Path = SCHOOLS_CSV,
+    stops_path: Path = STOPS_CSV,
+    students_path: Path = STUDENTS_CSV,
+    depots_path: Path = DEPOT_CSV,
+    buses_path: Path = BUSES_CSV,
+    boundary_buffer_km: float = BOUNDARY_BUFFER_KM,
     hexagonal: bool = False,
-    prune: int | None = None,
     save_path: Path | None = None,
     sanity_check: bool = False,
     precompute_cache: bool = True,
@@ -79,13 +61,13 @@ def setup(
     except FileNotFoundError:
         problem_data = ProblemDataClass(
             name=problem_name,
-            schools_path=SCHOOLS_CSV,
-            stops_path=STOPS_CSV,
-            students_path=STUDENTS_CSV,
-            depots_path=DEPOT_CSV,
-            buses_path=BUSES_CSV,
+            schools_path=schools_path,
+            stops_path=stops_path,
+            students_path=students_path,
+            depots_path=depots_path,
+            buses_path=buses_path,
             place_name=place_name,
-            boundary_buffer_km=BOUNDARY_BUFFER_KM,
+            boundary_buffer_km=boundary_buffer_km,
             prune=prune,
         )
 
@@ -155,7 +137,7 @@ def make_point_from_node_id(graph: "MultiDiGraph[NodeId]", node_id: NodeId) -> P
     return Point(graph.nodes[node_id]["x"], graph.nodes[node_id]["y"])
 
 
-def make_students_csv(students: tuple[Student, ...], path: Path | None = None) -> None:
+def make_students_csv(students: tuple[Student, ...], path: Path | None = None) -> pd.DataFrame:
     """Helper function to create a CSV file of students from the problem data"""
 
     # id,lon,lat,school_id,is_sp_ed,is_wheelchair_user

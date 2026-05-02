@@ -1,12 +1,27 @@
 mcdp {
-    provides distance [km]
+    provides distance_C [km]
+    provides distance_B [km]
+    provides distance_BWC [km]
+    provides distance_WC [km]
 
     requires fuel_cost [USD]
     requires emissions [kg]
 
-    constant fuel_cost_per_km = 0.60 USD / km
-    constant emissions_per_km = 1.20 kg / km
+    constant school_days = 180
+    constant fuel_cost_per_km = 0.6 USD / km
+    constant emissions_per_km = 1.2 kg / km
 
-    required fuel_cost ≥ provided distance * fuel_cost_per_km
-    required emissions ≥ provided distance * emissions_per_km
+    required fuel_cost ≥ (
+        provided distance_C +
+        provided distance_B +
+        provided distance_BWC +
+        provided distance_WC
+    ) * school_days * fuel_cost_per_km
+
+    required emissions ≥ (
+        provided distance_C +
+        provided distance_B +
+        provided distance_BWC +
+        provided distance_WC
+    ) * school_days * emissions_per_km
 }

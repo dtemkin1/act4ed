@@ -1,0 +1,26 @@
+school_days: 180
+capital_annualization_factor: 1.0
+
+capital:
+  C: 50000
+  B: 70000
+  BWC: 80000
+  WC: 90000
+
+driver_yearly_pay: 50000
+monitor_yearly_pay: 20000
+
+fuel_cost_per_km: 0.60
+emissions_kg_per_km: 1.20
+
+maintenance_distance_factor:
+  C: 0.15
+  B: 0.15
+  BWC: 0.15
+  WC: 0.15
+
+maintenance_runtime_factor:
+  C: 0.0
+  B: 0.0
+  BWC: 0.0
+  WC: 0.0

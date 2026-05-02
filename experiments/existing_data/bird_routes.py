@@ -18,12 +18,16 @@ BIRD_CONFIG = BirdAdapterConfig(
     bus_type="C",
     school_dwell_time=10,
     max_time_on_bus=60,
+    method="scenario",
 )
 
 
 def main() -> None:
     framingham_problem_data = setup_framingham(precompute_cache=True)
-    assigned_students = get_assigned_students(framingham_problem_data)
+    assigned_students = get_assigned_students(
+        framingham_problem_data.schools,
+        framingham_problem_data.stops,
+    )
 
     filtered_problem_data = FilteredProblemData(
         "framingham_filtered",
@@ -53,8 +57,6 @@ def main() -> None:
             str(instance_path),
             "--solution",
             str(solution_path),
-            "--method",
-            "scenario",
         ],
         check=True,
     )

@@ -1,8 +1,17 @@
 mcdp {
-  provides fleet_size [Nat]
+  provides used_C [Nat]
+  provides used_B [Nat]
+  provides used_BWC [Nat]
+  provides used_WC [Nat]
+
   requires driver_cost [USD]
 
-  constant cost_per_bus = 50000 USD
+  constant yearly_pay_per_bus = 50000 USD
 
-  required driver_cost >= provided fleet_size * cost_per_bus
+  required driver_cost >= (
+    provided used_C +
+    provided used_B +
+    provided used_BWC +
+    provided used_WC
+  ) * yearly_pay_per_bus
 }
