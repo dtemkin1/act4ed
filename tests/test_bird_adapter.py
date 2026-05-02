@@ -928,6 +928,7 @@ class BirdAdapterTests(unittest.TestCase):
                 ["school-a:Shared Stop", "school-b:Shared Stop"],
             )
             self.assertEqual(loaded_instance.lambda_value, 4321.0)
+            self.assertEqual(loaded_instance.method, "lbh")
             self.assertFalse(loaded_instance.stop_assignment_enabled)
             self.assertEqual(loaded_instance.stop_assignment_lambda, 1.0e4)
             self.assertIsNone(loaded_instance.max_walking_distance_km)

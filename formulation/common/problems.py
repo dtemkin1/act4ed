@@ -1015,7 +1015,7 @@ class ProblemDataRealSurrogate(ProblemDataReal):
         return f"{self.name}_hex_problem_data"
 
     @classmethod
-    def load(cls, name: str, prune: None = None) -> "ProblemDataReal":
+    def load(cls, name: str, prune: int | None = None) -> "ProblemDataReal":
         """load problem data from disk"""
         prob_name = f"{name}_hex_problem_data"
         return cls.load_path(CACHE_DIR / f"{prob_name}.pkl")
