@@ -62,13 +62,12 @@ function stop_fits_bus(data::BirdData, school_idx::Int, stop_idx::Int, bus::Bird
 end
 
 
-function itinerary_grade_id(data::BirdData, itinerary::Itinerary)
-    return data.stops[itinerary.schools[1]][itinerary.stops[1][1]].grade_id
-end
-
-
-function stop_matches_itinerary_grade(data::BirdData, itinerary::Itinerary, school_idx::Int, stop_idx::Int)
-    return data.stops[school_idx][stop_idx].grade_id == itinerary_grade_id(data, itinerary)
+function stop_matches_existing_school_route_grade(data::BirdData, itinerary::Itinerary, school_idx::Int, stop_idx::Int)
+    school_pos = findfirst(==(school_idx), itinerary.schools)
+    school_pos === nothing && return true
+    existing_stops = itinerary.stops[school_pos]
+    isempty(existing_stops) && return true
+    return data.stops[school_idx][stop_idx].grade_id == data.stops[school_idx][existing_stops[1]].grade_id
 end
 
 
@@ -135,7 +134,7 @@ function build_itinerary_for_bus!(
         for candidate_school in eachindex(available)
             for candidate_stop in findall(identity, available[candidate_school])
                 stop_fits_bus(data, candidate_school, candidate_stop, bus) || continue
-                stop_matches_itinerary_grade(data, itinerary, candidate_school, candidate_stop) || continue
+                stop_matches_existing_school_route_grade(data, itinerary, candidate_school, candidate_stop) || continue
                 under_capacity(data, itinerary, candidate_school, candidate_stop, bus.capacity, bus.wheelchair_capacity) || continue
                 insert_school, insert_stop, cost =
                     use_original_timing ?
@@ -570,7 +569,7 @@ function solve_lbh!(data::BirdData; seed::Int = 1)
             best_cost = Inf
             for candidate_school in eachindex(available)
                 for candidate_stop in findall(identity, available[candidate_school])
-                    stop_matches_itinerary_grade(data, itinerary, candidate_school, candidate_stop) || continue
+                    stop_matches_existing_school_route_grade(data, itinerary, candidate_school, candidate_stop) || continue
                     under_capacity(data, itinerary, candidate_school, candidate_stop) || continue
                     insert_school, insert_stop, cost =
                         use_original_timing ?

@@ -306,7 +306,6 @@ end
 function create_edge!(data::BirdData, graph::DirectedGraph, node1::BusNode, node2::BusNode)
     if (
         node1.depot_id == node2.depot_id &&
-        node1.grade_id == node2.grade_id &&
         node1.school != node2.school &&
         is_feasible_in_time(data, node1.school, node2.school, node2.route, node2.service_time)
     )

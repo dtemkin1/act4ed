@@ -240,7 +240,6 @@ end
 
 function _candidate_route_to_route_feasible(data::BirdData, first::FleetRouteCandidate, second::FleetRouteCandidate)
     first.school == second.school && return false
-    first.grade_id == second.grade_id || return false
     route = BirdRoute(0, second.stops)
     return is_feasible_in_time(data, first.school, second.school, route, second.service_time)
 end
