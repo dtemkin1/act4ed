@@ -2,10 +2,9 @@ mcdp {
   # buses with monitors on them
   provides monitor_buses [Nat]
 
-  # how much each monitor costs
   requires monitor_cost [USD]
 
-  constant cost_per_bus = 20000 USD
+  constant yearly_pay_per_monitor_bus = 20000 USD
 
-  required monitor_cost ≥ provided monitor_buses * cost_per_bus
+  required monitor_cost >= provided monitor_buses * yearly_pay_per_monitor_bus
 }

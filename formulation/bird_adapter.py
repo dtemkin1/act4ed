@@ -28,7 +28,7 @@ from formulation.normalized_result import (
     RoutingSolutionRow,
 )
 
-_BIRD_INSTANCE_SCHEMA_VERSION = 9
+_BIRD_INSTANCE_SCHEMA_VERSION = 12
 _BIRD_SOLUTION_SCHEMA_VERSION = 1
 _DEFAULT_BUS_SPEED_KM_PER_MINUTE = 40 / MPH_TO_KM_PER_MIN
 _DEFAULT_BIRD_LAMBDA_VALUE = 1.0e4
@@ -46,6 +46,12 @@ BirdCohort = Literal[
     "sped_and_wheelchair",
     "wheelchair_no_sped",
 ]
+
+# TODO currently this is not correctly respected in BiRD. I.e. if you set
+# the policy to "route_assigned", it will just flag all buses as having 
+# monitors rather than trying to minimize the amount of monitors.
+MonitorPolicy = Literal["fleet", "route_assigned"]
+OptimizationMethod = Literal["lbh", "scenario"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,6 +73,8 @@ class BirdAdapterConfig:
     fleet_aware: bool = False
     conventional_spillover: bool = False
     allow_partial: bool = False
+    monitor_policy: MonitorPolicy = "fleet"
+    method: OptimizationMethod = "lbh"
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,6 +87,7 @@ class BirdDemandRow:
     service_group: str
     grade: str
     students: int
+    special_ed_students: int
     wheelchair_students: int
     student_names: list[str]
     stop_node_id: int
@@ -119,6 +128,8 @@ class BirdExportInstance:
     fleet_aware: bool
     conventional_spillover: bool
     allow_partial: bool
+    monitor_policy: str
+    method: str
     bus_names: list[str]
     bus_capacities: np.ndarray
     bus_depot_indices: np.ndarray
@@ -197,6 +208,8 @@ class BirdExportInstance:
                 1 if self.allow_partial else 0,
                 dtype=np.int64,
             ),
+            "monitor_policy": _encode_bytes_array([self.monitor_policy]),
+            "method_id": np.asarray(_method_id(self.method), dtype=np.int64),
             "bus_names": _encode_bytes_array(self.bus_names),
             "bus_capacities": self.bus_capacities,
             "bus_depot_indices": self.bus_depot_indices,
@@ -254,6 +267,10 @@ class BirdExportInstance:
             ),
             "demand_students": np.asarray(
                 [row.students for row in self.demand_rows],
+                dtype=np.int64,
+            ),
+            "demand_special_ed_students": np.asarray(
+                [row.special_ed_students for row in self.demand_rows],
                 dtype=np.int64,
             ),
             "demand_wheelchair_students": np.asarray(
@@ -338,6 +355,22 @@ class BirdExportInstance:
                 if schema_version >= 5 and "demand_wheelchair_students" in payload.files
                 else np.zeros(len(demand_students), dtype=np.int64)
             )
+            demand_special_ed_students = (
+                np.asarray(payload["demand_special_ed_students"], dtype=np.int64)
+                if schema_version >= 10
+                and "demand_special_ed_students" in payload.files
+                else np.asarray(
+                    [
+                        students if service_group == "sped" else 0
+                        for students, service_group in zip(
+                            demand_students,
+                            demand_service_groups,
+                            strict=True,
+                        )
+                    ],
+                    dtype=np.int64,
+                )
+            )
             demand_rows = [
                 BirdDemandRow(
                     external_stop_id=external_stop_id,
@@ -350,11 +383,12 @@ class BirdExportInstance:
                     service_group=service_group,
                     grade=grade,
                     students=int(students),
+                    special_ed_students=int(special_ed_students),
                     wheelchair_students=int(wheelchair_students),
                     student_names=student_names,
                     stop_node_id=int(stop_node_id),
                 )
-                for external_stop_id, source_stop_id, stop_name, school_id, service_group, grade, students, wheelchair_students, student_names, stop_node_id in zip(
+                for external_stop_id, source_stop_id, stop_name, school_id, service_group, grade, students, special_ed_students, wheelchair_students, student_names, stop_node_id in zip(
                     _decode_bytes_array(payload["demand_external_stop_ids"]),
                     _decode_bytes_array(payload["demand_source_stop_ids"]),
                     _decode_bytes_array(payload["demand_stop_names"]),
@@ -362,6 +396,7 @@ class BirdExportInstance:
                     demand_service_groups,
                     demand_grades,
                     demand_students,
+                    demand_special_ed_students,
                     demand_wheelchair_students,
                     demand_student_names,
                     np.asarray(payload["demand_stop_node_ids"], dtype=np.int64),
@@ -489,6 +524,16 @@ class BirdExportInstance:
                     int(np.asarray(payload["allow_partial"]).item()) == 1
                     if schema_version >= 6 and "allow_partial" in payload.files
                     else False
+                ),
+                monitor_policy=(
+                    _decode_bytes_array(payload["monitor_policy"])[0]
+                    if schema_version >= 10 and "monitor_policy" in payload.files
+                    else "fleet"
+                ),
+                method=(
+                    _method_from_id(int(np.asarray(payload["method_id"]).item()))
+                    if schema_version >= 12 and "method_id" in payload.files
+                    else "lbh"
                 ),
                 bus_names=bus_names,
                 bus_capacities=bus_capacities,
@@ -641,6 +686,22 @@ def _decode_utf8_array(values: np.ndarray) -> str:
     return bytes(np.asarray(values, dtype=np.uint8).tolist()).decode("utf-8")
 
 
+def _method_id(method: str) -> int:
+    if method == "lbh":
+        return 1
+    if method == "scenario":
+        return 2
+    raise ValueError(f"unknown Bird optimization method {method!r}")
+
+
+def _method_from_id(method_id: int) -> str:
+    if method_id == 1:
+        return "lbh"
+    if method_id == 2:
+        return "scenario"
+    raise ValueError(f"unknown Bird optimization method id {method_id}")
+
+
 def _student_attributes(student: Student):
     attributes = getattr(student, "attributes", None)
     if attributes is None:
@@ -654,6 +715,10 @@ def _student_is_special_ed(student: Student) -> bool:
 
 def _student_is_wheelchair_user(student: Student) -> bool:
     return bool(student.attributes.wheelchair_user)
+
+
+def _student_needs_monitor(student: Student) -> bool:
+    return _student_is_special_ed(student) or _student_is_wheelchair_user(student)
 
 
 def _student_service_group(student: Student) -> str:
@@ -968,12 +1033,19 @@ def build_bird_export_instance(
     )
     if not selected_students:
         raise ValueError(f"no students available for cohort {config.cohort}")
+    if config.monitor_policy not in ("fleet", "route_assigned"):
+        raise ValueError(f"unknown Bird monitor policy {config.monitor_policy!r}")
+
+    def bus_has_monitor(bus: Bus) -> bool:
+        return config.monitor_policy == "route_assigned" or bus.has_monitor
+
     if config.fleet_aware:
         has_wheelchair_students = any(
             _student_is_wheelchair_user(student) for student in selected_students
         )
         if has_wheelchair_students and not any(
-            bus.has_monitor and _wheelchair_capacity_for_bus(bus) > 0 for bus in buses
+            bus_has_monitor(bus) and _wheelchair_capacity_for_bus(bus) > 0
+            for bus in buses
         ):
             raise ValueError(
                 "fleet-aware Bird export has wheelchair students but no monitor bus "
@@ -983,7 +1055,7 @@ def build_bird_export_instance(
             _student_is_special_ed(student) and not _student_is_wheelchair_user(student)
             for student in selected_students
         )
-        if has_sped_students and not any(bus.has_monitor for bus in buses):
+        if has_sped_students and not any(bus_has_monitor(bus) for bus in buses):
             raise ValueError(
                 "fleet-aware Bird export has SPED students but no monitor bus"
             )
@@ -1046,6 +1118,11 @@ def build_bird_export_instance(
                             service_group=service_group,
                             grade=grade,
                             students=len(students_at_stop),
+                            special_ed_students=sum(
+                                1
+                                for student in students_at_stop
+                                if _student_is_special_ed(student)
+                            ),
                             wheelchair_students=sum(
                                 1
                                 for student in students_at_stop
@@ -1105,6 +1182,8 @@ def build_bird_export_instance(
         fleet_aware=config.fleet_aware,
         conventional_spillover=config.conventional_spillover,
         allow_partial=config.allow_partial,
+        monitor_policy=config.monitor_policy,
+        method=config.method,
         bus_names=[bus.name for bus in buses],
         bus_capacities=np.asarray([bus.capacity for bus in buses], dtype=np.int64),
         bus_depot_indices=np.asarray(
@@ -1112,7 +1191,7 @@ def build_bird_export_instance(
             dtype=np.int64,
         ),
         bus_has_monitor=np.asarray(
-            [1 if bus.has_monitor else 0 for bus in buses],
+            [1 if bus_has_monitor(bus) else 0 for bus in buses],
             dtype=np.int64,
         ),
         bus_wheelchair_capacities=np.asarray(
@@ -1262,6 +1341,7 @@ def bird_stop_assignments(
                     "grade": row.grade,
                     "student_names": list(row.student_names),
                     "students": int(row.students),
+                    "special_ed_students": int(row.special_ed_students),
                     "wheelchair_students": int(row.wheelchair_students),
                     "demand_row_index": int(global_demand_idx),
                     "local_stop_id": int(local_stop_id),
@@ -1269,6 +1349,164 @@ def bird_stop_assignments(
             )
 
     return assignments
+
+
+def summarize_bird_solution_for_mcdp(
+    instance: BirdExportInstance,
+    solution: BirdBackendSolution,
+) -> dict[str, object]:
+    """Summarize a BiRD solution into scalar values for routing MCDP catalogues."""
+    demand_rows_by_school = _bird_demand_rows_by_school(instance)
+    demand_count = len(instance.demand_rows)
+    school_count = len(instance.schools)
+
+    rows_by_bus: dict[int, list[int]] = defaultdict(list)
+    for row_idx, bus_id in enumerate(solution.assignment_bus_ids.tolist()):
+        rows_by_bus[int(bus_id)].append(row_idx)
+
+    by_bus: dict[str, dict[str, object]] = {}
+    by_type: dict[str, dict[str, object]] = defaultdict(
+        lambda: {
+            "buses_used": 0,
+            "monitor_buses": 0,
+            "rounds_used": 0,
+            "distance_km": 0.0,
+            "runtime_s": 0.0,
+            "students_served": 0,
+            "sped_students_served": 0,
+            "wheelchair_students_served": 0,
+        }
+    )
+    totals = {
+        "students_served": 0,
+        "sped_students_served": 0,
+        "wheelchair_students_served": 0,
+        "stops_used": 0,
+        "monitor_buses": 0,
+    }
+
+    for bus_id, bus_rows in sorted(rows_by_bus.items()):
+        bus_index = bus_id - 1
+        bus_name = _bird_bus_display_name(instance, bus_id)
+        if 0 <= bus_index < len(instance.bus_type_names):
+            bus_type = instance.bus_type_names[bus_index]
+        else:
+            bus_type = instance.bus_type
+        if 0 <= bus_index < len(instance.bus_depot_indices):
+            depot_index = int(instance.bus_depot_indices[bus_index])
+        else:
+            depot_index = 1
+
+        current_matrix_idx = demand_count + school_count + depot_index
+        distance_km = 0.0
+        runtime_min = 0.0
+        bus_students = 0
+        bus_sped = 0
+        bus_wheelchair = 0
+        bus_stops = 0
+
+        for row_idx in sorted(
+            bus_rows, key=lambda idx: int(solution.assignment_orders[idx])
+        ):
+            school_idx = int(solution.assignment_school_indices[row_idx])
+            school_rows = demand_rows_by_school[school_idx]
+            start = int(solution.assignment_stop_ptr[row_idx])
+            end = int(solution.assignment_stop_ptr[row_idx + 1])
+            local_stop_ids = solution.assignment_stop_values[start:end].tolist()
+            route_rows = [school_rows[int(stop_id) - 1] for stop_id in local_stop_ids]
+
+            if route_rows:
+                first_demand_idx = int(route_rows[0][0])
+                deadhead_time_min = float(
+                    instance.travel_time_min[
+                        current_matrix_idx - 1,
+                        first_demand_idx - 1,
+                    ]
+                )
+            else:
+                deadhead_time_min = 0.0
+
+            distance_km += float(solution.assignment_distance_km[row_idx])
+            runtime_min += deadhead_time_min + float(
+                solution.assignment_service_time_min[row_idx]
+            )
+            bus_students += sum(row.students for _idx, row in route_rows)
+            bus_sped += sum(row.special_ed_students for _idx, row in route_rows)
+            bus_wheelchair += sum(row.wheelchair_students for _idx, row in route_rows)
+            bus_stops += len(route_rows)
+            current_matrix_idx = demand_count + school_idx
+
+        depot_matrix_idx = demand_count + school_count + depot_index
+        if bus_rows:
+            distance_km += float(
+                instance.travel_distance_km[
+                    current_matrix_idx - 1,
+                    depot_matrix_idx - 1,
+                ]
+            )
+            runtime_min += float(
+                instance.travel_time_min[
+                    current_matrix_idx - 1,
+                    depot_matrix_idx - 1,
+                ]
+            )
+
+        needs_monitor = bus_sped > 0 or bus_wheelchair > 0
+        bus_summary = {
+            "bus_name": bus_name,
+            "bus_type": bus_type,
+            "rounds_used": len(bus_rows),
+            "distance_km": distance_km,
+            "runtime_s": runtime_min * 60.0,
+            "students_served": bus_students,
+            "sped_students_served": bus_sped,
+            "wheelchair_students_served": bus_wheelchair,
+            "stops_used": bus_stops,
+            "needs_monitor": needs_monitor,
+        }
+        by_bus[bus_name] = bus_summary
+
+        type_summary = by_type[bus_type]
+        type_summary["buses_used"] = int(type_summary["buses_used"]) + 1
+        type_summary["monitor_buses"] = int(type_summary["monitor_buses"]) + int(
+            needs_monitor
+        )
+        type_summary["rounds_used"] = int(type_summary["rounds_used"]) + len(bus_rows)
+        type_summary["distance_km"] = float(type_summary["distance_km"]) + distance_km
+        type_summary["runtime_s"] = float(type_summary["runtime_s"]) + runtime_min * 60.0
+        type_summary["students_served"] = int(type_summary["students_served"]) + bus_students
+        type_summary["sped_students_served"] = (
+            int(type_summary["sped_students_served"]) + bus_sped
+        )
+        type_summary["wheelchair_students_served"] = (
+            int(type_summary["wheelchair_students_served"]) + bus_wheelchair
+        )
+
+        totals["students_served"] += bus_students
+        totals["sped_students_served"] += bus_sped
+        totals["wheelchair_students_served"] += bus_wheelchair
+        totals["stops_used"] += bus_stops
+        totals["monitor_buses"] += int(needs_monitor)
+
+    unassigned_rows = _bird_unassigned_demand_rows(instance, solution)
+    students_unserved = sum(row.students for row in unassigned_rows)
+    sped_students_unserved = sum(row.special_ed_students for row in unassigned_rows)
+    wheelchair_students_unserved = sum(
+        row.wheelchair_students for row in unassigned_rows
+    )
+
+    return {
+        **totals,
+        "students_unserved": students_unserved,
+        "sped_students_unserved": sped_students_unserved,
+        "wheelchair_students_unserved": wheelchair_students_unserved,
+        "total_distance_km": sum(
+            float(summary["distance_km"]) for summary in by_bus.values()
+        ),
+        "total_runtime_s": sum(float(summary["runtime_s"]) for summary in by_bus.values()),
+        "by_bus": by_bus,
+        "by_type": {key: dict(value) for key, value in by_type.items()},
+    }
 
 
 def normalized_result_from_bird_solution(
@@ -1349,6 +1587,8 @@ def normalized_result_from_bird_solution(
             "fleet_aware": instance.fleet_aware,
             "conventional_spillover": instance.conventional_spillover,
             "allow_partial": instance.allow_partial,
+            "monitor_policy": instance.monitor_policy,
+            "method": instance.method,
             "bus_names": instance.bus_names,
             "bus_capacities": instance.bus_capacities.tolist(),
             "bus_has_monitor": instance.bus_has_monitor.tolist(),
@@ -1372,6 +1612,7 @@ def normalized_result_from_bird_solution(
                     "service_group": row.service_group,
                     "grade": row.grade,
                     "students": row.students,
+                    "special_ed_students": row.special_ed_students,
                     "wheelchair_students": row.wheelchair_students,
                     "student_names": row.student_names,
                     "stop_node_id": row.stop_node_id,

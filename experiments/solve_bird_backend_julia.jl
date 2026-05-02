@@ -7,7 +7,7 @@ function parse_args(args)
     index = 1
     while index <= length(args)
         key = args[index]
-        if !(key in ("--instance", "--solution", "--log-file", "--method", "--seed"))
+        if !(key in ("--instance", "--solution", "--log-file", "--seed"))
             error("unknown argument: $(key)")
         end
         if index == length(args)
@@ -18,7 +18,7 @@ function parse_args(args)
     end
     if !haskey(parsed, "--instance") || !haskey(parsed, "--solution")
         error(
-            "usage: solve_bird_backend_julia.jl --instance <path> --solution <path> [--log-file <path>] [--method lbh|scenario] [--seed <int>]",
+            "usage: solve_bird_backend_julia.jl --instance <path> --solution <path> [--log-file <path>] [--seed <int>]",
         )
     end
     return parsed
@@ -29,7 +29,6 @@ function main(args = ARGS)
     parsed = parse_args(args)
     instance_path = parsed["--instance"]
     solution_path = parsed["--solution"]
-    method = get(parsed, "--method", "scenario")
     log_file = get(parsed, "--log-file", nothing)
     seed = parse(Int, get(parsed, "--seed", "1"))
 
@@ -38,16 +37,16 @@ function main(args = ARGS)
         log_file === nothing ? Pair{String, Any}[] : Pair{String, Any}["LogFile" => log_file]
 
     start_time = time()
-    if method == "lbh"
+    if data.method == "lbh"
         solve_lbh!(data; seed = seed)
-    elseif method == "scenario"
+    elseif data.method == "scenario"
         solve_with_scenarios!(
             data;
             seed = seed,
             optimizer_attributes = optimizer_attributes,
         )
     else
-        error("unknown Bird solve method: $(method)")
+        error("unknown Bird solve method: $(data.method)")
     end
     runtime_seconds = time() - start_time
 
@@ -64,7 +63,7 @@ function main(args = ARGS)
     summary = Dict(
         "instance_path" => instance_path,
         "solution_path" => solution_path,
-        "method" => method,
+        "method" => data.method,
         "status" => solution.status_name,
         "runtime_seconds" => runtime_seconds,
         "buses_used" => solution.buses_used,

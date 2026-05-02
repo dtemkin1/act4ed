@@ -57,8 +57,39 @@ function stop_fits_bus(data::BirdData, school_idx::Int, stop_idx::Int, bus::Bird
     return (
         stop.n_students <= bus.capacity &&
         stop.n_wheelchair <= bus.wheelchair_capacity &&
+        isfinite(travel_time(data, stop, data.schools[school_idx])) &&
         travel_time(data, stop, data.schools[school_idx]) <= max_travel_time(data, stop)
     )
+end
+
+
+function stop_fits_homogeneous_bus(data::BirdData, school_idx::Int, stop_idx::Int)
+    stop = data.stops[school_idx][stop_idx]
+    time_to_school = travel_time(data, stop, data.schools[school_idx])
+    return (
+        stop.n_students <= data.params.bus_capacity &&
+        isfinite(time_to_school) &&
+        time_to_school <= max_travel_time(data, stop)
+    )
+end
+
+
+function filter_unassignable_homogeneous_stops!(data::BirdData, available::Vector{BitVector})
+    for school_idx in eachindex(available)
+        for stop_idx in findall(identity, available[school_idx])
+            stop_fits_homogeneous_bus(data, school_idx, stop_idx) && continue
+            if data.allow_partial
+                available[school_idx][stop_idx] = false
+                mark_unassigned_stop!(data, school_idx, stop_idx)
+            else
+                stop = data.stops[school_idx][stop_idx]
+                error(
+                    "infeasible Bird demand: stop $(stop.external_id) for school $(school_idx) cannot be served by one homogeneous bus within capacity and max ride time",
+                )
+            end
+        end
+    end
+    return available
 end
 
 
@@ -560,6 +591,7 @@ function solve_lbh!(data::BirdData; seed::Int = 1)
     buses = BirdBus[]
     routes = [BirdRoute[] for _ in data.schools]
     available = [trues(length(data.stops[idx])) for idx in eachindex(data.schools)]
+    filter_unassignable_homogeneous_stops!(data, available)
     use_original_timing = uses_original_dwell_timing(data)
     while any(any(mask) for mask in available)
         school_idx, stop_idx = random_stop(available; rng = rng)

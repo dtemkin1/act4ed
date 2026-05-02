@@ -1,7 +1,8 @@
 dp {
-    provides fleet_size [Nat]
-    provides student_capacity [Nat]
-    provides wheelchair_buses [Nat]
+    provides available_C [Nat]
+    provides available_B [Nat]
+    provides available_BWC [Nat]
+    provides available_WC [Nat]
 
     requires capital_cost [USD]
 

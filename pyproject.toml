@@ -38,6 +38,7 @@ dependencies = [
     "pytest>=9.0.3",
     "haversine>=2.9.0",
     "juliacall>=0.9.31",
+    "dotenv>=0.9.9",
 ]
 
 [tool.uv]

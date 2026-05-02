@@ -1,5 +1,5 @@
 const MOI = MathOptInterface
-const BIRD_INSTANCE_SCHEMA_VERSION = 9
+const BIRD_INSTANCE_SCHEMA_VERSION = 12
 const BIRD_SOLUTION_SCHEMA_VERSION = 1
 const DEFAULT_LAMBDA_VALUE = 1.0e4
 const BIRD_TIMING_EPS = 1.0e-6
@@ -117,6 +117,7 @@ mutable struct BirdData
     used_scenario::Vector{Int}
     buses::Vector{BirdBus}
     unassigned_stops::Vector{Tuple{Int, Int}}
+    method::String
 end
 
 

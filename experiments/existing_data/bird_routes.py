@@ -25,8 +25,7 @@ BIRD_CONFIG = BirdAdapterConfig(
     school_dwell_time=10,
     stop_time_per_student=0.1,
     max_time_on_bus=60,
-    earliest_arrival_buffer=30,
-    allow_partial=True,
+    method="scenario",
 )
 EXISTING_ROUTES_OUTPUT = OUTPUTS_FOLDER / "existing_routes"
 SOLVE_BIRD_BACKEND_PATH = CURRENT_FILE_DIR / ".." / "solve_bird_backend_julia.jl"
@@ -56,8 +55,6 @@ def get_bird_routes(
             str(instance_path),
             "--solution",
             str(solution_path),
-            "--method",
-            "lbh",
         ],
         check=True,
     )

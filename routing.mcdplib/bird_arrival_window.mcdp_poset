@@ -1,0 +1,3 @@
+poset {
+    arrival_default arrival_early30_late10
+}

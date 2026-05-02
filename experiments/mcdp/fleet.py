@@ -5,7 +5,11 @@ import yaml
 
 import pandas as pd
 
-from formulation.common.classes import Bus, BusType, Depot
+from formulation.common.classes import (
+    Bus,
+    BusType,
+    Depot,
+)
 
 CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 
@@ -57,8 +61,8 @@ def get_all_fleet_data():
     fleet_data: list[Bus] = []
     for _, row in buses_df.iterrows():
         bus = Bus(
-            name=row["id"],
             id=row["id"],
+            name=row["num"],
             capacity=row["capacity"],
             range=row["range"],
             depot=depot,

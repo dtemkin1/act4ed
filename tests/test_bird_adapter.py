@@ -21,6 +21,7 @@ from formulation.bird_adapter import (
     bird_student_assignments,
     build_bird_export_instance,
     normalized_result_from_bird_solution,
+    summarize_bird_solution_for_mcdp,
 )
 from formulation.common import (
     Bus,
@@ -480,6 +481,69 @@ def _make_arrival_window_problem_data() -> TinyProblemData:
     )
 
 
+def _make_unreachable_stop_problem_data() -> TinyProblemData:
+    depot = Depot(name="Depot A", geographic_location=Point(0, 0), node_id=100)
+    reachable_stop = Stop(name="Reachable Stop", geographic_location=Point(1, 0), node_id=101)
+    unreachable_stop = Stop(name="Unreachable Stop", geographic_location=Point(2, 0), node_id=102)
+    school = School(
+        name="School A",
+        geographic_location=Point(3, 0),
+        node_id=103,
+        id="school-a",
+        type=SchoolType.E,
+        start_time=8 * 60,
+    )
+    students = [
+        Student(
+            id="reachable",
+            name="reachable",
+            geographic_location=Point(1, 0),
+            school=school,
+            stop=reachable_stop,
+            attributes=Attributes(special_ed=False, wheelchair_user=False),
+            grade="K",
+        ),
+        Student(
+            id="unreachable",
+            name="unreachable",
+            geographic_location=Point(2, 0),
+            school=school,
+            stop=unreachable_stop,
+            attributes=Attributes(special_ed=False, wheelchair_user=False),
+            grade="K",
+        ),
+    ]
+    buses = [
+        Bus(
+            id="bus-c-1",
+            name="bus-c-1",
+            capacity=40,
+            range=25,
+            has_wheelchair_access=False,
+            depot=depot,
+            type=BusType.C,
+        )
+    ]
+    graph = nx.MultiDiGraph()
+    for (src, dst), length in {
+        (100, 101): 1.0,
+        (100, 102): 1.0,
+        (101, 103): 1.0,
+        (103, 100): 1.0,
+    }.items():
+        graph.add_edge(src, dst, key=0, length=length, path=[src, dst])
+
+    return TinyProblemData(
+        name="bird-adapter-unreachable-stop",
+        _service_graph=graph,
+        _stops=[reachable_stop, unreachable_stop],
+        _schools=[school],
+        _depots=[depot],
+        _students=students,
+        _buses=buses,
+    )
+
+
 class BirdAdapterTests(unittest.TestCase):
     def test_default_speed_is_km_per_minute(self) -> None:
         self.assertAlmostEqual(
@@ -562,16 +626,104 @@ class BirdAdapterTests(unittest.TestCase):
                     row.external_stop_id,
                     row.service_group,
                     row.students,
+                    row.special_ed_students,
                     row.wheelchair_students,
                 )
                 for row in instance.demand_rows
             ],
             [
-                ("wheelchair:school-a:Shared Stop", "wheelchair", 1, 1),
-                ("sped:school-a:Shared Stop", "sped", 1, 0),
-                ("conventional:school-a:Shared Stop", "conventional", 1, 0),
+                ("wheelchair:school-a:Shared Stop", "wheelchair", 1, 1, 1),
+                ("sped:school-a:Shared Stop", "sped", 1, 1, 0),
+                ("conventional:school-a:Shared Stop", "conventional", 1, 0, 0),
             ],
         )
+
+    def test_route_assigned_monitor_policy_marks_all_buses_monitor_capable(
+        self,
+    ) -> None:
+        problem_data = _make_fleet_aware_problem_data()
+
+        instance = build_bird_export_instance(
+            problem_data,
+            BirdAdapterConfig(
+                cohort="all",
+                fleet_aware=True,
+                monitor_policy="route_assigned",
+            ),
+        )
+
+        self.assertEqual(instance.monitor_policy, "route_assigned")
+        np.testing.assert_array_equal(instance.bus_has_monitor, [1, 1, 1])
+        self.assertEqual(
+            [row.special_ed_students for row in instance.demand_rows],
+            [1, 1, 0],
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            instance_path = Path(tmpdir) / "bird_instance.npz"
+            instance.save(instance_path)
+            loaded_instance = BirdExportInstance.load(instance_path)
+
+        self.assertEqual(loaded_instance.monitor_policy, "route_assigned")
+        np.testing.assert_array_equal(loaded_instance.bus_has_monitor, [1, 1, 1])
+        self.assertEqual(
+            [row.special_ed_students for row in loaded_instance.demand_rows],
+            [1, 1, 0],
+        )
+
+    def test_mcdp_summary_counts_overlapping_categories_and_type_telemetry(
+        self,
+    ) -> None:
+        problem_data = _make_fleet_aware_problem_data()
+        instance = build_bird_export_instance(
+            problem_data,
+            BirdAdapterConfig(
+                cohort="all",
+                fleet_aware=True,
+                monitor_policy="route_assigned",
+                speed_km_per_minute=1.0,
+            ),
+        )
+        solution = BirdBackendSolution(
+            status="OPTIMAL",
+            objective_value=1.0,
+            runtime_seconds=2.5,
+            buses_used=2,
+            total_distance_km=37.0,
+            total_service_time_min=12.0,
+            assignment_bus_ids=np.asarray([1, 2], dtype=np.int64),
+            assignment_orders=np.asarray([0, 0], dtype=np.int64),
+            assignment_school_indices=np.asarray([1, 1], dtype=np.int64),
+            assignment_arrival_times=np.asarray([450.0, 455.0], dtype=np.float64),
+            assignment_distance_km=np.asarray([10.0, 12.0], dtype=np.float64),
+            assignment_service_time_min=np.asarray([5.0, 7.0], dtype=np.float64),
+            assignment_stop_ptr=np.asarray([0, 2, 3], dtype=np.int64),
+            assignment_stop_values=np.asarray([2, 3, 1], dtype=np.int64),
+        )
+
+        summary = summarize_bird_solution_for_mcdp(instance, solution)
+
+        self.assertEqual(summary["students_served"], 3)
+        self.assertEqual(summary["sped_students_served"], 2)
+        self.assertEqual(summary["wheelchair_students_served"], 1)
+        self.assertEqual(summary["students_unserved"], 0)
+        self.assertEqual(summary["sped_students_unserved"], 0)
+        self.assertEqual(summary["wheelchair_students_unserved"], 0)
+        self.assertEqual(summary["stops_used"], 3)
+        self.assertEqual(summary["monitor_buses"], 2)
+
+        by_type = summary["by_type"]
+        self.assertEqual(by_type["C"]["buses_used"], 1)
+        self.assertEqual(by_type["C"]["students_served"], 2)
+        self.assertEqual(by_type["C"]["sped_students_served"], 1)
+        self.assertAlmostEqual(by_type["C"]["distance_km"], 17.0)
+        self.assertAlmostEqual(by_type["C"]["runtime_s"], 1020.0)
+        self.assertEqual(by_type["BWC"]["buses_used"], 1)
+        self.assertEqual(by_type["BWC"]["students_served"], 1)
+        self.assertEqual(by_type["BWC"]["sped_students_served"], 1)
+        self.assertEqual(by_type["BWC"]["wheelchair_students_served"], 1)
+        self.assertAlmostEqual(by_type["BWC"]["distance_km"], 20.0)
+        self.assertAlmostEqual(by_type["BWC"]["runtime_s"], 1260.0)
 
     def test_export_splits_same_stop_school_service_group_by_grade(self) -> None:
         problem_data = _make_grade_split_problem_data()
@@ -776,6 +928,7 @@ class BirdAdapterTests(unittest.TestCase):
                 ["school-a:Shared Stop", "school-b:Shared Stop"],
             )
             self.assertEqual(loaded_instance.lambda_value, 4321.0)
+            self.assertEqual(loaded_instance.method, "lbh")
             self.assertFalse(loaded_instance.stop_assignment_enabled)
             self.assertEqual(loaded_instance.stop_assignment_lambda, 1.0e4)
             self.assertIsNone(loaded_instance.max_walking_distance_km)
@@ -859,7 +1012,11 @@ class BirdAdapterTests(unittest.TestCase):
         problem_data = _make_problem_data()
         instance = build_bird_export_instance(
             problem_data,
-            BirdAdapterConfig(cohort="conventional", bus_type="C"),
+            BirdAdapterConfig(
+                cohort="conventional", 
+                bus_type="C",
+                method="lbh"
+            ),
         )
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -876,8 +1033,6 @@ class BirdAdapterTests(unittest.TestCase):
                     str(instance_path),
                     "--solution",
                     str(solution_path),
-                    "--method",
-                    "lbh",
                 ],
                 check=True,
                 cwd=Path(__file__).resolve().parents[1],
@@ -899,7 +1054,7 @@ class BirdAdapterTests(unittest.TestCase):
         problem_data = _make_fleet_aware_problem_data()
         instance = build_bird_export_instance(
             problem_data,
-            BirdAdapterConfig(cohort="all", fleet_aware=True),
+            BirdAdapterConfig(cohort="all", fleet_aware=True, method="lbh"),
         )
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -916,8 +1071,6 @@ class BirdAdapterTests(unittest.TestCase):
                     str(instance_path),
                     "--solution",
                     str(solution_path),
-                    "--method",
-                    "lbh",
                 ],
                 check=True,
                 cwd=Path(__file__).resolve().parents[1],
@@ -943,7 +1096,7 @@ class BirdAdapterTests(unittest.TestCase):
         problem_data = _make_fleet_aware_problem_data()
         instance = build_bird_export_instance(
             problem_data,
-            BirdAdapterConfig(cohort="all", fleet_aware=True),
+            BirdAdapterConfig(cohort="all", fleet_aware=True, method="scenario"),
         )
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -960,8 +1113,6 @@ class BirdAdapterTests(unittest.TestCase):
                     str(instance_path),
                     "--solution",
                     str(solution_path),
-                    "--method",
-                    "scenario",
                 ],
                 check=True,
                 cwd=Path(__file__).resolve().parents[1],
@@ -992,6 +1143,7 @@ class BirdAdapterTests(unittest.TestCase):
                 bus_type="BWC",
                 fleet_aware=True,
                 allow_partial=True,
+                method="lbh"
             ),
         )
 
@@ -1009,8 +1161,6 @@ class BirdAdapterTests(unittest.TestCase):
                     str(instance_path),
                     "--solution",
                     str(solution_path),
-                    "--method",
-                    "lbh",
                 ],
                 check=True,
                 cwd=Path(__file__).resolve().parents[1],
@@ -1051,6 +1201,7 @@ class BirdAdapterTests(unittest.TestCase):
                 bus_type="BWC",
                 fleet_aware=True,
                 allow_partial=True,
+                method="scenario"
             ),
         )
 
@@ -1068,8 +1219,6 @@ class BirdAdapterTests(unittest.TestCase):
                     str(instance_path),
                     "--solution",
                     str(solution_path),
-                    "--method",
-                    "scenario",
                 ],
                 check=True,
                 cwd=Path(__file__).resolve().parents[1],
@@ -1093,18 +1242,24 @@ class BirdAdapterTests(unittest.TestCase):
             ["sped", "conventional"],
         )
 
-    def test_julia_lbh_driver_does_not_mix_grades_within_one_school_route(self) -> None:
+    def test_julia_scenario_driver_reports_partial_nonfleet_unreachable_stops(
+        self,
+    ) -> None:
         julia = shutil.which("julia")
         if julia is None:
             self.skipTest("julia executable not available")
 
-        problem_data = _make_grade_split_problem_data(bus_count=1)
+        problem_data = _make_unreachable_stop_problem_data()
         instance = build_bird_export_instance(
             problem_data,
             BirdAdapterConfig(
                 cohort="conventional",
-                fleet_aware=True,
+                bus_type="C",
                 allow_partial=True,
+                constant_stop_time=0.0,
+                stop_time_per_student=0.0,
+                speed_km_per_minute=1.0,
+                method="scenario"
             ),
         )
 
@@ -1122,8 +1277,103 @@ class BirdAdapterTests(unittest.TestCase):
                     str(instance_path),
                     "--solution",
                     str(solution_path),
-                    "--method",
-                    "lbh",
+                    "--seed",
+                    "1",
+                ],
+                check=True,
+                cwd=Path(__file__).resolve().parents[1],
+            )
+
+            solution = BirdBackendSolution.load(solution_path)
+            normalized = normalized_result_from_bird_solution(instance, solution)
+
+        self.assertEqual(solution.status, "PARTIAL")
+        self.assertEqual(solution.buses_used, 1)
+        self.assertEqual(solution.unassigned_school_indices.tolist(), [1])
+        self.assertEqual(solution.unassigned_stop_indices.tolist(), [2])
+        self.assertEqual(normalized.metadata["unassigned_students"], ["unreachable"])
+
+    def test_julia_lbh_driver_reports_partial_nonfleet_unreachable_stops(
+        self,
+    ) -> None:
+        julia = shutil.which("julia")
+        if julia is None:
+            self.skipTest("julia executable not available")
+
+        problem_data = _make_unreachable_stop_problem_data()
+        instance = build_bird_export_instance(
+            problem_data,
+            BirdAdapterConfig(
+                cohort="conventional",
+                bus_type="C",
+                allow_partial=True,
+                constant_stop_time=0.0,
+                stop_time_per_student=0.0,
+                speed_km_per_minute=1.0,
+                method="lbh",
+            ),
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            instance_path = Path(tmpdir) / "bird_instance.npz"
+            solution_path = Path(tmpdir) / "bird_solution.npz"
+            instance.save(instance_path)
+
+            subprocess.run(
+                [
+                    julia,
+                    "--project=julia",
+                    "experiments/solve_bird_backend_julia.jl",
+                    "--instance",
+                    str(instance_path),
+                    "--solution",
+                    str(solution_path),
+                    "--seed",
+                    "1",
+                ],
+                check=True,
+                cwd=Path(__file__).resolve().parents[1],
+            )
+
+            solution = BirdBackendSolution.load(solution_path)
+            normalized = normalized_result_from_bird_solution(instance, solution)
+
+        self.assertEqual(solution.status, "PARTIAL")
+        self.assertEqual(solution.buses_used, 1)
+        self.assertEqual(solution.unassigned_school_indices.tolist(), [1])
+        self.assertEqual(solution.unassigned_stop_indices.tolist(), [2])
+        self.assertEqual(normalized.metadata["unassigned_students"], ["unreachable"])
+
+    def test_julia_lbh_driver_does_not_mix_grades_within_one_school_route(self) -> None:
+        julia = shutil.which("julia")
+        if julia is None:
+            self.skipTest("julia executable not available")
+
+        problem_data = _make_grade_split_problem_data(bus_count=1)
+        instance = build_bird_export_instance(
+            problem_data,
+            BirdAdapterConfig(
+                cohort="conventional",
+                fleet_aware=True,
+                allow_partial=True,
+                method="lbh"
+            ),
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            instance_path = Path(tmpdir) / "bird_instance.npz"
+            solution_path = Path(tmpdir) / "bird_solution.npz"
+            instance.save(instance_path)
+
+            subprocess.run(
+                [
+                    julia,
+                    "--project=julia",
+                    "experiments/solve_bird_backend_julia.jl",
+                    "--instance",
+                    str(instance_path),
+                    "--solution",
+                    str(solution_path),
                     "--seed",
                     "1",
                 ],
@@ -1159,6 +1409,7 @@ class BirdAdapterTests(unittest.TestCase):
                 cohort="conventional",
                 fleet_aware=True,
                 allow_partial=True,
+                method="scenario"
             ),
         )
 
@@ -1176,8 +1427,6 @@ class BirdAdapterTests(unittest.TestCase):
                     str(instance_path),
                     "--solution",
                     str(solution_path),
-                    "--method",
-                    "scenario",
                     "--seed",
                     "1",
                 ],
@@ -1215,6 +1464,7 @@ class BirdAdapterTests(unittest.TestCase):
             constant_stop_time=0.0,
             stop_time_per_student=0.0,
             speed_km_per_minute=1.0,
+            method="lbh"
         )
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1235,8 +1485,6 @@ class BirdAdapterTests(unittest.TestCase):
                     str(fixed_instance_path),
                     "--solution",
                     str(fixed_solution_path),
-                    "--method",
-                    "lbh",
                     "--seed",
                     "1",
                 ],
@@ -1264,8 +1512,6 @@ class BirdAdapterTests(unittest.TestCase):
                     str(wide_instance_path),
                     "--solution",
                     str(wide_solution_path),
-                    "--method",
-                    "lbh",
                     "--seed",
                     "1",
                 ],
@@ -1310,6 +1556,7 @@ class BirdAdapterTests(unittest.TestCase):
                 constant_stop_time=0.0,
                 stop_time_per_student=0.0,
                 speed_km_per_minute=1.0,
+                method="scenario"
             ),
         )
 
@@ -1327,8 +1574,6 @@ class BirdAdapterTests(unittest.TestCase):
                     str(instance_path),
                     "--solution",
                     str(solution_path),
-                    "--method",
-                    "scenario",
                     "--seed",
                     "1",
                 ],

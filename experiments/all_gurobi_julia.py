@@ -223,6 +223,7 @@ def _solve_with_bird(
         fleet_aware=fleet_aware,
         conventional_spillover=conventional_spillover,
         allow_partial=allow_partial,
+        method=method,
     )
     instance_path = export_bird_instance(
         problem_data,
@@ -242,8 +243,6 @@ def _solve_with_bird(
         str(instance_path),
         "--solution",
         str(solution_path),
-        "--method",
-        method,
         "--log-file",
         str(log_file),
     ]

@@ -233,3 +233,6 @@ rico_data
 bird/
 data/
 out-*
+
+# Generated MCDPL files
+**/*.dpc.yaml
