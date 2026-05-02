@@ -121,7 +121,8 @@ def get_rows() -> list[SamplingTable]:
 
             print("Running implementation", i, "with phi =", phi, "and rounds =", r)
 
-            model, vals = build_model_from_definition(formulation)
+            bundle = build_model_from_definition(formulation)
+            model, vals = bundle.model, bundle.variables
             # dont run on local with 64 gb...
             solve_problem(model)
 
@@ -151,7 +152,7 @@ def get_rows() -> list[SamplingTable]:
                 if z_b[b].X > 0.5:
                     buses_total += 1
                     total_bus_capacity += bus.capacity
-                    if bus.has_wheelchair_access:
+                    if bus.wheelchair_capacity > 0:
                         buses_with_wheelchair_access += 1
                     if r_bmon[b].X > 0.5:
                         buses_with_monitors += 1
@@ -185,8 +186,8 @@ def get_rows() -> list[SamplingTable]:
             result = SamplingTable(
                 implementation=[b for b in range(len(B)) if z_b[b].X > 0.5],
                 fixed_functionality=[
-                    student
-                    for m, student in enumerate(problem_data.students)
+                    m
+                    for m, _ in enumerate(problem_data.students)
                     if any(a_mbq[m, b, q].X > 0.5 for b in range(len(B)) for q in Q)
                 ],
                 minimal_resources=(

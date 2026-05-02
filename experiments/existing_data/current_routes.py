@@ -3,8 +3,9 @@ from datetime import time
 from typing import TypedDict
 
 import osmnx as ox
-import matplotlib.pyplot as plt
 import matplotlib as mpl
+from matplotlib.figure import Figure
+from matplotlib.axes import Axes
 
 from experiments.helpers import (
     OUTPUTS_FOLDER,
@@ -193,7 +194,7 @@ def get_existing_routes(
 
 def plot_existing_routes(
     routes: list[RouteResult], problem_data: ProblemData
-) -> tuple[plt.Figure, plt.Axes]:
+) -> tuple[Figure, Axes]:
 
     graph = problem_data.base_graph
     service_graph = problem_data.service_graph
@@ -241,7 +242,7 @@ def plot_existing_routes(
         ox.plot_graph_route(
             graph,
             all_nodes,
-            route_color=colormap(i / len(routes)),
+            route_color=colormap(i / len(routes)),  # type: ignore
             orig_dest_size=0,
             ax=ax,
             route_alpha=0.2,

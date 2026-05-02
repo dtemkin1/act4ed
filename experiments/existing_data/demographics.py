@@ -43,7 +43,7 @@ def get_attributes_of_stops(
 
 def main() -> None:
     problem_data = setup_framingham()
-    assigned_students = get_assigned_students(problem_data)
+    assigned_students = get_assigned_students(problem_data.schools, problem_data.stops)
 
     attributes_of_stops = get_attributes_of_stops(problem_data, assigned_students)
 

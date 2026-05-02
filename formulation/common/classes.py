@@ -4,7 +4,7 @@ from functools import cache, cached_property
 import json
 import os
 from random import random
-from typing import NamedTuple
+from typing import NamedTuple, cast
 
 from dotenv import load_dotenv
 import re
@@ -84,7 +84,7 @@ _CACHE_CENSUS_DEMOGRAPHIC = CACHE_DIR / "census_demographics_cache.json"
 
 
 @cache
-def _get_census_geocode(x: float, y: float) -> CensusGeoData:
+def _get_census_geocode(x: float, y: float) -> CensusGeoData | None:
     """get census geocode for a location"""
 
     if not _CACHE_CENSUS_GEOCODE.is_file():
@@ -102,7 +102,8 @@ def _get_census_geocode(x: float, y: float) -> CensusGeoData:
         )
 
     try:
-        geo: cg.censusgeocode.GeographyResult = cg.coordinates(x, y)
+        geo = cg.coordinates(x, y)
+        geo = cast(cg.censusgeocode.GeographyResult, geo)
     except ValueError:
         return None
 
@@ -132,7 +133,9 @@ def _get_census_geocode(x: float, y: float) -> CensusGeoData:
 
 
 @cache
-def _get_census_tract_info(state: str, county: str, tract: str) -> CensusTractInfo:
+def _get_census_tract_info(
+    state: str, county: str, tract: str
+) -> CensusTractInfo | None:
     """get demographic info for a census tract"""
 
     if not _CACHE_CENSUS_DEMOGRAPHIC.is_file():
@@ -227,7 +230,7 @@ class LocationData(Base):
         )
 
     @cached_property
-    def census_data(self) -> CensusTractInfo:
+    def census_data(self) -> CensusTractInfo | None:
         """get relevant census data for this location"""
 
         geo = self.census_geo
@@ -281,9 +284,6 @@ class School(NodeLocationData):
     start_time: int
     """mins from midnight"""
 
-    def __str__(self):
-        return self.name
-
 
 @dataclass(frozen=True)
 class Bus(Base):
@@ -295,7 +295,7 @@ class Bus(Base):
     id: str
     capacity: int
     range: float
-    has_wheelchair_access: bool
+    wheelchair_capacity: int
     depot: Depot
     type: BusType | None = None
 
@@ -307,9 +307,6 @@ class Bus(Base):
     @property
     def has_monitor(self) -> bool:
         return re.fullmatch(r"M\d{2}", self.name) is not None
-
-    def __str__(self):
-        return self.name
 
 
 @dataclass(frozen=True)
@@ -345,14 +342,11 @@ class Student(LocationData):
             if census_data.total_language_at_home > 0
             else False
         )
-        car_owning_household = (
+        not_car_owning_household = (
             random()
             < (
-                1
-                - (
-                    census_data.not_car_owning_households
-                    / census_data.total_vehicle_households
-                )
+                census_data.not_car_owning_households
+                / census_data.total_vehicle_households
             )
             if census_data.total_vehicle_households > 0
             else False
@@ -360,12 +354,8 @@ class Student(LocationData):
 
         return CensusDemographics(
             english_at_home=english_at_home,
-            car_owning_household=car_owning_household,
+            not_car_owning_household=not_car_owning_household,
         )
-
-    @cached_property
-    def __str__(self):
-        return self.name
 
 
 Place = School | Depot | Stop

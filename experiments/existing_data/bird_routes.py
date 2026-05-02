@@ -1,3 +1,5 @@
+import os
+from pathlib import Path
 import subprocess
 
 from experiments.existing_data.utils import get_assigned_students
@@ -13,12 +15,20 @@ from formulation.bird_adapter import (
     normalized_result_from_bird_solution,
 )
 
+CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
+
 BIRD_CONFIG = BirdAdapterConfig(
     cohort="conventional",
-    bus_type="C",
+    # bus_type="C",
+    fleet_aware=True,
     school_dwell_time=10,
+    stop_time_per_student=0.1,
     max_time_on_bus=60,
+    earliest_arrival_buffer=30,
+    allow_partial=True,
 )
+
+SOLVE_BIRD_BACKEND_PATH = CURRENT_FILE_DIR / ".." / "solve_bird_backend_julia.jl"
 
 
 def main() -> None:
@@ -50,13 +60,13 @@ def main() -> None:
         [
             "julia",
             "--project=julia",
-            "experiments/solve_bird_backend_julia.jl",
+            str(SOLVE_BIRD_BACKEND_PATH),
             "--instance",
             str(instance_path),
             "--solution",
             str(solution_path),
             "--method",
-            "scenario",
+            "lbh",
         ],
         check=True,
     )

@@ -1,6 +1,7 @@
 from dataclasses import replace
 from random import random
 
+from matplotlib.colors import Normalize
 import matplotlib.pyplot as plt
 
 from experiments.helpers import (
@@ -40,7 +41,7 @@ def more_realistic_students(problem_data: ProblemDataReal) -> tuple[Student, ...
     for stop_name, group in assigned_students.groupby("BUS STOP"):
         special_ed_count = group["Student_Program"].str.contains("SPED").sum()
         total_count = len(group)
-        stop_name_to_special_ed_ratio[stop_name] = special_ed_count / total_count
+        stop_name_to_special_ed_ratio[str(stop_name)] = special_ed_count / total_count
 
     for student in students:
         stop_name = student.stop.name
@@ -66,7 +67,7 @@ def plot_special_education_students(problem_data: ProblemDataReal) -> None:
     colored by how far they are from their school.
     """
 
-    students = get_assigned_students(problem_data)
+    students = get_assigned_students(problem_data.schools, problem_data.stops)
     special_education_students = [
         student
         for student in students
@@ -88,7 +89,7 @@ def plot_special_education_students(problem_data: ProblemDataReal) -> None:
         if student.school is not None
     ]
     color_gradient = plt.cm.get_cmap("RdYlGn_r")
-    norm = plt.Normalize(vmin=min(all_distances), vmax=max(all_distances))
+    norm = Normalize(vmin=min(all_distances), vmax=max(all_distances))
     sm = plt.cm.ScalarMappable(cmap=color_gradient, norm=norm)
     sm.set_array([])
 

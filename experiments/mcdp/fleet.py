@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from shapely import Point
 import yaml
 
 import pandas as pd
@@ -49,7 +50,7 @@ def get_all_fleet_data():
 
     depot = Depot(
         name="Depot",
-        geographic_location=(0, 0),
+        geographic_location=Point(0, 0),
         node_id=0,
     )
 
@@ -57,10 +58,11 @@ def get_all_fleet_data():
     for _, row in buses_df.iterrows():
         bus = Bus(
             name=row["id"],
+            id=row["id"],
             capacity=row["capacity"],
             range=row["range"],
             depot=depot,
-            has_wheelchair_access=bool(row["has_wheelchair_access"]),
+            wheelchair_capacity=row["wheelchair_capacity"],
             type=BusType[row["type"]] if row["type"] in BusType.__members__ else None,
         )
         fleet_data.append(bus)

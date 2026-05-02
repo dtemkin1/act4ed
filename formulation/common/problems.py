@@ -224,29 +224,31 @@ class ProblemData(ABC):
             raise ValueError("no schools matched the requested restriction")
 
         selected_school_ids = {school.id for school in selected_schools}
-        selected_students = [
+        selected_students = tuple(
             student
             for student in self.students
             if student.school.id in selected_school_ids
-        ]
+        )
         if not selected_students:
             raise ValueError("no students matched the requested school restriction")
 
         selected_school_ids = {student.school.id for student in selected_students}
-        selected_schools = [
+        selected_schools = tuple(
             school for school in selected_schools if school.id in selected_school_ids
-        ]
+        )
         selected_stops_set = {student.stop for student in selected_students}
-        selected_stops = [stop for stop in self.stops if stop in selected_stops_set]
+        selected_stops = tuple(
+            stop for stop in self.stops if stop in selected_stops_set
+        )
 
         return FilteredProblemData(
             name=f"{self.name}_{_restriction_suffix(school_ids, school_types)}",
             base_problem_data=self,
             _stops=selected_stops,
             _schools=selected_schools,
-            _depots=list(self.depots),
+            _depots=self.depots,
             _students=selected_students,
-            _buses=list(self.buses),
+            _buses=self.buses,
         )
 
     def restrict_to_school(self, school: School | str | int) -> "FilteredProblemData":
@@ -912,7 +914,7 @@ class ProblemDataReal(ProblemData):
                 "depot_name": str,
                 "capacity": int,
                 "range": float,
-                "has_wheelchair_access": bool,
+                "wheelchair_capacity": int,
                 "type": str,
             },
         )
@@ -925,7 +927,7 @@ class ProblemDataReal(ProblemData):
                 capacity=row["capacity"],
                 range=row["range"],
                 depot=depot,
-                has_wheelchair_access=bool(row["has_wheelchair_access"]),
+                wheelchair_capacity=row["wheelchair_capacity"],
                 type=(
                     BusType[row["type"]]
                     if row.get("type") in BusType.__members__
@@ -1015,7 +1017,7 @@ class ProblemDataRealSurrogate(ProblemDataReal):
         return f"{self.name}_hex_problem_data"
 
     @classmethod
-    def load(cls, name: str, prune: None = None) -> "ProblemDataReal":
+    def load(cls, name: str, prune: int | None = None) -> "ProblemDataReal":
         """load problem data from disk"""
         prob_name = f"{name}_hex_problem_data"
         return cls.load_path(CACHE_DIR / f"{prob_name}.pkl")
@@ -1079,19 +1081,23 @@ class ProblemDataRealSurrogate(ProblemDataReal):
             mapping[node] = i
         return mapping
 
-    @cached_property
+    @property
     def base_graph(self) -> "nx.MultiDiGraph[NodeId]":
+        return self._make_base_graph
+
+    @cached_property
+    def _make_base_graph(self) -> "nx.MultiDiGraph[NodeId]":
         hex_graph = self.hex_graph
 
-        base_graph: "nx.MultiDiGraph[NodeId]" = nx.MultiDiGraph()
+        base_graph_return: "nx.MultiDiGraph[NodeId]" = nx.MultiDiGraph()
         for node, data in hex_graph.nodes.items():
-            base_graph.add_node(self.mapping_hex_base[node], **data)
+            base_graph_return.add_node(self.mapping_hex_base[node], **data)
         for u, v, data in hex_graph.edges(data=True):
-            base_graph.add_edge(
+            base_graph_return.add_edge(
                 self.mapping_hex_base[u], self.mapping_hex_base[v], **data
             )
 
-        return base_graph
+        return base_graph_return
 
     def _get_nearest_hex_node_id(self, geographic_location: Point) -> tuple[int, int]:
         """Get the nearest node in the hex graph to a given point."""
@@ -1120,7 +1126,10 @@ class ProblemDataRealSurrogate(ProblemDataReal):
                 stop.geographic_location
             )
 
-            geo_point = self.mapping_hex_geo[nearest_hex_node_id]
+            geo_point = (
+                self.base_graph.nodes[self.mapping_hex_base[nearest_hex_node_id]]["x"],
+                self.base_graph.nodes[self.mapping_hex_base[nearest_hex_node_id]]["y"],
+            )
             new_stop = Stop(
                 name=stop.name,
                 node_id=self.mapping_hex_base[nearest_hex_node_id],

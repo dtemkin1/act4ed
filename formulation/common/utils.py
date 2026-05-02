@@ -101,7 +101,7 @@ def C_b(b: Bus):
 
 def Wh_b(b: Bus):
     """1 if bus b has wheelchair access"""
-    return 1 if b.has_wheelchair_access else 0
+    return 1 if b.wheelchair_capacity > 0 else 0
 
 
 def R_b(b: Bus):
