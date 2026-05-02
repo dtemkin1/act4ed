@@ -309,7 +309,9 @@ class RoutingSolutionJsonTests(unittest.TestCase):
     def test_fleet_aware_bird_solution_json_uses_original_bus_and_depot(self) -> None:
         instance = build_bird_export_instance(
             _build_fleet_aware_bird_problem(),
-            BirdAdapterConfig(cohort="conventional", fleet_aware=True, speed_km_per_minute=1.0),
+            BirdAdapterConfig(
+                cohort="conventional", fleet_aware=True, speed_km_per_minute=1.0
+            ),
         )
         solution = BirdBackendSolution(
             status="OPTIMAL",

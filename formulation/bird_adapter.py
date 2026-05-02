@@ -211,9 +211,7 @@ class BirdExportInstance:
             ),
             "school_start_times": self.school_start_times,
             "school_dwell_times": self.school_dwell_times,
-            "school_earliest_arrival_buffers": (
-                self.school_earliest_arrival_buffers
-            ),
+            "school_earliest_arrival_buffers": (self.school_earliest_arrival_buffers),
             "school_latest_arrival_buffers": self.school_latest_arrival_buffers,
             "school_node_ids": np.asarray(
                 [school.node_id for school in self.schools],
@@ -337,8 +335,7 @@ class BirdExportInstance:
                 demand_grades = [_UNKNOWN_GRADE for _ in range(len(demand_students))]
             demand_wheelchair_students = (
                 np.asarray(payload["demand_wheelchair_students"], dtype=np.int64)
-                if schema_version >= 5
-                and "demand_wheelchair_students" in payload.files
+                if schema_version >= 5 and "demand_wheelchair_students" in payload.files
                 else np.zeros(len(demand_students), dtype=np.int64)
             )
             demand_rows = [
@@ -400,10 +397,7 @@ class BirdExportInstance:
             school_dwell_times = np.asarray(
                 payload["school_dwell_times"], dtype=np.float64
             )
-            if (
-                schema_version >= 7
-                and "school_latest_arrival_buffers" in payload.files
-            ):
+            if schema_version >= 7 and "school_latest_arrival_buffers" in payload.files:
                 school_latest_arrival_buffers = np.asarray(
                     payload["school_latest_arrival_buffers"],
                     dtype=np.float64,
@@ -419,9 +413,7 @@ class BirdExportInstance:
                     dtype=np.float64,
                 )
             else:
-                school_earliest_arrival_buffers = (
-                    school_latest_arrival_buffers.copy()
-                )
+                school_earliest_arrival_buffers = school_latest_arrival_buffers.copy()
             latest_arrival_buffer = (
                 float(np.asarray(payload["latest_arrival_buffer"]).item())
                 if schema_version >= 7 and "latest_arrival_buffer" in payload.files
@@ -442,9 +434,7 @@ class BirdExportInstance:
                 ),
                 stop_time_per_wheelchair_student=(
                     float(
-                        np.asarray(
-                            payload["stop_time_per_wheelchair_student"]
-                        ).item()
+                        np.asarray(payload["stop_time_per_wheelchair_student"]).item()
                     )
                     if schema_version >= 8
                     and "stop_time_per_wheelchair_student" in payload.files
@@ -492,8 +482,7 @@ class BirdExportInstance:
                 ),
                 conventional_spillover=(
                     int(np.asarray(payload["conventional_spillover"]).item()) == 1
-                    if schema_version >= 5
-                    and "conventional_spillover" in payload.files
+                    if schema_version >= 5 and "conventional_spillover" in payload.files
                     else False
                 ),
                 allow_partial=(
@@ -660,11 +649,11 @@ def _student_attributes(student: Student):
 
 
 def _student_is_special_ed(student: Student) -> bool:
-    return bool(_student_attributes(student).special_ed)
+    return bool(student.attributes.special_ed)
 
 
-def _student_is_wheelchair_user(student: Student) -> bool:
-    return bool(_student_attributes(student).wheelchair_user)
+def _student_requires_wheelchair(student: Student) -> bool:
+    return bool(student.attributes.wheelchair_user)
 
 
 def _student_service_group(student: Student) -> str:
@@ -1023,7 +1012,9 @@ def build_bird_export_instance(
         else [student.stop for student in selected_students]
     )
 
-    students_by_key: dict[tuple[Stop, School, str, str], list[Student]] = defaultdict(list)
+    students_by_key: dict[tuple[Stop, School, str, str], list[Student]] = defaultdict(
+        list
+    )
     grade_order: list[str] = []
     for student, assigned_stop in zip(selected_students, assigned_stops, strict=True):
         grade = _student_grade(student)
@@ -1065,7 +1056,9 @@ def build_bird_export_instance(
                                 for student in students_at_stop
                                 if _student_is_wheelchair_user(student)
                             ),
-                            student_names=[student.name for student in students_at_stop],
+                            student_names=[
+                                student.name for student in students_at_stop
+                            ],
                             stop_node_id=stop.node_id,
                         ),
                     )
@@ -1334,15 +1327,11 @@ def normalized_result_from_bird_solution(
     ]
     unassigned_rows = _bird_unassigned_demand_rows(instance, solution)
     unassigned_student_names = sorted(
-        student_name
-        for row in unassigned_rows
-        for student_name in row.student_names
+        student_name for row in unassigned_rows for student_name in row.student_names
     )
     unassigned_rows = _bird_unassigned_demand_rows(instance, solution)
     unassigned_student_names = sorted(
-        student_name
-        for row in unassigned_rows
-        for student_name in row.student_names
+        student_name for row in unassigned_rows for student_name in row.student_names
     )
 
     return NormalizedRoutingResult(
@@ -1368,9 +1357,7 @@ def normalized_result_from_bird_solution(
             "bus_names": instance.bus_names,
             "bus_capacities": instance.bus_capacities.tolist(),
             "bus_has_monitor": instance.bus_has_monitor.tolist(),
-            "bus_wheelchair_capacities": (
-                instance.bus_wheelchair_capacities.tolist()
-            ),
+            "bus_wheelchair_capacities": (instance.bus_wheelchair_capacities.tolist()),
             "stop_assignment_enabled": instance.stop_assignment_enabled,
             "stop_assignment_lambda": instance.stop_assignment_lambda,
             "max_walking_distance_km": instance.max_walking_distance_km,
@@ -1415,10 +1402,7 @@ def routing_solution_json_from_bird_solution(
     rows: list[RoutingSolutionRow] = []
     served_student_names: set[str] = set()
     for bus_id, bus_rows in sorted(rows_by_bus.items()):
-        if (
-            instance.fleet_aware
-            and 1 <= int(bus_id) <= len(instance.bus_depot_indices)
-        ):
+        if instance.fleet_aware and 1 <= int(bus_id) <= len(instance.bus_depot_indices):
             depot_index = int(instance.bus_depot_indices[int(bus_id) - 1])
             current_origin_node = int(instance.depots[depot_index - 1].node_id)
             current_origin_matrix_idx = demand_count + school_count + depot_index

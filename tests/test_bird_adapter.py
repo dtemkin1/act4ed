@@ -433,7 +433,6 @@ def _make_arrival_window_problem_data() -> TinyProblemData:
             school=school_a,
             stop=stop_a,
             attributes=Attributes(special_ed=False, wheelchair_user=False),
-            grade="K",
         ),
         Student(
             id="conv-b",
@@ -442,7 +441,6 @@ def _make_arrival_window_problem_data() -> TinyProblemData:
             school=school_b,
             stop=stop_b,
             attributes=Attributes(special_ed=False, wheelchair_user=False),
-            grade="1",
         ),
     ]
     buses = [
@@ -532,7 +530,9 @@ class BirdAdapterTests(unittest.TestCase):
         self.assertEqual(instance.bus_capacity, 30)
         self.assertEqual(instance.fleet_size, 1)
 
-    def test_fleet_aware_export_includes_bus_records_and_group_split_demand(self) -> None:
+    def test_fleet_aware_export_includes_bus_records_and_group_split_demand(
+        self,
+    ) -> None:
         problem_data = _make_fleet_aware_problem_data()
 
         instance = build_bird_export_instance(
@@ -556,7 +556,12 @@ class BirdAdapterTests(unittest.TestCase):
         self.assertEqual(instance.bus_type_names, ["C", "BWC", "B"])
         self.assertEqual(
             [
-                (row.external_stop_id, row.service_group, row.students, row.wheelchair_students)
+                (
+                    row.external_stop_id,
+                    row.service_group,
+                    row.students,
+                    row.wheelchair_students,
+                )
                 for row in instance.demand_rows
             ],
             [
@@ -620,8 +625,12 @@ class BirdAdapterTests(unittest.TestCase):
         self.assertEqual(instance.stop_time_per_wheelchair_student, 3.0)
         self.assertEqual(instance.latest_arrival_buffer, 10.0)
         self.assertEqual(instance.earliest_arrival_buffer, 60.0)
-        np.testing.assert_array_equal(instance.school_latest_arrival_buffers, [10.0, 10.0])
-        np.testing.assert_array_equal(instance.school_earliest_arrival_buffers, [60.0, 60.0])
+        np.testing.assert_array_equal(
+            instance.school_latest_arrival_buffers, [10.0, 10.0]
+        )
+        np.testing.assert_array_equal(
+            instance.school_earliest_arrival_buffers, [60.0, 60.0]
+        )
 
         with tempfile.TemporaryDirectory() as tmpdir:
             instance_path = Path(tmpdir) / "bird_instance.npz"
@@ -631,8 +640,12 @@ class BirdAdapterTests(unittest.TestCase):
         self.assertEqual(loaded_instance.latest_arrival_buffer, 10.0)
         self.assertEqual(loaded_instance.earliest_arrival_buffer, 60.0)
         self.assertEqual(loaded_instance.stop_time_per_wheelchair_student, 3.0)
-        np.testing.assert_array_equal(loaded_instance.school_latest_arrival_buffers, [10.0, 10.0])
-        np.testing.assert_array_equal(loaded_instance.school_earliest_arrival_buffers, [60.0, 60.0])
+        np.testing.assert_array_equal(
+            loaded_instance.school_latest_arrival_buffers, [10.0, 10.0]
+        )
+        np.testing.assert_array_equal(
+            loaded_instance.school_earliest_arrival_buffers, [60.0, 60.0]
+        )
 
         default_instance = build_bird_export_instance(
             problem_data,
@@ -1021,7 +1034,9 @@ class BirdAdapterTests(unittest.TestCase):
             ["sped", "conventional"],
         )
 
-    def test_julia_scenario_driver_reports_partial_fleet_aware_assignments(self) -> None:
+    def test_julia_scenario_driver_reports_partial_fleet_aware_assignments(
+        self,
+    ) -> None:
         julia = shutil.which("julia")
         if julia is None:
             self.skipTest("julia executable not available")
