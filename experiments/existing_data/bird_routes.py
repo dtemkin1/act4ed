@@ -23,7 +23,9 @@ BIRD_CONFIG = BirdAdapterConfig(
 
 def main() -> None:
     framingham_problem_data = setup_framingham(precompute_cache=True)
-    assigned_students = get_assigned_students(framingham_problem_data)
+    assigned_students = get_assigned_students(
+        framingham_problem_data.schools, framingham_problem_data.stops
+    )
 
     filtered_problem_data = FilteredProblemData(
         "framingham_filtered",

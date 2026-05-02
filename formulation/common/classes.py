@@ -3,6 +3,7 @@ from enum import IntEnum
 from functools import cache, cached_property
 import json
 import os
+from random import random
 from typing import NamedTuple
 
 from dotenv import load_dotenv
@@ -73,6 +74,11 @@ class CensusTractInfo(NamedTuple):
     not_car_owning_households: float
 
 
+class CensusDemographics(NamedTuple):
+    english_at_home: bool
+    not_car_owning_household: bool
+
+
 _CACHE_CENSUS_GEOCODE = CACHE_DIR / "census_geocode_cache.json"
 _CACHE_CENSUS_DEMOGRAPHIC = CACHE_DIR / "census_demographics_cache.json"
 
@@ -81,22 +87,24 @@ _CACHE_CENSUS_DEMOGRAPHIC = CACHE_DIR / "census_demographics_cache.json"
 def _get_census_geocode(x: float, y: float) -> CensusGeoData:
     """get census geocode for a location"""
 
-    if not _CACHE_CENSUS_GEOCODE.exists():
-        with open(_CACHE_CENSUS_GEOCODE, "w+") as f:
-            json.dump({}, f)
+    if not _CACHE_CENSUS_GEOCODE.is_file():
+        cache_data = {}
+    else:
+        with open(_CACHE_CENSUS_GEOCODE, "r") as f:
+            cache_data = json.load(f)
 
-    with open(_CACHE_CENSUS_GEOCODE, "r") as f:
-        cache_data = json.load(f)
-
-    if x in cache_data and y in cache_data[x]:
-        cached = cache_data[x][y]
+    if str(x) in cache_data and str(y) in cache_data[str(x)]:
+        cached = cache_data[str(x)][str(y)]
         return CensusGeoData(
             statefp=cached["statefp"],
             countyfp=cached["countyfp"],
             tract=cached["tract"],
         )
 
-    geo: cg.censusgeocode.GeographyResult = cg.coordinates(x, y)
+    try:
+        geo: cg.censusgeocode.GeographyResult = cg.coordinates(x, y)
+    except ValueError:
+        return None
 
     if not geo:
         return None
@@ -105,9 +113,13 @@ def _get_census_geocode(x: float, y: float) -> CensusGeoData:
     countyfp = geo["Counties"][0]["COUNTY"]
     tract = geo["Census Tracts"][0]["TRACT"]
 
-    if x not in cache_data:
-        cache_data[x] = {}
-    cache_data[x][y] = {"statefp": statefp, "countyfp": countyfp, "tract": tract}
+    if str(x) not in cache_data:
+        cache_data[str(x)] = {}
+    cache_data[str(x)][str(y)] = {
+        "statefp": statefp,
+        "countyfp": countyfp,
+        "tract": tract,
+    }
 
     with open(_CACHE_CENSUS_GEOCODE, "w") as f:
         json.dump(cache_data, f)
@@ -120,15 +132,14 @@ def _get_census_geocode(x: float, y: float) -> CensusGeoData:
 
 
 @cache
-def _get_census_demographic(state: str, county: str, tract: str) -> CensusTractInfo:
+def _get_census_tract_info(state: str, county: str, tract: str) -> CensusTractInfo:
     """get demographic info for a census tract"""
 
-    if not _CACHE_CENSUS_DEMOGRAPHIC.exists():
-        with open(_CACHE_CENSUS_DEMOGRAPHIC, "w+") as f:
-            json.dump({}, f)
-
-    with open(_CACHE_CENSUS_DEMOGRAPHIC, "r") as f:
-        cache_data = json.load(f)
+    if not _CACHE_CENSUS_DEMOGRAPHIC.is_file():
+        cache_data = {}
+    else:
+        with open(_CACHE_CENSUS_DEMOGRAPHIC, "r") as f:
+            cache_data = json.load(f)
 
     if (
         state in cache_data
@@ -177,6 +188,9 @@ def _get_census_demographic(state: str, county: str, tract: str) -> CensusTractI
         "not_car_owning_households": tract_data[0]["B08201_002E"],
     }
 
+    with open(_CACHE_CENSUS_DEMOGRAPHIC, "w") as f:
+        json.dump(cache_data, f)
+
     return CensusTractInfo(
         total_population=tract_data[0]["B01001_001E"],
         total_language_at_home=tract_data[0]["C16001_001E"],
@@ -221,7 +235,7 @@ class LocationData(Base):
         if geo is None:
             return None
 
-        return _get_census_demographic(geo.statefp, geo.countyfp, geo.tract)
+        return _get_census_tract_info(geo.statefp, geo.countyfp, geo.tract)
 
 
 @dataclass(frozen=True)
@@ -311,6 +325,45 @@ class Student(LocationData):
     attributes: Attributes
     grade: str | None = None
 
+    @cached_property
+    def demographics(self) -> CensusDemographics | None:
+        """get demographic info for this student based on their census tract"""
+
+        census_data = self.census_data
+
+        if census_data is None:
+            return None
+
+        english_at_home = (
+            (
+                random()
+                < (
+                    census_data.english_only_language_at_home
+                    / census_data.total_language_at_home
+                )
+            )
+            if census_data.total_language_at_home > 0
+            else False
+        )
+        car_owning_household = (
+            random()
+            < (
+                1
+                - (
+                    census_data.not_car_owning_households
+                    / census_data.total_vehicle_households
+                )
+            )
+            if census_data.total_vehicle_households > 0
+            else False
+        )
+
+        return CensusDemographics(
+            english_at_home=english_at_home,
+            car_owning_household=car_owning_household,
+        )
+
+    @cached_property
     def __str__(self):
         return self.name
 
