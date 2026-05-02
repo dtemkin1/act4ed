@@ -233,3 +233,5 @@ rico_data
 bird/
 data/
 out-*
+
+**/*.dpc.yaml
