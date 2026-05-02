@@ -433,6 +433,7 @@ def _make_arrival_window_problem_data() -> TinyProblemData:
             school=school_a,
             stop=stop_a,
             attributes=Attributes(special_ed=False, wheelchair_user=False),
+            grade="K",
         ),
         Student(
             id="conv-b",
@@ -441,6 +442,7 @@ def _make_arrival_window_problem_data() -> TinyProblemData:
             school=school_b,
             stop=stop_b,
             attributes=Attributes(special_ed=False, wheelchair_user=False),
+            grade="1",
         ),
     ]
     buses = [
