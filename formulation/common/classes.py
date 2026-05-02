@@ -74,7 +74,7 @@ class CensusTractInfo(NamedTuple):
 
 
 _CACHE_CENSUS_GEOCODE = CACHE_DIR / "census_geocode_cache.json"
-_CACHE_CENSUS_TRACT_DATA = CACHE_DIR / "census_tract_data_cache.json"
+_CACHE_CENSUS_DEMOGRAPHIC = CACHE_DIR / "census_demographics_cache.json"
 
 
 @cache
@@ -123,11 +123,11 @@ def _get_census_geocode(x: float, y: float) -> CensusGeoData:
 def _get_census_demographic(state: str, county: str, tract: str) -> CensusTractInfo:
     """get demographic info for a census tract"""
 
-    if not _CACHE_CENSUS_GEOCODE.exists():
-        with open(_CACHE_CENSUS_GEOCODE, "w+") as f:
+    if not _CACHE_CENSUS_DEMOGRAPHIC.exists():
+        with open(_CACHE_CENSUS_DEMOGRAPHIC, "w+") as f:
             json.dump({}, f)
 
-    with open(_CACHE_CENSUS_GEOCODE, "r") as f:
+    with open(_CACHE_CENSUS_DEMOGRAPHIC, "r") as f:
         cache_data = json.load(f)
 
     if (

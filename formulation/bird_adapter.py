@@ -641,6 +641,13 @@ def _decode_utf8_array(values: np.ndarray) -> str:
     return bytes(np.asarray(values, dtype=np.uint8).tolist()).decode("utf-8")
 
 
+def _student_attributes(student: Student):
+    attributes = getattr(student, "attributes", None)
+    if attributes is None:
+        attributes = getattr(student, "demographics")
+    return attributes
+
+
 def _student_is_special_ed(student: Student) -> bool:
     return bool(student.attributes.special_ed)
 
@@ -650,7 +657,7 @@ def _student_requires_wheelchair(student: Student) -> bool:
 
 
 def _student_service_group(student: Student) -> str:
-    if _student_requires_wheelchair(student):
+    if _student_is_wheelchair_user(student):
         return "wheelchair"
     if _student_is_special_ed(student):
         return "sped"
@@ -772,26 +779,26 @@ def _filter_students_for_cohort(
             student
             for student in students
             if not _student_is_special_ed(student)
-            and not _student_requires_wheelchair(student)
+            and not _student_is_wheelchair_user(student)
         ]
     if cohort == "sped_no_wheelchair":
         return [
             student
             for student in students
             if _student_is_special_ed(student)
-            and not _student_requires_wheelchair(student)
+            and not _student_is_wheelchair_user(student)
         ]
     if cohort == "sped_and_wheelchair":
         return [
             student
             for student in students
-            if _student_is_special_ed(student) or _student_requires_wheelchair(student)
+            if _student_is_special_ed(student) or _student_is_wheelchair_user(student)
         ]
     if cohort == "wheelchair_no_sped":
         return [
             student
             for student in students
-            if _student_requires_wheelchair(student)
+            if _student_is_wheelchair_user(student)
             and not _student_is_special_ed(student)
         ]
     raise ValueError(f"unknown Bird cohort {cohort!r}")
@@ -967,7 +974,7 @@ def build_bird_export_instance(
         raise ValueError(f"no students available for cohort {config.cohort}")
     if config.fleet_aware:
         has_wheelchair_students = any(
-            _student_requires_wheelchair(student) for student in selected_students
+            _student_is_wheelchair_user(student) for student in selected_students
         )
         if has_wheelchair_students and not any(
             bus.has_monitor and _wheelchair_capacity_for_bus(bus) > 0 for bus in buses
@@ -978,7 +985,7 @@ def build_bird_export_instance(
             )
         has_sped_students = any(
             _student_is_special_ed(student)
-            and not _student_requires_wheelchair(student)
+            and not _student_is_wheelchair_user(student)
             for student in selected_students
         )
         if has_sped_students and not any(bus.has_monitor for bus in buses):
@@ -1047,7 +1054,7 @@ def build_bird_export_instance(
                             wheelchair_students=sum(
                                 1
                                 for student in students_at_stop
-                                if _student_requires_wheelchair(student)
+                                if _student_is_wheelchair_user(student)
                             ),
                             student_names=[
                                 student.name for student in students_at_stop
