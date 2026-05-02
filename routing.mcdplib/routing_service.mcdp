@@ -1,0 +1,41 @@
+dp {
+  # demand satisfied by a BiRD run
+  provides students_served [Nat]
+  provides sped_students_served [Nat]
+  provides wheelchair_students_served [Nat]
+
+  # demand left unserved by the same BiRD run
+  requires students_unserved [Nat]
+  requires sped_students_unserved [Nat]
+  requires wheelchair_students_unserved [Nat]
+
+  # route complexity and staffing selected by BiRD
+  requires stops_used [Nat]
+  requires monitor_buses [Nat]
+
+  # used buses by fleet type
+  requires used_C [Nat]
+  requires used_B [Nat]
+  requires used_BWC [Nat]
+  requires used_WC [Nat]
+
+  # daily telemetry by fleet type
+  requires distance_C [km]
+  requires distance_B [km]
+  requires distance_BWC [km]
+  requires distance_WC [km]
+
+  requires runtime_C [s]
+  requires runtime_B [s]
+  requires runtime_BWC [s]
+  requires runtime_WC [s]
+
+  # discrete BiRD configuration choices
+  requires bird_method [`bird_method]
+  requires bird_lambda [`bird_lambda]
+  requires bird_partial [`bird_partial]
+  requires bird_dwell [`bird_dwell]
+  requires bird_arrival_window [`bird_arrival_window]
+
+  implemented-by yaml resource("routing_service.dpc.yaml")
+}

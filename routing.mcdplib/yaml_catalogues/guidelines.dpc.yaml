@@ -1,0 +1,11 @@
+F:
+  - "USD"
+R:
+  - "Nat"
+
+implementations:
+  guideline_200:
+    f_max:
+      - "4500000 USD"
+    r_min:
+      - "0"

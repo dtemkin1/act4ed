@@ -1,0 +1,15 @@
+mcdp {
+    provides students_served [Nat]
+    provides sped_students_served [Nat]
+    provides wheelchair_students_served [Nat]
+
+    requires policy_cost [USD]
+
+    sub g = instance `guidelines
+
+    provided students_served >= students_served required by g
+    provided sped_students_served >= sped_students_served required by g
+    provided wheelchair_students_served >= wheelchair_students_served required by g
+
+    required policy_cost <= roi_budget provided by g
+}

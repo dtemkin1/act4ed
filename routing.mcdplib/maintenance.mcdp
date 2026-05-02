@@ -1,0 +1,36 @@
+mcdp {
+    provides distance_C [km]
+    provides distance_B [km]
+    provides distance_BWC [km]
+    provides distance_WC [km]
+
+    provides runtime_C [s]
+    provides runtime_B [s]
+    provides runtime_BWC [s]
+    provides runtime_WC [s]
+
+    requires maintenance_cost [USD]
+
+    constant school_days = 180
+
+    constant distance_factor_C = 0.15 USD / km
+    constant distance_factor_B = 0.15 USD / km
+    constant distance_factor_BWC = 0.15 USD / km
+    constant distance_factor_WC = 0.15 USD / km
+
+    constant runtime_factor_C = 0 USD / s
+    constant runtime_factor_B = 0 USD / s
+    constant runtime_factor_BWC = 0 USD / s
+    constant runtime_factor_WC = 0 USD / s
+
+    required maintenance_cost >= school_days * (
+        provided distance_C * distance_factor_C +
+        provided distance_B * distance_factor_B +
+        provided distance_BWC * distance_factor_BWC +
+        provided distance_WC * distance_factor_WC +
+        provided runtime_C * runtime_factor_C +
+        provided runtime_B * runtime_factor_B +
+        provided runtime_BWC * runtime_factor_BWC +
+        provided runtime_WC * runtime_factor_WC
+    )
+}

@@ -1,0 +1,10 @@
+mcdp {
+  # buses with monitors on them
+  provides monitor_buses [Nat]
+
+  requires monitor_cost [USD]
+
+  constant yearly_pay_per_monitor_bus = 20000 USD
+
+  required monitor_cost >= provided monitor_buses * yearly_pay_per_monitor_bus
+}

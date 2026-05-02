@@ -1,0 +1,22 @@
+title: Simple Routing Query
+description: Basic example query for the full routing design problem.
+model: "`routing"
+query:
+  query_type: FixFunMinRes
+  min_f:
+    students_served: "10"
+    sped_students_served: "0"
+    wheelchair_students_served: "0"
+  max_r:
+    total_cost: "4500000 USD"
+    emissions: "1000000 kg"
+    students_unserved: "100000"
+    sped_students_unserved: "100000"
+    wheelchair_students_unserved: "100000"
+    stops_used: "100000"
+    bird_method: "`bird_method: scenario"
+    bird_lambda: "`bird_lambda: lambda_1e4"
+    bird_partial: "`bird_partial: partial_true"
+    bird_dwell: "`bird_dwell: dwell_10"
+    bird_arrival_window: "`bird_arrival_window: arrival_default"
+  optimize_for: [total_cost]

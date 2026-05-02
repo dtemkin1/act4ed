@@ -1,0 +1,3 @@
+mcdp {
+    requires capital_cost [USD]
+}

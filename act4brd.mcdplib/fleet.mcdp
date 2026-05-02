@@ -1,6 +1,0 @@
-mcdp {
-    provides fleet_composition [dimensionless]
-
-    requires num_operators [ℕ]
-    requires capital_cost [$]
-}

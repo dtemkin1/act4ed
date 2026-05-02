@@ -1,0 +1,211 @@
+from typing import cast
+import random
+
+import networkx as nx
+
+from formulation.common.classes import (
+    Attributes,
+    Bus,
+    Depot,
+    NodeId,
+    School,
+    SchoolType,
+    Stop,
+    Student,
+)
+from formulation.common.problems import ProblemDataToy
+
+try:
+    from shapely.geometry import Point
+except Exception as exc:
+    raise ImportError(
+        "Shapely not found. Please install it with 'pip install shapely'"
+        " and ensure Java is properly configured."
+    ) from exc
+
+random.seed(42)  # for reproducibility <3
+
+
+def make_graph(size: tuple[int, int] = (10, 10)) -> "nx.MultiDiGraph[NodeId]":
+    graph_2d = nx.grid_2d_graph(size[0], size[1], create_using=nx.MultiDiGraph)
+    graph_2d = cast("nx.MultiDiGraph[tuple[int, int]]", graph_2d)
+    # Add weights to the edges
+    for u, v in graph_2d.edges():
+        graph_2d.edges[u, v, 0]["length"] = 1000.0  # 1 km between adjacent nodes
+
+    graph: "nx.MultiDiGraph[NodeId]" = nx.MultiDiGraph()
+    mapping: dict[tuple[int, int], NodeId] = {}
+    for i, node in enumerate(graph_2d.nodes()):
+        mapping[node] = i
+        x = node[0]
+        y = node[1]
+        graph.add_node(i, x=x, y=y)
+    for u, v in graph_2d.edges():
+        graph.add_edge(mapping[u], mapping[v], length=graph_2d.edges[u, v, 0]["length"])
+
+    return graph
+
+
+def make_schools(
+    graph: "nx.MultiDiGraph[NodeId]",
+    num_schools: int = 3,
+    types: tuple[SchoolType, ...] | None = None,
+) -> tuple[School, ...]:
+    if types is None:
+        types = tuple(SchoolType.__members__.values())
+    all_nodes = list(graph.nodes)
+    schools: list[School] = []
+    for i in range(num_schools):
+        node_id = all_nodes[random.randint(0, len(all_nodes) - 1)]
+        point = Point(graph.nodes[node_id]["x"], graph.nodes[node_id]["y"])
+        school = School(
+            name=f"School {i}",
+            geographic_location=point,
+            node_id=node_id,
+            type=types[i % len(types)],
+            start_time=8 * 60 + i * 15,  # staggered start times
+            id=str(i),
+        )
+        schools.append(school)
+    return tuple(schools)
+
+
+def make_depots(
+    graph: "nx.MultiDiGraph[NodeId]", num_depots: int = 1
+) -> tuple[Depot, ...]:
+    all_nodes = list(graph.nodes)
+    depots: list[Depot] = []
+    for i in range(num_depots):
+        node_id = all_nodes[random.randint(0, len(all_nodes) - 1)]
+        point = Point(graph.nodes[node_id]["x"], graph.nodes[node_id]["y"])
+        depot = Depot(
+            name=f"Depot {i}",
+            geographic_location=point,
+            node_id=node_id,
+        )
+        depots.append(depot)
+    return tuple(depots)
+
+
+def make_stops(
+    graph: "nx.MultiDiGraph[NodeId]", num_stops: int = 5
+) -> tuple[Stop, ...]:
+    all_nodes = list(graph.nodes)
+    stops: list[Stop] = []
+    for i in range(num_stops):
+        node_id = all_nodes[random.randint(0, len(all_nodes) - 1)]
+        point = Point(graph.nodes[node_id]["x"], graph.nodes[node_id]["y"])
+        stop = Stop(
+            name=f"Stop {i}",
+            geographic_location=point,
+            node_id=node_id,
+        )
+        stops.append(stop)
+    return tuple(stops)
+
+
+def make_students(
+    graph: "nx.MultiDiGraph[NodeId]",
+    num_students: int = 20,
+    schools: tuple[School, ...] | None = None,
+    stops: tuple[Stop, ...] | None = None,
+) -> tuple[Student, ...]:
+    if schools is None:
+        schools = make_schools(graph)
+    if stops is None:
+        stops = make_stops(graph)
+    num_schools = len(schools)
+    all_nodes = list(graph.nodes)
+    students: list[Student] = []
+
+    for i in range(num_students):
+        node_id = all_nodes[random.randint(0, len(all_nodes) - 1)]
+        home_location = Point(graph.nodes[node_id]["x"], graph.nodes[node_id]["y"])
+        # get nearest stop
+        stop = min(
+            stops,
+            key=lambda s: home_location.distance(s.geographic_location),
+        )
+        random_school = schools[random.randint(0, num_schools - 1)]
+        student = Student(
+            id=str(i),
+            name=f"Student {i}",
+            geographic_location=home_location,
+            school=random_school,
+            stop=stop,
+            attributes=Attributes(
+                special_ed=(i % 4 == 0), wheelchair_user=(i % 5 == 0)
+            ),
+        )
+        students.append(student)
+    return tuple(students)
+
+
+def make_buses(
+    graph: "nx.MultiDiGraph[NodeId]",
+    num_buses: int = 3,
+    capacities: list[int] | None = None,
+    ranges: list[float] | None = None,
+    depots: tuple[Depot, ...] | None = None,
+) -> tuple[Bus, ...]:
+    if capacities is None:
+        capacities = [40] * num_buses
+    if depots is None:
+        depots = make_depots(graph)
+    if ranges is None:
+        ranges = [float(len(graph.nodes))] * num_buses
+    buses: list[Bus] = []
+    for i in range(num_buses):
+        bus = Bus(
+            name=f"Bus {i}",
+            id=str(i),
+            capacity=capacities[i % len(capacities)],
+            range=ranges[i % len(ranges)],
+            depot=depots[i % len(depots)],
+            wheelchair_capacity=(
+                2 if i % 2 == 0 else 0
+            ),  # every other bus has wheelchair access
+        )
+        buses.append(bus)
+    return tuple(buses)
+
+
+def make_toy_problem_data(
+    name: str,
+    size: tuple[int, int] | None,
+    num_schools: int | None,
+    num_depots: int | None,
+    num_stops: int | None,
+    num_students: int | None,
+    num_buses: int | None,
+) -> ProblemDataToy:
+    graph = make_graph(size=size) if size else make_graph()
+    schools = (
+        make_schools(graph, num_schools=num_schools)
+        if num_schools
+        else make_schools(graph)
+    )
+    depots = (
+        make_depots(graph, num_depots=num_depots) if num_depots else make_depots(graph)
+    )
+    stops = make_stops(graph, num_stops=num_stops) if num_stops else make_stops(graph)
+    students = (
+        make_students(graph, num_students=num_students, schools=schools, stops=stops)
+        if num_students
+        else make_students(graph, schools=schools, stops=stops)
+    )
+    buses = (
+        make_buses(graph, num_buses=num_buses, depots=depots)
+        if num_buses
+        else make_buses(graph, depots=depots)
+    )
+
+    return ProblemDataToy(
+        name=name,
+        _base_graph=graph,
+        _schools=schools,
+        _depots=depots,
+        _stops=stops,
+        _students=students,
+        _buses=buses,
+    )
