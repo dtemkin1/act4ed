@@ -5,7 +5,7 @@ import subprocess
 from experiments.existing_data.utils import get_assigned_students
 from experiments.helpers import OUTPUTS_FOLDER, setup_framingham
 
-from formulation.common.problems import FilteredProblemData
+from formulation.common.problems import FilteredProblemData, ProblemData
 
 from formulation.bird_adapter import (
     BirdAdapterConfig,
@@ -14,6 +14,7 @@ from formulation.bird_adapter import (
     export_bird_instance,
     normalized_result_from_bird_solution,
 )
+from formulation.normalized_result import NormalizedRoutingResult
 
 CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 
@@ -27,28 +28,18 @@ BIRD_CONFIG = BirdAdapterConfig(
     earliest_arrival_buffer=30,
     allow_partial=True,
 )
-
+EXISTING_ROUTES_OUTPUT = OUTPUTS_FOLDER / "existing_routes"
 SOLVE_BIRD_BACKEND_PATH = CURRENT_FILE_DIR / ".." / "solve_bird_backend_julia.jl"
 
 
-def main() -> None:
-    framingham_problem_data = setup_framingham(precompute_cache=True)
-    assigned_students = get_assigned_students(
-        framingham_problem_data.schools, framingham_problem_data.stops
-    )
+def get_bird_routes(
+    problem_data: ProblemData,
+    config: BirdAdapterConfig,
+    out_dir: Path,
+    save_results: bool = False,
+) -> NormalizedRoutingResult:
 
-    filtered_problem_data = FilteredProblemData(
-        "framingham_filtered",
-        base_problem_data=framingham_problem_data,
-        _students=assigned_students,
-    )
-
-    bird_problem = filtered_problem_data
-    config = BIRD_CONFIG
-
-    out_dir = OUTPUTS_FOLDER / "existing_bird"
-    out_dir.mkdir(parents=True, exist_ok=True)
-
+    bird_problem = problem_data
     instance_path = export_bird_instance(
         bird_problem,
         out_dir / "bird_all_instance.npz",
@@ -74,7 +65,31 @@ def main() -> None:
     instance = BirdExportInstance.load(instance_path)
     solution = BirdBackendSolution.load(solution_path)
     normalized = normalized_result_from_bird_solution(instance, solution)
-    normalized.save(out_dir / "bird_all_normalized.json")
+
+    if save_results:
+        normalized.save(out_dir / "bird_all_normalized.json")
+
+    return normalized
+
+
+def main() -> None:
+    framingham_problem_data = setup_framingham(precompute_cache=True)
+    assigned_students = get_assigned_students(
+        framingham_problem_data.schools, framingham_problem_data.stops
+    )
+
+    filtered_problem_data = FilteredProblemData(
+        "framingham_filtered",
+        base_problem_data=framingham_problem_data,
+        _students=assigned_students,
+    )
+
+    config = BIRD_CONFIG
+
+    out_dir = EXISTING_ROUTES_OUTPUT
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    get_bird_routes(filtered_problem_data, config, out_dir)
 
 
 if __name__ == "__main__":
