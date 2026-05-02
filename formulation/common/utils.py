@@ -4,7 +4,14 @@ from collections.abc import Hashable
 
 import networkx as nx
 
-from formulation.common.classes import NodeId, Place, School, Bus, Student, Depot
+from formulation.common.classes import (
+    NodeId,
+    Place,
+    School,
+    Bus,
+    Student,
+    Depot,
+)
 from formulation.common.constants import METERS_PER_KM
 
 

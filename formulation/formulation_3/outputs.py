@@ -12,7 +12,6 @@ from formulation.common.utils import (
     Wh_b,
     s_m,
 )
-from formulation.common.constants import TAU
 from formulation.formulation_3.definition import Formulation3
 from formulation.formulation_3.solution import (
     Formulation3Solution,
@@ -34,6 +33,7 @@ def make_report(
     S = formulation.S
     A = formulation.A
     Q = formulation.Q
+    TAU = formulation.TAU
 
     # z_b = model_vars["z_b"]
     z_bq: tupledict[tuple[Any, ...], Var] = model_vars["z_bq"]

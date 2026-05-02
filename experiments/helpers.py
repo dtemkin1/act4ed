@@ -110,17 +110,24 @@ def setup_framingham(
     hexagonal: Literal[False] = False,
     prune: int | None = None,
     sanity_check: bool = False,
+    precompute_cache: bool = True,
 ) -> ProblemDataReal: ...
 
 
 @overload
 def setup_framingham(
-    hexagonal: Literal[True], prune: None = None, sanity_check: bool = False
+    hexagonal: Literal[True],
+    prune: None = None,
+    sanity_check: bool = False,
+    precompute_cache: bool = True,
 ) -> ProblemDataRealSurrogate: ...
 
 
 def setup_framingham(
-    hexagonal: bool = False, prune: int | None = None, sanity_check: bool = False
+    hexagonal: bool = False,
+    prune: int | None = None,
+    sanity_check: bool = False,
+    precompute_cache: bool = True,
 ) -> ProblemDataReal | ProblemDataRealSurrogate:
     return setup(
         problem_name="framingham",
@@ -128,6 +135,7 @@ def setup_framingham(
         hexagonal=hexagonal,
         prune=prune,
         sanity_check=sanity_check,
+        precompute_cache=precompute_cache,
     )
 
 
