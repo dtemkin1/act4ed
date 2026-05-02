@@ -6,7 +6,6 @@ from gurobipy import GRB, GurobiError
 
 from loguru import logger
 
-from formulation.common.constants import TAU
 from formulation.common.utils import (
     C_b,
     R_b,
@@ -56,6 +55,7 @@ def build_model_from_definition(
     H_RIDE = problem.H_RIDE
     KAPPA = problem.KAPPA
     C_CAP_B = problem.C_CAP_B
+    TAU = problem.TAU
 
     B_idx = range(len(B))
     M_idx = range(len(M))

@@ -20,7 +20,6 @@ from formulation.common.utils import (
     tau_m,
 )
 from formulation.common.classes import BusType
-from formulation.common.constants import TAU
 
 from formulation.formulation_3.definition import (
     Formulation3,
@@ -230,6 +229,7 @@ def build_formulation3_numeric_instance(
     D_PLUS = list(problem.D_PLUS)
     D_MINUS = list(problem.D_MINUS)
     N = P + S + S_PLUS + D_PLUS + D_MINUS
+    TAU = problem.TAU
 
     included_nodes = set(N)
     A_list = [

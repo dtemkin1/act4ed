@@ -191,6 +191,8 @@ class Formulation3:
     """students needing monitor, eg special education or wheelchair"""
     W: tuple[Student, ...] = field(init=False, default_factory=list)
     """students needing wheelchair access"""
+    TAU: tuple[SchoolType, ...] = field(init=False, default_factory=tuple)
+    """school types"""
 
     # utility
     A: dict[tuple[Place, Place], float] = field(init=False, default_factory=dict)
@@ -250,6 +252,7 @@ class Formulation3:
             for student in self.problem_data.students
             if student.attributes.wheelchair_user
         )
+        self.TAU = tuple(SchoolType)
 
         self.Q = tuple(range(self.rounds))
         self.Q_MAX = self.rounds - 1

@@ -1,14 +1,9 @@
 import os
 from pathlib import Path
 
-from formulation.common.classes import SchoolType
-
 CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 
 NETWORK_TYPE = "drive"
-
-TAU = tuple(SchoolType)
-"""school types"""
 
 MPH_TO_KM_PER_MIN = 37.282
 "divide the mph value by 37.282"

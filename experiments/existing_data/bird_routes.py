@@ -11,7 +11,6 @@ from formulation.bird_adapter import (
     BirdExportInstance,
     export_bird_instance,
     normalized_result_from_bird_solution,
-    routing_solution_json_from_bird_solution,
 )
 
 BIRD_CONFIG = BirdAdapterConfig(
@@ -23,7 +22,7 @@ BIRD_CONFIG = BirdAdapterConfig(
 
 
 def main() -> None:
-    framingham_problem_data = setup_framingham(sanity_check=True)
+    framingham_problem_data = setup_framingham(precompute_cache=True)
     assigned_students = get_assigned_students(framingham_problem_data)
 
     filtered_problem_data = FilteredProblemData(

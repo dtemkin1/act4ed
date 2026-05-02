@@ -6,7 +6,7 @@ from networkx import MultiDiGraph
 import pandas as pd
 from shapely import Point
 
-from formulation.common.classes import Attributes, NodeId, Student
+from formulation.common.classes import NodeId, Student
 from formulation.common.problems import ProblemDataReal, ProblemDataRealSurrogate
 
 CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
@@ -19,7 +19,7 @@ DATA_FOLDER = CURRENT_FILE_DIR / "data"
 DEPOT_CSV = DATA_FOLDER / "depot.csv"
 SCHOOLS_CSV = DATA_FOLDER / "schools.csv"
 STOPS_CSV = DATA_FOLDER / "stops.csv"
-STUDENTS_CSV = DATA_FOLDER / "students_with_special_ed_inferred_w_grades.csv"
+STUDENTS_CSV = DATA_FOLDER / "students.csv"
 BUSES_CSV = DATA_FOLDER / "buses.csv"
 
 # thresholds
@@ -110,17 +110,24 @@ def setup_framingham(
     hexagonal: Literal[False] = False,
     prune: int | None = None,
     sanity_check: bool = False,
+    precompute_cache: bool = True,
 ) -> ProblemDataReal: ...
 
 
 @overload
 def setup_framingham(
-    hexagonal: Literal[True], prune: None = None, sanity_check: bool = False
+    hexagonal: Literal[True],
+    prune: None = None,
+    sanity_check: bool = False,
+    precompute_cache: bool = True,
 ) -> ProblemDataRealSurrogate: ...
 
 
 def setup_framingham(
-    hexagonal: bool = False, prune: int | None = None, sanity_check: bool = False
+    hexagonal: bool = False,
+    prune: int | None = None,
+    sanity_check: bool = False,
+    precompute_cache: bool = True,
 ) -> ProblemDataReal | ProblemDataRealSurrogate:
     return setup(
         problem_name="framingham",
@@ -128,6 +135,7 @@ def setup_framingham(
         hexagonal=hexagonal,
         prune=prune,
         sanity_check=sanity_check,
+        precompute_cache=precompute_cache,
     )
 
 

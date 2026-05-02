@@ -1,13 +1,16 @@
 from dataclasses import dataclass
 from enum import IntEnum
-from functools import cached_property
+from functools import cache, cached_property
+import json
 import os
 from typing import NamedTuple
 
 from dotenv import load_dotenv
-import censusgeocode as cg
 import re
+import censusgeocode as cg
 from census import Census
+
+from formulation.common.constants import CACHE_DIR
 
 try:
     from shapely.geometry import Point
@@ -50,16 +53,137 @@ class Attributes(NamedTuple):
     wheelchair_user: bool
 
 
-DemographicInfo = Attributes
+class CensusGeoData(NamedTuple):
+    """census geocode data for a location"""
+
+    statefp: str
+    countyfp: str
+    tract: str
 
 
 class CensusTractInfo(NamedTuple):
     """demographic info for a student"""
 
-    total_population: int
-    not_english_proficient: int
-    english_proficient: int
-    car_owning_households: int
+    total_population: float
+
+    total_language_at_home: float
+    english_only_language_at_home: float
+
+    total_vehicle_households: float
+    not_car_owning_households: float
+
+
+_CACHE_CENSUS_GEOCODE = CACHE_DIR / "census_geocode_cache.json"
+_CACHE_CENSUS_DEMOGRAPHIC = CACHE_DIR / "census_demographics_cache.json"
+
+
+@cache
+def _get_census_geocode(x: float, y: float) -> CensusGeoData:
+    """get census geocode for a location"""
+
+    if not _CACHE_CENSUS_GEOCODE.exists():
+        with open(_CACHE_CENSUS_GEOCODE, "w+") as f:
+            json.dump({}, f)
+
+    with open(_CACHE_CENSUS_GEOCODE, "r") as f:
+        cache_data = json.load(f)
+
+    if x in cache_data and y in cache_data[x]:
+        cached = cache_data[x][y]
+        return CensusGeoData(
+            statefp=cached["statefp"],
+            countyfp=cached["countyfp"],
+            tract=cached["tract"],
+        )
+
+    geo: cg.censusgeocode.GeographyResult = cg.coordinates(x, y)
+
+    if not geo:
+        return None
+
+    statefp = geo["States"][0]["STATE"]
+    countyfp = geo["Counties"][0]["COUNTY"]
+    tract = geo["Census Tracts"][0]["TRACT"]
+
+    if x not in cache_data:
+        cache_data[x] = {}
+    cache_data[x][y] = {"statefp": statefp, "countyfp": countyfp, "tract": tract}
+
+    with open(_CACHE_CENSUS_GEOCODE, "w") as f:
+        json.dump(cache_data, f)
+
+    return CensusGeoData(
+        statefp=geo["States"][0]["STATE"],
+        countyfp=geo["Counties"][0]["COUNTY"],
+        tract=geo["Census Tracts"][0]["TRACT"],
+    )
+
+
+@cache
+def _get_census_demographic(state: str, county: str, tract: str) -> CensusTractInfo:
+    """get demographic info for a census tract"""
+
+    if not _CACHE_CENSUS_DEMOGRAPHIC.exists():
+        with open(_CACHE_CENSUS_DEMOGRAPHIC, "w+") as f:
+            json.dump({}, f)
+
+    with open(_CACHE_CENSUS_DEMOGRAPHIC, "r") as f:
+        cache_data = json.load(f)
+
+    if (
+        state in cache_data
+        and county in cache_data[state]
+        and tract in cache_data[state][county]
+    ):
+        cached = cache_data[state][county][tract]
+        return CensusTractInfo(
+            total_population=cached["total_population"],
+            total_language_at_home=cached["total_language_at_home"],
+            english_only_language_at_home=cached["english_only_language_at_home"],
+            total_vehicle_households=cached["total_vehicle_households"],
+            not_car_owning_households=cached["not_car_owning_households"],
+        )
+
+    census_api_key = os.getenv("CENSUS_API_KEY")
+    if census_api_key is None:
+        raise ValueError("CENSUS_API_KEY not found in environment variables")
+
+    c = Census(census_api_key)
+    tract_data = c.acs5.state_county_tract(
+        fields=[
+            "B01001_001E",  # total population
+            "C16001_001E",  # total language at home
+            "C16001_002E",  # english only language at home
+            "B08201_001E",  # total households
+            "B08201_002E",  # not car owning households
+        ],
+        state_fips=state,
+        county_fips=county,
+        tract=tract,
+    )
+
+    if not tract_data:
+        return None
+
+    if state not in cache_data:
+        cache_data[state] = {}
+    if county not in cache_data[state]:
+        cache_data[state][county] = {}
+    cache_data[state][county][tract] = {
+        "total_population": tract_data[0]["B01001_001E"],
+        "total_language_at_home": tract_data[0]["C16001_001E"],
+        "english_only_language_at_home": tract_data[0]["C16001_002E"],
+        "total_vehicle_households": tract_data[0]["B08201_001E"],
+        "not_car_owning_households": tract_data[0]["B08201_002E"],
+    }
+
+    return CensusTractInfo(
+        total_population=tract_data[0]["B01001_001E"],
+        total_language_at_home=tract_data[0]["C16001_001E"],
+        english_only_language_at_home=tract_data[0]["C16001_002E"],
+        total_vehicle_households=tract_data[0]["B08201_001E"],
+        not_car_owning_households=tract_data[0]["B08201_002E"],
+    )
 
 
 @dataclass(frozen=True)
@@ -82,39 +206,22 @@ class LocationData(Base):
     geographic_location: Point
 
     @cached_property
-    def census_geo(self) -> str:
+    def census_geo(self) -> CensusGeoData | None:
         """get the census tract info for this location"""
-        geo: cg.censusgeocode.GeographyResult = cg.coordinates(
+        return _get_census_geocode(
             self.geographic_location.x, self.geographic_location.y
         )
-        return geo
 
     @cached_property
-    def census_data(self) -> dict[str, str | int | float]:
+    def census_data(self) -> CensusTractInfo:
         """get relevant census data for this location"""
 
-        # get census tract info for this location
         geo = self.census_geo
 
-        census_api_key = os.getenv("CENSUS_API_KEY")
-        if census_api_key is None:
-            raise ValueError("CENSUS_API_KEY not found in environment variables")
+        if geo is None:
+            return None
 
-        # get census data for this tract
-        c = Census(census_api_key)
-        _tract_data = c.acs5.state_county_tract(
-            fields=[
-                "B01001_001E",  # total population
-                "B02001_002E",  # not english proficient
-                "B02001_003E",  # english proficient
-                "B02001_004E",  # car owning households
-            ],
-            state_fips=geo.statefp,
-            county_fips=geo.countyfp,
-            tract=geo.tract,
-        )
-
-        raise NotImplementedError("census_data method not fully implemented yet")
+        return _get_census_demographic(geo.statefp, geo.countyfp, geo.tract)
 
 
 @dataclass(frozen=True)
