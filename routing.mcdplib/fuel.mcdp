@@ -11,14 +11,14 @@ mcdp {
     constant fuel_cost_per_km = 0.6 USD / km
     constant emissions_per_km = 1.2 kg / km
 
-    required fuel_cost ≥ (
+    required fuel_cost >= (
         provided distance_C +
         provided distance_B +
         provided distance_BWC +
         provided distance_WC
     ) * school_days * fuel_cost_per_km
 
-    required emissions ≥ (
+    required emissions >= (
         provided distance_C +
         provided distance_B +
         provided distance_BWC +
