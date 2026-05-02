@@ -652,7 +652,7 @@ def _student_is_special_ed(student: Student) -> bool:
     return bool(student.attributes.special_ed)
 
 
-def _student_requires_wheelchair(student: Student) -> bool:
+def _student_is_wheelchair_user(student: Student) -> bool:
     return bool(student.attributes.wheelchair_user)
 
 

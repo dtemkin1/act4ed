@@ -140,6 +140,9 @@ function build_itinerary_for_bus!(
                     use_original_timing ?
                     itinerary_best_insertion_original(data, candidate_school, candidate_stop, itinerary) :
                     itinerary_best_insertion_window(data, candidate_school, candidate_stop, itinerary)
+                isfinite(cost) || continue
+                candidate_itinerary = insert_itinerary(data, itinerary, candidate_school, candidate_stop, insert_school, insert_stop)
+                itinerary_feasible(data, candidate_itinerary) || continue
                 if cost < best_cost
                     best_cost = cost
                     best_school = candidate_school
@@ -575,6 +578,9 @@ function solve_lbh!(data::BirdData; seed::Int = 1)
                         use_original_timing ?
                         itinerary_best_insertion_original(data, candidate_school, candidate_stop, itinerary) :
                         itinerary_best_insertion_window(data, candidate_school, candidate_stop, itinerary)
+                    isfinite(cost) || continue
+                    candidate_itinerary = insert_itinerary(data, itinerary, candidate_school, candidate_stop, insert_school, insert_stop)
+                    itinerary_feasible(data, candidate_itinerary) || continue
                     if cost < best_cost
                         best_cost = cost
                         best_school = candidate_school
