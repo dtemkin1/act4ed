@@ -6,8 +6,7 @@ from typing import NamedTuple
 import pandas as pd
 
 from experiments.helpers import DATA_FOLDER
-from formulation.common.problems import ProblemDataReal
-from formulation.common.classes import Attributes, Student
+from formulation.common.classes import Attributes, School, Stop, Student
 
 ASSIGNED_STUDENTS = DATA_FOLDER / "assigned_students.csv"
 
@@ -92,7 +91,9 @@ def get_raw_assigned_buses() -> tuple[set[RawBusRoutes], dict[str, str]]:
     }, schools_to_bus
 
 
-def get_assigned_students(problem_data: ProblemDataReal) -> tuple[Student, ...]:
+def get_assigned_students(
+    schools: tuple[School, ...], stops: tuple[Stop, ...]
+) -> tuple[Student, ...]:
     """
     Uses the assigned_students.csv file to get a list of students
     with their assigned bus stops and schools. This is used for plotting the
@@ -101,13 +102,13 @@ def get_assigned_students(problem_data: ProblemDataReal) -> tuple[Student, ...]:
     assigned_students = get_raw_assigned_students()
 
     # filter for only students where we have a school match in our data
-    school_names = set(school.name for school in problem_data.schools)
+    school_names = set(school.name for school in schools)
     assigned_students = assigned_students[
         assigned_students["Student_School"].isin(school_names)
     ]
 
     # filter for only students where we have a bus stop match in our data
-    stop_names = set(stop.name for stop in problem_data.stops)
+    stop_names = set(stop.name for stop in stops)
     assigned_students = assigned_students[
         assigned_students["BUS STOP"].isin(stop_names)
     ]
@@ -117,20 +118,16 @@ def get_assigned_students(problem_data: ProblemDataReal) -> tuple[Student, ...]:
         special_ed = "SPED" in row["Student_Program"]
         # am not sure this is how they mark it, follow up
         wheelchair_user = "WHEELCHAIR" in row["Student_Program"]
-        stop = next(stop for stop in problem_data.stops if stop.name == row["BUS STOP"])
+        stop = next(stop for stop in stops if stop.name == row["BUS STOP"])
 
         student = Student(
             id=row["Student_District ID"],
             name=f"{row['Student_First Name']} {row['Student_Last Name']}",
             geographic_location=stop.geographic_location,
             school=next(
-                school
-                for school in problem_data.schools
-                if school.name == row["Student_School"]
+                school for school in schools if school.name == row["Student_School"]
             ),
-            stop=next(
-                stop for stop in problem_data.stops if stop.name == row["BUS STOP"]
-            ),
+            stop=next(stop for stop in stops if stop.name == row["BUS STOP"]),
             attributes=Attributes(
                 special_ed=special_ed, wheelchair_user=wheelchair_user
             ),
