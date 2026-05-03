@@ -207,9 +207,60 @@ end
 _encode_utf8_array(value::AbstractString) = collect(codeunits(String(value)))
 
 
+function _log_timing(label::AbstractString, enabled::Bool, elapsed_seconds::Real)
+    if enabled
+        println(stderr, "[bird timing] $(label): $(round(elapsed_seconds; digits = 3))s")
+        flush(stderr)
+    end
+end
+
+
+function _log_timing_message(message::AbstractString, enabled::Bool)
+    if enabled
+        println(stderr, "[bird timing] $(message)")
+        flush(stderr)
+    end
+end
+
+
+function _timed_value(label::AbstractString, enabled::Bool, f::Function)
+    start_time = time()
+    value = f()
+    _log_timing(label, enabled, time() - start_time)
+    return value
+end
+
+
+_timed_value(f::Function, label::AbstractString, enabled::Bool) = _timed_value(label, enabled, f)
+
+
 function _make_model(; optimizer = Gurobi.Optimizer, log_file = nothing, optimizer_attributes = Pair{String, Any}[])
-    model = optimizer === nothing ? Model() : Model(optimizer)
-    if optimizer !== nothing && log_file !== nothing
+    optimizer === nothing && return Model()
+
+    if optimizer === Gurobi.Optimizer
+        params = Dict{String, Any}()
+        if log_file !== nothing
+            params["LogFile"] = String(log_file)
+        end
+        for (name, value) in optimizer_attributes
+            params[String(name)] = value
+        end
+        attribute_names = Set(keys(params))
+        has_log_file = "LogFile" in attribute_names
+        has_log_control = "OutputFlag" in attribute_names || "LogToConsole" in attribute_names
+        if !has_log_control
+            if has_log_file
+                params["LogToConsole"] = 0
+            else
+                params["OutputFlag"] = 0
+            end
+        end
+        env = Gurobi.Env(params)
+        return Model(() -> Gurobi.Optimizer(env))
+    end
+
+    model = Model(optimizer)
+    if log_file !== nothing
         set_optimizer_attribute(model, "LogFile", String(log_file))
     end
     for (name, value) in optimizer_attributes

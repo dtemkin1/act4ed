@@ -17,6 +17,7 @@ from formulation.bird_adapter import (
     BirdBackendSolution,
     BirdExportInstance,
     assign_students_to_existing_stops,
+    bird_export_instance_from_template,
     bird_stop_assignments,
     bird_student_assignments,
     build_bird_export_instance,
@@ -545,11 +546,18 @@ def _make_unreachable_stop_problem_data() -> TinyProblemData:
 
 
 class BirdAdapterTests(unittest.TestCase):
-    def test_default_speed_is_km_per_minute(self) -> None:
+    def test_default_speed_is_bus_mph(self) -> None:
+        self.assertEqual(BirdAdapterConfig().bus_mph, 40.0)
         self.assertAlmostEqual(
             BirdAdapterConfig().speed_km_per_minute,
             40 / MPH_TO_KM_PER_MIN,
         )
+
+    def test_legacy_km_per_minute_speed_overrides_bus_mph(self) -> None:
+        config = BirdAdapterConfig(speed_km_per_minute=1.0)
+
+        self.assertAlmostEqual(config.speed_km_per_minute, 1.0)
+        self.assertAlmostEqual(config.bus_mph, MPH_TO_KM_PER_MIN)
 
     def test_conventional_export_duplicates_shared_stop_by_school(self) -> None:
         problem_data = _make_problem_data()
@@ -638,6 +646,40 @@ class BirdAdapterTests(unittest.TestCase):
             ],
         )
 
+    def test_fleet_aware_template_reuses_demand_and_distance_matrix(self) -> None:
+        problem_data = _make_fleet_aware_problem_data()
+        template = build_bird_export_instance(
+            problem_data,
+            BirdAdapterConfig(cohort="all", fleet_aware=True),
+        )
+
+        instance = bird_export_instance_from_template(
+            template,
+            problem_data.buses,
+            BirdAdapterConfig(
+                cohort="all",
+                fleet_aware=True,
+                conventional_spillover=True,
+                allow_partial=True,
+                lambda_value=7.0,
+                school_dwell_time=5.0,
+                bus_mph=MPH_TO_KM_PER_MIN,
+                method="scenario",
+            ),
+        )
+
+        self.assertIs(instance.demand_rows, template.demand_rows)
+        self.assertIs(instance.travel_distance_km, template.travel_distance_km)
+        np.testing.assert_array_equal(
+            instance.travel_time_min,
+            template.travel_distance_km,
+        )
+        self.assertEqual(instance.method, "scenario")
+        self.assertEqual(instance.lambda_value, 7.0)
+        self.assertTrue(instance.allow_partial)
+        self.assertTrue(instance.conventional_spillover)
+        np.testing.assert_array_equal(instance.school_dwell_times, [5.0])
+
     def test_route_assigned_monitor_policy_marks_all_buses_monitor_capable(
         self,
     ) -> None:
@@ -681,7 +723,7 @@ class BirdAdapterTests(unittest.TestCase):
                 cohort="all",
                 fleet_aware=True,
                 monitor_policy="route_assigned",
-                speed_km_per_minute=1.0,
+                bus_mph=MPH_TO_KM_PER_MIN,
             ),
         )
         solution = BirdBackendSolution(
@@ -1258,7 +1300,7 @@ class BirdAdapterTests(unittest.TestCase):
                 allow_partial=True,
                 constant_stop_time=0.0,
                 stop_time_per_student=0.0,
-                speed_km_per_minute=1.0,
+                bus_mph=MPH_TO_KM_PER_MIN,
                 method="scenario"
             ),
         )
@@ -1309,7 +1351,7 @@ class BirdAdapterTests(unittest.TestCase):
                 allow_partial=True,
                 constant_stop_time=0.0,
                 stop_time_per_student=0.0,
-                speed_km_per_minute=1.0,
+                bus_mph=MPH_TO_KM_PER_MIN,
                 method="lbh",
             ),
         )
@@ -1463,7 +1505,7 @@ class BirdAdapterTests(unittest.TestCase):
             school_dwell_time=10.0,
             constant_stop_time=0.0,
             stop_time_per_student=0.0,
-            speed_km_per_minute=1.0,
+            bus_mph=MPH_TO_KM_PER_MIN,
             method="lbh"
         )
 
@@ -1555,7 +1597,7 @@ class BirdAdapterTests(unittest.TestCase):
                 earliest_arrival_buffer=60.0,
                 constant_stop_time=0.0,
                 stop_time_per_student=0.0,
-                speed_km_per_minute=1.0,
+                bus_mph=MPH_TO_KM_PER_MIN,
                 method="scenario"
             ),
         )

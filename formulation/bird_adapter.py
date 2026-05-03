@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from dataclasses import dataclass, field
+from collections.abc import Iterable
+from dataclasses import dataclass, field, replace
 import math
 from pathlib import Path
 from typing import Literal
@@ -30,7 +31,8 @@ from formulation.normalized_result import (
 
 _BIRD_INSTANCE_SCHEMA_VERSION = 12
 _BIRD_SOLUTION_SCHEMA_VERSION = 1
-_DEFAULT_BUS_SPEED_KM_PER_MINUTE = 40 / MPH_TO_KM_PER_MIN
+_DEFAULT_BUS_MPH = 40.0
+_DEFAULT_BUS_SPEED_KM_PER_MINUTE = _DEFAULT_BUS_MPH / MPH_TO_KM_PER_MIN
 _DEFAULT_BIRD_LAMBDA_VALUE = 1.0e4
 _DEFAULT_STOP_ASSIGNMENT_LAMBDA = 1.0e4
 _SERVICE_GROUP_WHEELCHAIR = 1
@@ -65,7 +67,8 @@ class BirdAdapterConfig:
     school_dwell_time: float = 0.0
     earliest_arrival_buffer: float | None = None
     latest_arrival_buffer: float | None = None
-    speed_km_per_minute: float = _DEFAULT_BUS_SPEED_KM_PER_MINUTE
+    bus_mph: float = _DEFAULT_BUS_MPH
+    speed_km_per_minute: float | None = field(default=None, repr=False)
     lambda_value: float = _DEFAULT_BIRD_LAMBDA_VALUE
     reassign_stops: bool = False
     stop_assignment_lambda: float = _DEFAULT_STOP_ASSIGNMENT_LAMBDA
@@ -75,6 +78,25 @@ class BirdAdapterConfig:
     allow_partial: bool = False
     monitor_policy: MonitorPolicy = "fleet"
     method: OptimizationMethod = "lbh"
+
+    def __post_init__(self) -> None:
+        if self.speed_km_per_minute is None:
+            if self.bus_mph <= 0:
+                raise ValueError("bus_mph must be positive")
+            object.__setattr__(
+                self,
+                "speed_km_per_minute",
+                self.bus_mph / MPH_TO_KM_PER_MIN,
+            )
+            return
+
+        if self.speed_km_per_minute <= 0:
+            raise ValueError("speed_km_per_minute must be positive")
+        object.__setattr__(
+            self,
+            "bus_mph",
+            self.speed_km_per_minute * MPH_TO_KM_PER_MIN,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -146,6 +168,10 @@ class BirdExportInstance:
     travel_distance_km: np.ndarray
     travel_time_min: np.ndarray
     demand_school_indices: np.ndarray
+
+    @property
+    def bus_mph(self) -> float:
+        return self.speed_km_per_minute * MPH_TO_KM_PER_MIN
 
     def to_payload(self) -> dict[str, np.ndarray]:
         demand_student_names_ptr, demand_student_names_values = (
@@ -797,6 +823,16 @@ def _depot_index(depots: list[Depot], depot: Depot) -> int:
     raise ValueError(f"bus depot {depot.name} is not present in Bird depots")
 
 
+def _template_depot_index(
+    depots: list[Depot | BirdDepotView],
+    depot: Depot,
+) -> int:
+    for idx, candidate in enumerate(depots, start=1):
+        if candidate == depot or candidate.node_id == depot.node_id:
+            return idx
+    raise ValueError(f"bus depot {depot.name} is not present in Bird template depots")
+
+
 def _coerce_bus_type(value: BusType | str | int | None, buses: list[Bus]) -> BusType:
     if value is None:
         bus_types = {bus.type for bus in buses}
@@ -1228,6 +1264,114 @@ def build_bird_export_instance(
     )
 
 
+def bird_export_instance_from_template(
+    template: BirdExportInstance,
+    buses: Iterable[Bus],
+    config: BirdAdapterConfig,
+) -> BirdExportInstance:
+    selected_buses = list(buses)
+    if not selected_buses:
+        raise ValueError("no buses available for Bird export")
+    if not template.fleet_aware or not config.fleet_aware:
+        raise ValueError("Bird template reuse currently requires fleet_aware=True")
+    if template.cohort != config.cohort:
+        raise ValueError("Bird template cohort does not match requested config")
+    if template.stop_assignment_enabled != config.reassign_stops:
+        raise ValueError("Bird template stop reassignment setting does not match requested config")
+    if config.reassign_stops:
+        if (
+            template.stop_assignment_lambda != config.stop_assignment_lambda
+            or template.max_walking_distance_km != config.max_walking_distance_km
+        ):
+            raise ValueError("Bird template stop reassignment parameters do not match requested config")
+    if config.monitor_policy not in ("fleet", "route_assigned"):
+        raise ValueError(f"unknown Bird monitor policy {config.monitor_policy!r}")
+
+    def bus_has_monitor(bus: Bus) -> bool:
+        return config.monitor_policy == "route_assigned" or bus.has_monitor
+
+    bus_monitor_flags = [bus_has_monitor(bus) for bus in selected_buses]
+    bus_wheelchair_capacities = [
+        _wheelchair_capacity_for_bus(bus) for bus in selected_buses
+    ]
+    if any(row.wheelchair_students > 0 for row in template.demand_rows) and not any(
+        has_monitor and wheelchair_capacity > 0
+        for has_monitor, wheelchair_capacity in zip(
+            bus_monitor_flags,
+            bus_wheelchair_capacities,
+            strict=True,
+        )
+    ):
+        raise ValueError(
+            "fleet-aware Bird export has wheelchair students but no monitor bus "
+            "with wheelchair capacity"
+        )
+    if any(
+        row.service_group == "sped" and row.students > 0
+        for row in template.demand_rows
+    ) and not any(bus_monitor_flags):
+        raise ValueError("fleet-aware Bird export has SPED students but no monitor bus")
+
+    earliest_arrival_buffer, latest_arrival_buffer = _resolve_arrival_buffers(config)
+    bus_type_names = [_bus_type_name(bus) for bus in selected_buses]
+    bus_type_set = set(bus_type_names)
+    travel_time_min = template.travel_distance_km / config.speed_km_per_minute
+
+    return replace(
+        template,
+        max_time_on_bus=config.max_time_on_bus,
+        constant_stop_time=config.constant_stop_time,
+        stop_time_per_student=config.stop_time_per_student,
+        stop_time_per_wheelchair_student=config.stop_time_per_wheelchair_student,
+        school_dwell_time=config.school_dwell_time,
+        earliest_arrival_buffer=earliest_arrival_buffer,
+        latest_arrival_buffer=latest_arrival_buffer,
+        speed_km_per_minute=config.speed_km_per_minute,
+        lambda_value=config.lambda_value,
+        stop_assignment_enabled=config.reassign_stops,
+        stop_assignment_lambda=config.stop_assignment_lambda,
+        max_walking_distance_km=config.max_walking_distance_km,
+        bus_capacity=max(bus.capacity for bus in selected_buses),
+        fleet_size=len(selected_buses),
+        bus_type="mixed" if len(bus_type_set) > 1 else bus_type_names[0],
+        conventional_spillover=config.conventional_spillover,
+        allow_partial=config.allow_partial,
+        monitor_policy=config.monitor_policy,
+        method=config.method,
+        bus_names=[bus.name for bus in selected_buses],
+        bus_capacities=np.asarray(
+            [bus.capacity for bus in selected_buses],
+            dtype=np.int64,
+        ),
+        bus_depot_indices=np.asarray(
+            [_template_depot_index(list(template.depots), bus.depot) for bus in selected_buses],
+            dtype=np.int64,
+        ),
+        bus_has_monitor=np.asarray(
+            [1 if has_monitor else 0 for has_monitor in bus_monitor_flags],
+            dtype=np.int64,
+        ),
+        bus_wheelchair_capacities=np.asarray(
+            bus_wheelchair_capacities,
+            dtype=np.int64,
+        ),
+        bus_type_names=bus_type_names,
+        school_dwell_times=np.asarray(
+            [config.school_dwell_time for _ in template.schools],
+            dtype=np.float64,
+        ),
+        school_earliest_arrival_buffers=np.asarray(
+            [earliest_arrival_buffer for _ in template.schools],
+            dtype=np.float64,
+        ),
+        school_latest_arrival_buffers=np.asarray(
+            [latest_arrival_buffer for _ in template.schools],
+            dtype=np.float64,
+        ),
+        travel_time_min=travel_time_min,
+    )
+
+
 def export_bird_instance(
     problem_data: ProblemData,
     path: str | Path,
@@ -1589,6 +1733,8 @@ def normalized_result_from_bird_solution(
             "bus_capacity": instance.bus_capacity,
             "earliest_arrival_buffer": instance.earliest_arrival_buffer,
             "latest_arrival_buffer": instance.latest_arrival_buffer,
+            "bus_mph": instance.bus_mph,
+            "speed_km_per_minute": instance.speed_km_per_minute,
             "fleet_aware": instance.fleet_aware,
             "conventional_spillover": instance.conventional_spillover,
             "allow_partial": instance.allow_partial,

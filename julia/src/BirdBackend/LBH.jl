@@ -661,6 +661,7 @@ function solve_with_scenarios!(
     seed::Int = 1,
     optimizer = Gurobi.Optimizer,
     optimizer_attributes = Pair{String, Any}[],
+    timing_log::Bool = false,
 )
     data.fleet_aware && return solve_fleet_aware_with_scenarios!(
         data;
@@ -668,9 +669,21 @@ function solve_with_scenarios!(
         seed = seed,
         optimizer = optimizer,
         optimizer_attributes = optimizer_attributes,
+        timing_log = timing_log,
     )
 
-    compute_scenarios!(data, scenario_params; seed = seed, optimizer = optimizer, optimizer_attributes = optimizer_attributes)
-    route_buses!(data; optimizer = optimizer, optimizer_attributes = optimizer_attributes)
+    _timed_value("nonfleet scenario compute_scenarios", timing_log) do
+        compute_scenarios!(
+            data,
+            scenario_params;
+            seed = seed,
+            optimizer = optimizer,
+            optimizer_attributes = optimizer_attributes,
+            timing_log = timing_log,
+        )
+    end
+    _timed_value("nonfleet scenario route_buses", timing_log) do
+        route_buses!(data; optimizer = optimizer, optimizer_attributes = optimizer_attributes, timing_log = timing_log)
+    end
     return data
 end

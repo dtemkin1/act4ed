@@ -20,6 +20,7 @@ from formulation.common import (
     BusType,
     Attributes,
     Depot,
+    MPH_TO_KM_PER_MIN,
     ProblemData,
     School,
     SchoolType,
@@ -259,7 +260,7 @@ class RoutingSolutionJsonTests(unittest.TestCase):
         instance = build_bird_export_instance(
             _build_bird_problem(),
             BirdAdapterConfig(
-                cohort="conventional", bus_type="C", speed_km_per_minute=1.0
+                cohort="conventional", bus_type="C", bus_mph=MPH_TO_KM_PER_MIN
             ),
         )
         solution = BirdBackendSolution(
@@ -310,7 +311,7 @@ class RoutingSolutionJsonTests(unittest.TestCase):
         instance = build_bird_export_instance(
             _build_fleet_aware_bird_problem(),
             BirdAdapterConfig(
-                cohort="conventional", fleet_aware=True, speed_km_per_minute=1.0
+                cohort="conventional", fleet_aware=True, bus_mph=MPH_TO_KM_PER_MIN
             ),
         )
         solution = BirdBackendSolution(

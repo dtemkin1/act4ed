@@ -19,11 +19,16 @@ from formulation.bird_adapter import (
     BirdAdapterConfig,
     BirdBackendSolution,
     BirdExportInstance,
+    bird_export_instance_from_template,
+    build_bird_export_instance,
     export_bird_instance,
     summarize_bird_solution_for_mcdp,
 )
 from formulation.common import Bus
 from formulation.common.problems import FilteredProblemData, ProblemData
+
+from tqdm import tqdm
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ROUTING_LIB = PROJECT_ROOT / "routing.mcdplib"
@@ -62,13 +67,13 @@ ROUTING_R = [
 ]
 
 GRID_FLEET = {
-    "C": (0, 15, 30, 45),
-    "B": (0, 8, 17),
-    "BWC": (0, 4, 9),
-    "WC": (0, 1),
+    "C":   (45,),
+    "B":   (17,),
+    "BWC": (9,),
+    "WC":  (1, ),
 }
 GRID_METHODS = ("scenario", "lbh")
-GRID_LAMBDAS = ((1.0e3, "lambda_1e3"), (1.0e4, "lambda_1e4"), (1.0e5, "lambda_1e5"))
+GRID_LAMBDAS = ((0, "lambda_0"), (1.0e2, "lambda_1e3"), (1.0e4, "lambda_1e4"), (1.0e5, "lambda_1e5"))
 GRID_PARTIAL = ((False, "partial_false"), (True, "partial_true"))
 GRID_SPILLOVER = ((False, "spillover_false"), (True, "spillover_true"))
 GRID_DWELL = ((0.0, "dwell_0"), (10.0, "dwell_10"))
@@ -515,6 +520,9 @@ def solve_grid_point(
     *,
     output_dir: Path,
     bus_order: Mapping[str, list[str]],
+    template: BirdExportInstance | None = None,
+    julia_timing_log: bool = True,
+    gurobi_verbose: bool = False,
 ) -> tuple[dict[str, Any], BirdExportInstance, BirdBackendSolution]:
     selected_buses = select_buses_by_type_counts(
         problem_data.buses,
@@ -524,7 +532,6 @@ def solve_grid_point(
     if not selected_buses:
         raise ValueError("BiRD fleet-aware export requires at least one selected bus")
 
-    run_problem = _problem_with_buses(problem_data, selected_buses)
     config = BirdAdapterConfig(
         cohort="all",
         fleet_aware=True,
@@ -537,11 +544,14 @@ def solve_grid_point(
         method=grid_point.method
     )
 
-    instance_path = export_bird_instance(
-        run_problem,
-        output_dir / f"{grid_point.label}_instance.npz",
-        config,
-    )
+    instance_path = output_dir / f"{grid_point.label}_instance.npz"
+    if template is None:
+        run_problem = _problem_with_buses(problem_data, selected_buses)
+        export_bird_instance(run_problem, instance_path, config)
+    else:
+        bird_export_instance_from_template(template, selected_buses, config).save(
+            instance_path
+        )
     solution_path = output_dir / f"{grid_point.label}_solution.npz"
     log_file = output_dir / f"{grid_point.label}.log"
 
@@ -558,6 +568,10 @@ def solve_grid_point(
         "--log-file",
         str(log_file),
     ]
+    if julia_timing_log:
+        command.append("--timing-log")
+    if gurobi_verbose:
+        command.append("--gurobi-verbose")
     subprocess.run(command, check=True, cwd=PROJECT_ROOT)
 
     instance = BirdExportInstance.load(instance_path)
@@ -595,19 +609,31 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--routing-lib", type=Path, default=ROUTING_LIB)
     parser.add_argument("--cost-config", type=Path, default=COST_CONFIG)
-    parser.add_argument("--current-routes", type=bool, default=False)
+    parser.add_argument("--current-routes", action="store_true", default=False)
+    parser.add_argument("--julia-timing-log", action="store_true", default=False)
+    parser.add_argument("--gurobi-verbose", action="store_true", default=False)
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    args.output_dir.mkdir(parents=True, exist_ok=True)
+
+    output_dir = (
+        args.output_dir.with_name(f"{args.output_dir.name}_current_routes")
+        if args.current_routes
+        else args.output_dir
+    )
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     costs = load_routing_costs(args.cost_config)
     if args.current_routes:
         problem_data = _load_assigned_framingham_problem()
     else:
         problem_data = _load_full_framingham_problem()
+    bird_template = build_bird_export_instance(
+        problem_data,
+        BirdAdapterConfig(cohort="all", fleet_aware=True),
+    )
 
     bus_order = read_bus_inventory_order()
 
@@ -616,18 +642,19 @@ def main() -> None:
     errors: list[dict[str, Any]] = []
 
     attempted = 0
-    for grid_point in iter_grid():
+    for grid_point in tqdm(iter_grid()):
         if sum(grid_point.counts.values()) == 0:
             continue
-        if args.limit is not None and attempted >= args.limit:
-            break
         attempted += 1
         try:
             summary, _instance, solution = solve_grid_point(
                 problem_data,
                 grid_point,
-                output_dir=args.output_dir,
+                output_dir=output_dir,
                 bus_order=bus_order,
+                template=bird_template,
+                julia_timing_log=args.julia_timing_log,
+                gurobi_verbose=args.gurobi_verbose,
             )
         except Exception as exc:
             errors.append({"label": grid_point.label, "error": str(exc)})
@@ -654,11 +681,11 @@ def main() -> None:
         costs=costs,
         routing_implementations=implementations or None,
     )
-    (args.output_dir / "routing_bird_catalogue_partial_result.json").write_text(
+    (output_dir / "routing_bird_catalogue_partial_result.json").write_text(
         json.dumps(partial_result, indent=2, sort_keys=True),
         encoding="utf-8",
     )
-    (args.output_dir / "routing_bird_errors.json").write_text(
+    (output_dir / "routing_bird_errors.json").write_text(
         json.dumps(errors, indent=2, sort_keys=True),
         encoding="utf-8",
     )

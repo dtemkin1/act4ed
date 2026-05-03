@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import unittest
 
+import networkx as nx
 import pandas as pd
 from shapely import Point
 
 from formulation.common import (
     Attributes,
     Depot,
+    FilteredProblemData,
     ProblemDataReal,
     School,
     SchoolType,
@@ -121,6 +123,58 @@ class CommonServiceGraphTests(unittest.TestCase):
         self.assertFalse(graph.has_node(stop_c.node_id))
         self.assertFalse(graph.has_node(school_h.node_id))
         self.assertTrue(graph.has_edge(stop_a.node_id, school_e.node_id))
+
+    def test_filtered_service_graph_recovers_edges_allowed_by_filtered_students(
+        self,
+    ) -> None:
+        stop = _make_stop("Stop", 1)
+        school_e = _make_school("School E", 10, SchoolType.E)
+        school_h = _make_school("School H", 11, SchoolType.HS)
+        base_student = _make_student("base-h", stop, school_h)
+        filtered_student = _make_student("filtered-e", stop, school_e)
+        problem_data = _make_problem_data(
+            stops=[stop],
+            schools=[school_e, school_h],
+            students=[base_student],
+        )
+        base_graph = nx.MultiDiGraph()
+        base_graph.add_edge(stop.node_id, school_e.node_id, key=0, length=9_000.0)
+        object.__setattr__(problem_data, "osm_graph", base_graph)
+
+        self.assertFalse(problem_data.service_graph.has_edge(stop.node_id, school_e.node_id))
+
+        filtered = FilteredProblemData(
+            name="filtered",
+            base_problem_data=problem_data,
+            _stops=[stop],
+            _schools=[school_e],
+            _depots=[],
+            _students=[filtered_student],
+        )
+
+        edge = filtered.service_graph.get_edge_data(stop.node_id, school_e.node_id, key=0)
+        self.assertIsNotNone(edge)
+        self.assertEqual(edge["length"], 9.0)
+
+    def test_filtered_service_graph_reuses_base_graph_when_only_buses_change(
+        self,
+    ) -> None:
+        stop = _make_stop("Stop", 1)
+        school = _make_school("School", 10, SchoolType.E)
+        problem_data = _make_problem_data(
+            stops=[stop],
+            schools=[school],
+            students=[_make_student("student", stop, school)],
+        )
+        base_service_graph = problem_data.service_graph
+
+        filtered = FilteredProblemData(
+            name="bus-filtered",
+            base_problem_data=problem_data,
+            _buses=[],
+        )
+
+        self.assertIs(filtered.service_graph, base_service_graph)
 
     def test_restrict_to_school_type_keeps_all_matching_schools_and_stops(self) -> None:
         stop_shared = _make_stop("Stop Shared", 1)

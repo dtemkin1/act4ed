@@ -383,6 +383,7 @@ function _solve_fleet_stage_mip!(
     fail_if_unserved::Bool = true,
     optimizer = Gurobi.Optimizer,
     optimizer_attributes = Pair{String, Any}[],
+    timing_log::Bool = false,
 )
     stage_stops = _stage_stop_pairs(available)
     isempty(stage_stops) && return Int[]
@@ -393,22 +394,28 @@ function _solve_fleet_stage_mip!(
         return Int[]
     end
 
-    candidates = _generate_fleet_route_candidates(
-        data,
-        available,
-        eligible_remaining,
-        scenario_params;
-        rng = rng,
-    )
-    candidates = _reduce_fleet_route_candidates(
-        data,
-        candidates,
-        stage_stops,
-        label;
-        optimizer = optimizer,
-        optimizer_attributes = optimizer_attributes,
-    )
-    covering = _coverage_by_stop(candidates, stage_stops)
+    candidates = _timed_value("fleet scenario $(label) candidate generation", timing_log) do
+        _generate_fleet_route_candidates(
+            data,
+            available,
+            eligible_remaining,
+            scenario_params;
+            rng = rng,
+        )
+    end
+    candidates = _timed_value("fleet scenario $(label) candidate reduction", timing_log) do
+        _reduce_fleet_route_candidates(
+            data,
+            candidates,
+            stage_stops,
+            label;
+            optimizer = optimizer,
+            optimizer_attributes = optimizer_attributes,
+        )
+    end
+    covering = _timed_value("fleet scenario $(label) coverage indexing", timing_log) do
+        _coverage_by_stop(candidates, stage_stops)
+    end
     if fail_if_unserved
         for (position, routes_covering_stop) in enumerate(covering)
             if isempty(routes_covering_stop)
@@ -422,9 +429,16 @@ function _solve_fleet_stage_mip!(
 
     bus_ids = collect(eligible_remaining)
     route_ids = collect(eachindex(candidates))
-    route_arcs = _candidate_route_arcs(data, candidates)
+    route_arcs = _timed_value("fleet scenario $(label) arc construction", timing_log) do
+        _candidate_route_arcs(data, candidates)
+    end
     compatible_bus_sets = [Set(candidate.compatible_buses) for candidate in candidates]
+    _log_timing_message(
+        "fleet scenario $(label) size: stops=$(length(stage_stops)), buses=$(length(bus_ids)), candidates=$(length(route_ids)), arcs=$(length(route_arcs)), assign_vars=$(length(bus_ids) * length(route_ids)), link_vars=$(length(bus_ids) * length(route_arcs))",
+        timing_log,
+    )
 
+    model_build_start = time()
     model = _make_model(; optimizer = optimizer, optimizer_attributes = optimizer_attributes)
     @variable(model, assign[bus_ids, route_ids], Bin)
     @variable(model, used[bus_ids], Bin)
@@ -493,38 +507,58 @@ function _solve_fleet_stage_mip!(
     )
     if data.allow_partial
         @objective(model, Max, served_objective)
-        optimize!(model)
+        _log_timing("fleet scenario $(label) model build", timing_log, time() - model_build_start)
+        _timed_value("fleet scenario $(label) served optimize", timing_log) do
+            optimize!(model)
+        end
         status = termination_status(model)
         status == MOI.OPTIMAL || error("fleet-aware scenario $(label) served-count solve failed with $(status)")
         best_served = objective_value(model)
         @constraint(model, served_objective >= best_served - BIRD_TIMING_EPS)
+    else
+        _log_timing("fleet scenario $(label) model build", timing_log, time() - model_build_start)
     end
 
     bus_fixed_cost = max(data.default_lambda_value * 100.0, 1.0e6)
-    cost_objective =
-        bus_fixed_cost * _aff_sum(used[bus_idx] for bus_idx in bus_ids) +
+    objective_build_start = time()
+    cost_objective = _timed_value("fleet scenario $(label) objective bus fixed term", timing_log) do
+        bus_fixed_cost * _aff_sum(used[bus_idx] for bus_idx in bus_ids)
+    end
+    cost_objective += _timed_value("fleet scenario $(label) objective route assignment term", timing_log) do
         _aff_sum(
             assign[bus_idx, route_idx] * candidates[route_idx].cost
             for bus_idx in bus_ids
             for route_idx in route_ids
-        ) +
+        )
+    end
+    cost_objective += _timed_value("fleet scenario $(label) objective route start term", timing_log) do
         _aff_sum(
             start_route[bus_idx, route_idx] * _route_start_cost(data, bus_idx, candidates[route_idx])
             for bus_idx in bus_ids
             for route_idx in route_ids
-        ) +
+        )
+    end
+    cost_objective += _timed_value("fleet scenario $(label) objective route finish term", timing_log) do
         _aff_sum(
             finish_route[bus_idx, route_idx] * _route_finish_cost(data, bus_idx, candidates[route_idx])
             for bus_idx in bus_ids
             for route_idx in route_ids
-        ) +
+        )
+    end
+    cost_objective += _timed_value("fleet scenario $(label) objective route link term", timing_log) do
         _aff_sum(
             link_route[bus_idx, arc] * _route_link_cost(data, candidates[arc[1]], candidates[arc[2]])
             for bus_idx in bus_ids
             for arc in route_arcs
         )
-    @objective(model, Min, cost_objective)
-    optimize!(model)
+    end
+    _timed_value("fleet scenario $(label) objective attach", timing_log) do
+        @objective(model, Min, cost_objective)
+    end
+    _log_timing("fleet scenario $(label) objective build", timing_log, time() - objective_build_start)
+    _timed_value("fleet scenario $(label) cost optimize", timing_log) do
+        optimize!(model)
+    end
     status = termination_status(model)
     if status != MOI.OPTIMAL
         fail_if_unserved && error("fleet-aware scenario $(label) solve failed with $(status)")
@@ -582,6 +616,7 @@ function solve_fleet_aware_with_scenarios!(
     seed::Int = 1,
     optimizer = Gurobi.Optimizer,
     optimizer_attributes = Pair{String, Any}[],
+    timing_log::Bool = false,
 )
     isempty(data.fleet) && error("fleet-aware Bird instance has no concrete buses")
 
@@ -608,6 +643,7 @@ function solve_fleet_aware_with_scenarios!(
         fail_if_unserved = !data.allow_partial,
         optimizer = optimizer,
         optimizer_attributes = optimizer_attributes,
+        timing_log = timing_log,
     )
     foreach(bus_idx -> delete!(remaining_bus_indices, bus_idx), used)
 
@@ -626,6 +662,7 @@ function solve_fleet_aware_with_scenarios!(
         fail_if_unserved = !data.allow_partial,
         optimizer = optimizer,
         optimizer_attributes = optimizer_attributes,
+        timing_log = timing_log,
     )
     foreach(bus_idx -> delete!(remaining_bus_indices, bus_idx), used)
 
@@ -644,6 +681,7 @@ function solve_fleet_aware_with_scenarios!(
         fail_if_unserved = !data.allow_partial && !data.conventional_spillover,
         optimizer = optimizer,
         optimizer_attributes = optimizer_attributes,
+        timing_log = timing_log,
     )
     foreach(bus_idx -> delete!(remaining_bus_indices, bus_idx), used)
 
@@ -665,6 +703,7 @@ function solve_fleet_aware_with_scenarios!(
                 fail_if_unserved = !data.allow_partial,
                 optimizer = optimizer,
                 optimizer_attributes = optimizer_attributes,
+                timing_log = timing_log,
             )
             foreach(bus_idx -> delete!(remaining_bus_indices, bus_idx), used)
         end

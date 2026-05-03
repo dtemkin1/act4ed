@@ -182,7 +182,14 @@ function build_scenario_graph(data::BirdData)
 end
 
 
-function select_scenario(data::BirdData, scenario_graph::ScenarioGraph; optimizer = Gurobi.Optimizer, optimizer_attributes = Pair{String, Any}[])
+function select_scenario(
+    data::BirdData,
+    scenario_graph::ScenarioGraph;
+    optimizer = Gurobi.Optimizer,
+    optimizer_attributes = Pair{String, Any}[],
+    timing_log::Bool = false,
+)
+    model_build_start = time()
     model = _make_model(; optimizer = optimizer, optimizer_attributes = optimizer_attributes)
     @variable(model, use_scenario[school in eachindex(data.schools), scenario in 1:scenario_graph.num_scenarios[school]], Bin)
     @variable(model, bus_flow[edge in edges(scenario_graph.graph)] >= 0, Int)
@@ -206,7 +213,10 @@ function select_scenario(data::BirdData, scenario_graph::ScenarioGraph; optimize
         sum(bus_flow[edge] for edge in edges_out(scenario_graph.graph, node_id)),
     )
     @objective(model, Min, sum(bus_flow[edge] * get(scenario_graph.costs, (edge.src, edge.dst), 0.0) for edge in edges(scenario_graph.graph)))
-    optimize!(model)
+    _log_timing("nonfleet scenario selection model build", timing_log, time() - model_build_start)
+    _timed_value("nonfleet scenario selection optimize", timing_log) do
+        optimize!(model)
+    end
     status = termination_status(model)
     status == MOI.OPTIMAL || error("scenario selection failed with $(status)")
     return [argmax([value(use_scenario[school, scenario]) for scenario in 1:scenario_graph.num_scenarios[school]]) for school in eachindex(data.schools)]
@@ -328,7 +338,14 @@ function yard_to_node_dict(graph::FullRoutingGraph)
 end
 
 
-function solve_full_routing(data::BirdData, graph::FullRoutingGraph; optimizer = Gurobi.Optimizer, optimizer_attributes = Pair{String, Any}[])
+function solve_full_routing(
+    data::BirdData,
+    graph::FullRoutingGraph;
+    optimizer = Gurobi.Optimizer,
+    optimizer_attributes = Pair{String, Any}[],
+    timing_log::Bool = false,
+)
+    model_build_start = time()
     model = _make_model(; optimizer = optimizer, optimizer_attributes = optimizer_attributes)
     @variable(model, bus_flow[edge in edges(graph.graph)], Bin)
     @variable(model, yard_capacity[node_id in eachindex(graph.nodes); graph.nodes[node_id] isa FullYardNode] >= 0, Int)
@@ -349,7 +366,10 @@ function solve_full_routing(data::BirdData, graph::FullRoutingGraph; optimizer =
         sum(bus_flow[edge] for edge in edges_out(graph.graph, node_id)) <= yard_capacity[node_id],
     )
     @objective(model, Min, sum(yard_capacity[node_id] for node_id in eachindex(graph.nodes) if graph.nodes[node_id] isa FullYardNode))
-    optimize!(model)
+    _log_timing("nonfleet full routing model build", timing_log, time() - model_build_start)
+    _timed_value("nonfleet full routing optimize", timing_log) do
+        optimize!(model)
+    end
     status = termination_status(model)
     status == MOI.OPTIMAL || error("full routing solve failed with $(status)")
     flows = Dict(edge => value(bus_flow[edge]) for edge in edges(graph.graph))
@@ -403,10 +423,19 @@ function interpret_flows!(data::BirdData, graph::FullRoutingGraph, flows::Dict{D
 end
 
 
-function route_buses!(data::BirdData; optimizer = Gurobi.Optimizer, optimizer_attributes = Pair{String, Any}[])
-    scenario_graph = build_scenario_graph(data)
-    data.used_scenario = select_scenario(data, scenario_graph; optimizer = optimizer, optimizer_attributes = optimizer_attributes)
-    full_routing_graph = build_full_routing_graph(data, data.used_scenario)
-    data.buses = solve_full_routing(data, full_routing_graph; optimizer = optimizer, optimizer_attributes = optimizer_attributes)
+function route_buses!(
+    data::BirdData;
+    optimizer = Gurobi.Optimizer,
+    optimizer_attributes = Pair{String, Any}[],
+    timing_log::Bool = false,
+)
+    scenario_graph = _timed_value("nonfleet scenario selection arc construction", timing_log) do
+        build_scenario_graph(data)
+    end
+    data.used_scenario = select_scenario(data, scenario_graph; optimizer = optimizer, optimizer_attributes = optimizer_attributes, timing_log = timing_log)
+    full_routing_graph = _timed_value("nonfleet full routing arc construction", timing_log) do
+        build_full_routing_graph(data, data.used_scenario)
+    end
+    data.buses = solve_full_routing(data, full_routing_graph; optimizer = optimizer, optimizer_attributes = optimizer_attributes, timing_log = timing_log)
     return data
 end

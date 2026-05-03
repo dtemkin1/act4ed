@@ -270,6 +270,14 @@ function add_route!(data::BirdData, school_idx::Int, routes::FeasibleRouteSet, r
     return routes
 end
 
+# TODO make sure this makes sense
+function add_single_stop_routes!(data::BirdData, school_idx::Int, routes::FeasibleRouteSet)
+    for stop_idx in eachindex(data.stops[school_idx])
+        add_route!(data, school_idx, routes, FeasibleRoute(data, school_idx, BirdRoute(0, [stop_idx])))
+    end
+    return routes
+end
+
 
 function generate_routes(
     data::BirdData,
@@ -298,6 +306,7 @@ function best_routes(
     lambda_value::Float64;
     optimizer = Gurobi.Optimizer,
     optimizer_attributes = Pair{String, Any}[],
+    timing_log::Bool = false,
 )
     constrained_stops = Int[]
     for stop_idx in 1:length(data.stops[school_idx])
@@ -313,11 +322,15 @@ function best_routes(
     end
     isempty(constrained_stops) && return Int[]
 
+    model_build_start = time()
     model = _make_model(; optimizer = optimizer, optimizer_attributes = optimizer_attributes)
     @variable(model, route_used[1:length(routes.list)], Bin)
     @objective(model, Min, sum(route_used[idx] * (lambda_value + routes.list[idx].cost) for idx in eachindex(routes.list)))
     @constraint(model, [stop_idx in constrained_stops], sum(route_used[idx] for idx in routes.at_stop[stop_idx]) >= 1)
-    optimize!(model)
+    _log_timing("nonfleet scenario school $(school_idx) route selection model build", timing_log, time() - model_build_start)
+    _timed_value("nonfleet scenario school $(school_idx) route selection optimize", timing_log) do
+        optimize!(model)
+    end
     status = termination_status(model)
     status == MOI.OPTIMAL || error("best_routes solve failed with $(status)")
     return [idx for idx in eachindex(routes.list) if value(route_used[idx]) >= 0.5]
@@ -397,12 +410,16 @@ function greedy_combined(
     rng = Random.default_rng(),
     optimizer = Gurobi.Optimizer,
     optimizer_attributes = Pair{String, Any}[],
+    timing_log::Bool = false,
 )
     routes = FeasibleRouteSet(data, school_idx)
-    for route in generate_routes(data, school_idx, n_routes, max_route_time_lower, max_route_time_upper; rng = rng)
-        add_route!(data, school_idx, routes, route)
+    _timed_value("nonfleet scenario school $(school_idx) candidate generation", timing_log) do
+        add_single_stop_routes!(data, school_idx, routes)
+        for route in generate_routes(data, school_idx, n_routes, max_route_time_lower, max_route_time_upper; rng = rng)
+            add_route!(data, school_idx, routes, route)
+        end
     end
-    selected = best_routes(data, school_idx, routes, lambda_value; optimizer = optimizer, optimizer_attributes = optimizer_attributes)
+    selected = best_routes(data, school_idx, routes, lambda_value; optimizer = optimizer, optimizer_attributes = optimizer_attributes, timing_log = timing_log)
     return build_solution(data, school_idx, routes, selected)
 end
 
@@ -418,15 +435,19 @@ function greedy_combined(
     rng = Random.default_rng(),
     optimizer = Gurobi.Optimizer,
     optimizer_attributes = Pair{String, Any}[],
+    timing_log::Bool = false,
 )
     routes = FeasibleRouteSet(data, school_idx)
-    for route in generate_routes(data, school_idx, n_routes, max_route_time_lower, max_route_time_upper; rng = rng)
-        add_route!(data, school_idx, routes, route)
+    _timed_value("nonfleet scenario school $(school_idx) candidate generation", timing_log) do
+        add_single_stop_routes!(data, school_idx, routes)
+        for route in generate_routes(data, school_idx, n_routes, max_route_time_lower, max_route_time_upper; rng = rng)
+            add_route!(data, school_idx, routes, route)
+        end
+        for route in start_routes
+            add_route!(data, school_idx, routes, FeasibleRoute(data, school_idx, route))
+        end
     end
-    for route in start_routes
-        add_route!(data, school_idx, routes, FeasibleRoute(data, school_idx, route))
-    end
-    selected = best_routes(data, school_idx, routes, lambda_value; optimizer = optimizer, optimizer_attributes = optimizer_attributes)
+    selected = best_routes(data, school_idx, routes, lambda_value; optimizer = optimizer, optimizer_attributes = optimizer_attributes, timing_log = timing_log)
     return build_solution(data, school_idx, routes, selected)
 end
 
@@ -438,6 +459,7 @@ function greedy_combined_iterated(
     rng = Random.default_rng(),
     optimizer = Gurobi.Optimizer,
     optimizer_attributes = Pair{String, Any}[],
+    timing_log::Bool = false,
 )
     routes = greedy_routes(data, school_idx, Inf; rng = rng)
     for _ in 1:params.n_iterations
@@ -452,6 +474,7 @@ function greedy_combined_iterated(
             rng = rng,
             optimizer = optimizer,
             optimizer_attributes = optimizer_attributes,
+            timing_log = timing_log,
         )
     end
     return routes
@@ -464,6 +487,7 @@ function compute_scenarios!(
     seed::Int = 1,
     optimizer = Gurobi.Optimizer,
     optimizer_attributes = Pair{String, Any}[],
+    timing_log::Bool = false,
 )
     rng = MersenneTwister(seed)
     scenario_list = Tuple{BirdScenario, Vector{BirdRoute}}[]
@@ -476,6 +500,7 @@ function compute_scenarios!(
                 rng = rng,
                 optimizer = optimizer,
                 optimizer_attributes = optimizer_attributes,
+                timing_log = timing_log,
             )
             push!(scenario_list, (BirdScenario(school.id, param_idx, collect(eachindex(routes))), routes))
         end

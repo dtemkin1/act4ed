@@ -5,9 +5,16 @@ using .BirdBackend
 function parse_args(args)
     parsed = Dict{String, String}()
     index = 1
+    flag_args = Set(["--gurobi-verbose", "--timing-log"])
+    value_args = Set(["--instance", "--solution", "--log-file", "--seed"])
     while index <= length(args)
         key = args[index]
-        if !(key in ("--instance", "--solution", "--log-file", "--seed"))
+        if key in flag_args
+            parsed[key] = "true"
+            index += 1
+            continue
+        end
+        if !(key in value_args)
             error("unknown argument: $(key)")
         end
         if index == length(args)
@@ -18,7 +25,7 @@ function parse_args(args)
     end
     if !haskey(parsed, "--instance") || !haskey(parsed, "--solution")
         error(
-            "usage: solve_bird_backend_julia.jl --instance <path> --solution <path> [--log-file <path>] [--seed <int>]",
+            "usage: solve_bird_backend_julia.jl --instance <path> --solution <path> [--log-file <path>] [--seed <int>] [--timing-log] [--gurobi-verbose]",
         )
     end
     return parsed
@@ -31,10 +38,17 @@ function main(args = ARGS)
     solution_path = parsed["--solution"]
     log_file = get(parsed, "--log-file", nothing)
     seed = parse(Int, get(parsed, "--seed", "1"))
+    gurobi_verbose = get(parsed, "--gurobi-verbose", "false") == "true"
+    timing_log = get(parsed, "--timing-log", "false") == "true"
 
     data = load_instance(instance_path)
-    optimizer_attributes =
-        log_file === nothing ? Pair{String, Any}[] : Pair{String, Any}["LogFile" => log_file]
+    optimizer_attributes = Pair{String, Any}[]
+    if log_file !== nothing
+        push!(optimizer_attributes, "LogFile" => log_file)
+    end
+    if gurobi_verbose
+        push!(optimizer_attributes, "OutputFlag" => 1)
+    end
 
     start_time = time()
     if data.method == "lbh"
@@ -44,6 +58,7 @@ function main(args = ARGS)
             data;
             seed = seed,
             optimizer_attributes = optimizer_attributes,
+            timing_log = timing_log,
         )
     else
         error("unknown Bird solve method: $(data.method)")
