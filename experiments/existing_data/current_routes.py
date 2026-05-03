@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import json
 from datetime import time
 from typing import TypedDict
@@ -13,12 +14,12 @@ from experiments.helpers import (
 )
 from experiments.existing_data.utils import RawBusRoutes, get_raw_assigned_buses
 from formulation.common.problems import ProblemData
-from formulation.common.classes import NodeId, Stop
+from formulation.common.classes import Bus, Depot, NodeId, School, Stop, Student
 
 OUTPUT_ROUTES = OUTPUTS_FOLDER / "existing_routes.json"
 
 
-class RouteResult(TypedDict):
+class RouteResultExport(TypedDict):
     bus_name: str
     destination_node_id: NodeId
     distance_km: float
@@ -31,6 +32,50 @@ class RouteResult(TypedDict):
     student_names: list[str]
     students_served: int
     time_spent: float
+
+
+@dataclass
+class RouteResult:
+    bus: Bus
+    school: School
+    stops: tuple[Stop, ...]
+    students_served: tuple[Student, ...]
+    depot: Depot
+    distance_km: float
+    round: int
+    end_time: time
+    start_time: time
+    path: tuple[NodeId, ...]
+
+    @property
+    def all_nodes(self) -> tuple[NodeId, ...]:
+        """
+        Returns a tuple of all node ids in the route, including the depot, stops, and school.
+        Assumes the route goes from depot to stops to school in order.
+        """
+        return tuple(
+            [self.depot.node_id]
+            + [stop.node_id for stop in self.stops]
+            + [self.school.node_id]
+        )
+
+    @property
+    def export(self) -> RouteResultExport:
+        return RouteResultExport(
+            bus_name=self.bus.name,
+            destination_node_id=self.school.node_id,
+            distance_km=self.distance_km,
+            end_time=self.end_time.hour * 60.0 + self.end_time.minute,
+            origin_node_id=self.depot.node_id,
+            round=self.round,
+            school_name=self.school.name,
+            start_time=self.start_time.hour * 60.0 + self.start_time.minute,
+            stop_node_ids=[stop.node_id for stop in self.stops],
+            student_names=[student.name for student in self.students_served],
+            students_served=len(self.students_served),
+            time_spent=(self.end_time.hour * 60.0 + self.end_time.minute)
+            - (self.start_time.hour * 60.0 + self.start_time.minute),
+        )
 
 
 class SolutionMetadata(TypedDict):
@@ -47,8 +92,13 @@ def ordered_routes(raw_buses: set[RawBusRoutes]) -> dict[str, list[str]]:
     """
     Orders the raw bus routes by time, and returns a dictionary of the form {bus_id: [list of stop_ids in order]}.
     """
+
+    raw_buses_list = sorted(
+        raw_buses, key=lambda x: x.bus_name
+    )  # sort by bus name for consistency
+
     bus_to_stops_times: dict[str, list[tuple[str, time]]] = {}
-    for bus_route in raw_buses:
+    for bus_route in raw_buses_list:
         if bus_route.bus_name not in bus_to_stops_times:
             bus_to_stops_times[bus_route.bus_name] = []
         bus_to_stops_times[bus_route.bus_name].append(
@@ -114,9 +164,6 @@ def add_depot_and_school_to_routes(
         end_time = max(
             bus_route.time for bus_route in raw_buses if bus_route.bus_name == bus_name
         )
-        total_time = (end_time.hour * 60.0 + end_time.minute) - (
-            start_time.hour * 60.0 + start_time.minute
-        )
 
         # get students served by this bus, using students at the stop who are going to the school destination
         students_served = []
@@ -124,35 +171,23 @@ def add_depot_and_school_to_routes(
             if student.stop in stops and student.school == school:
                 students_served.append(student)
 
-        total_distance_km = 0.0
-        for i in range(len(stops) - 1):
-            stop_before = stops[i]
-            stop_after = stops[i + 1]
-
-            edge_data = problem_data.service_graph.get_edge_data(
-                stop_before.node_id, stop_after.node_id, 0
-            )
-            if edge_data is None:
-                print(
-                    f"Warning: No edge found between stop {stop_before.name} and stop {stop_after.name} for bus {bus_name}. Skipping this edge."
-                )
-                continue
-
-            total_distance_km += edge_data["length"]
+        path_locations = [depot] + stops + [school]
+        total_distance_m, all_nodes = problem_data.get_shortest_paths_base(
+            tuple(place.node_id for place in path_locations)
+        )
+        total_distance_km = total_distance_m / 1000.0
 
         route_result = RouteResult(
-            bus_name=bus_name,
-            destination_node_id=school.node_id,
+            bus=bus,
+            school=school,
+            stops=tuple(stops),
+            students_served=tuple(students_served),
+            depot=depot,
             distance_km=total_distance_km,
-            end_time=end_time.hour * 60.0 + end_time.minute,
-            origin_node_id=depot.node_id,
-            round=1,  # only 1 round in real world data
-            school_name=school_name,
-            start_time=start_time.hour * 60.0 + start_time.minute,
-            stop_node_ids=[stop.node_id for stop in stops],
-            student_names=[student.name for student in students_served],
-            students_served=len(students_served),
-            time_spent=total_time,
+            round=0,
+            end_time=end_time,
+            start_time=start_time,
+            path=tuple(all_nodes),
         )
 
         bus_to_stops_with_depot_and_school.append(route_result)
@@ -163,10 +198,10 @@ def get_solution_metadata(
     bus_to_stops_with_depot_and_school: list[RouteResult],
 ) -> SolutionMetadata:
     total_distance_km = sum(
-        route["distance_km"] for route in bus_to_stops_with_depot_and_school
+        route.distance_km for route in bus_to_stops_with_depot_and_school
     )
     total_students_served = sum(
-        route["students_served"] for route in bus_to_stops_with_depot_and_school
+        len(route.students_served) for route in bus_to_stops_with_depot_and_school
     )
 
     return SolutionMetadata(
@@ -193,11 +228,10 @@ def get_existing_routes(
 
 
 def plot_existing_routes(
-    routes: list[RouteResult], problem_data: ProblemData
+    routes: list[RouteResult], problem_data: ProblemData, save_fig: bool = True
 ) -> tuple[Figure, Axes]:
 
     graph = problem_data.base_graph
-    service_graph = problem_data.service_graph
 
     if "crs" not in graph.graph:
         graph.graph["crs"] = "EPSG:3857"  # uses meters
@@ -219,29 +253,15 @@ def plot_existing_routes(
     colormap = mpl.colormaps["hsv"]
 
     for i, route in enumerate(routes):
-        start = route["origin_node_id"]
-        end = route["destination_node_id"]
-        stop_node_ids = route["stop_node_ids"]
+        depot = route.depot
+        school = route.school
+        stops = route.stops
 
-        all_places = [start] + stop_node_ids + [end]
-        all_nodes = []
-        for i in range(len(all_places) - 1):
-            node1 = all_places[i]
-            node2 = all_places[i + 1]
-            edge_data = service_graph.get_edge_data(node1, node2, 0)
-            if edge_data is None:
-                print(f"Warning: No edge found between node {node1} and node {node2}.")
-                continue
-
-            path = list(edge_data["path"])
-            while all_nodes and path and path[0] == all_nodes[-1]:
-                path = path[1:]
-
-            all_nodes.extend(path)
+        all_nodes = route.path
 
         ox.plot_graph_route(
             graph,
-            all_nodes,
+            list(all_nodes),
             route_color=colormap(i / len(routes)),  # type: ignore
             orig_dest_size=0,
             ax=ax,
@@ -249,43 +269,57 @@ def plot_existing_routes(
             show=False,
         )
 
-        if start not in depots_plotted:
+        if depot not in depots_plotted:
             ax.scatter(
-                pos[start][0],
-                pos[start][1],
+                pos[depot.node_id][0],
+                pos[depot.node_id][1],
                 c="black",
                 marker="X",
-                label="Depot" if start not in depots_plotted else "",
+                label=depot.name if depot not in depots_plotted else "",
+                zorder=4,
                 s=16,
             )
-            depots_plotted.add(start)
+            depots_plotted.add(depot)
 
-        if end not in schools_plotted:
+        if school not in schools_plotted:
             ax.scatter(
-                pos[end][0],
-                pos[end][1],
+                pos[school.node_id][0],
+                pos[school.node_id][1],
                 c="red",
                 marker="s",
-                label=route["school_name"] if end not in schools_plotted else "",
+                label=school.name if school not in schools_plotted else "",
+                zorder=3,
                 s=16,
             )
-            schools_plotted.add(end)
+            schools_plotted.add(school)
 
-        for node_id in stop_node_ids:
-            if node_id not in stops_plotted:
+        for stop in stops:
+            if stop.node_id not in stops_plotted:
                 ax.scatter(
-                    pos[node_id][0],
-                    pos[node_id][1],
+                    pos[stop.node_id][0],
+                    pos[stop.node_id][1],
                     c="tab:blue",
                     marker="o",
                     s=8,
                 )
-                stops_plotted.add(node_id)
+                stops_plotted.add(stop.node_id)
 
     ax.title.set_text("Existing School Bus Routes")
     ax.legend(loc="upper right", fontsize="small")
 
-    fig.savefig(OUTPUTS_FOLDER / "existing_routes.png", bbox_inches="tight")
+    if save_fig:
+        # tex_path = OUTPUTS_FOLDER / "existing_routes.tex"
+        # # matplot2tikz.clean_figure(fig=fig)
+        # tex_code = matplot2tikz.get_tikz_code(
+        #     figure=fig,
+        #     filepath=OUTPUTS_FOLDER / "existing_routes.tikz",
+        # )
+
+        # with tex_path.open("w", encoding="utf-8") as f:
+        #     f.write(tex_code)
+
+        fig.savefig(OUTPUTS_FOLDER / "existing_routes.png", bbox_inches="tight")
+
     return fig, ax
 
 
@@ -299,8 +333,9 @@ def main() -> None:
 
     # Save the routes to a JSON file
     with open(OUTPUT_ROUTES, "w") as f:
+        existing_routes_export = [route.export for route in existing_routes]
         json.dump(
-            {"metadata": metadata, "solution": existing_routes},
+            {"metadata": metadata, "solution": existing_routes_export},
             f,
             indent=4,
         )

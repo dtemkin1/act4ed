@@ -7,7 +7,7 @@ from typing import Any, Callable, Optional, cast
 
 import datetime as dt
 import pickle
-from collections.abc import Hashable, Iterable
+from collections.abc import Hashable, Iterable, Sequence
 
 import geopandas as gpd
 import networkx as nx
@@ -125,6 +125,29 @@ class ProblemData(ABC):
     def all_nodes(self) -> tuple[Place, ...]:
         """all nodes in the problem, including stops, schools, and depots"""
         return self.stops + self.schools + self.depots
+
+    def get_shortest_path_base(
+        self, start: NodeId, end: NodeId, weight: str = "length"
+    ) -> tuple[float, list[NodeId]]:
+        """get shortest path and length in meters between two nodes in the base graph"""
+        return get_shortest_path(self.base_graph, start, end, weight)
+
+    def get_shortest_paths_base(
+        self, nodes: Sequence[NodeId], weight: str = "length"
+    ) -> tuple[float, list[NodeId]]:
+        length = 0.0
+        all_path: list[NodeId] = []
+        for i in range(len(nodes) - 1):
+            start = nodes[i]
+            end = nodes[i + 1]
+            length_m, path = self.get_shortest_path_base(start, end, weight)
+            length += length_m
+
+            while all_path and path and path[0] == all_path[-1]:
+                path = path[1:]
+            all_path.extend(path)
+
+        return length, all_path
 
     def special_ed_students_in_stop(self, stop: Stop) -> tuple[Student, ...]:
         """Return students with special educational needs who are assigned to a specific stop."""
@@ -373,11 +396,6 @@ class ProblemDataToy(ProblemData):
     def buses(self) -> tuple[Bus, ...]:
         return self._buses
 
-    def _get_shortest_path_base(
-        self, start: NodeId, end: NodeId, weight: str = "length"
-    ) -> tuple[float, list[NodeId]]:
-        return get_shortest_path(self.base_graph, start, end, weight)
-
     @property
     def service_graph(self) -> "nx.MultiDiGraph[NodeId]":
         service_graph: "nx.MultiDiGraph[NodeId]" = nx.MultiDiGraph()
@@ -397,7 +415,7 @@ class ProblemDataToy(ProblemData):
                 return
 
             try:
-                length, path_list = self._get_shortest_path_base(start_id, end_id)
+                length, path_list = self.get_shortest_path_base(start_id, end_id)
                 path = tuple(path_list)
                 service_graph.add_edge(
                     start_id,
@@ -563,10 +581,24 @@ class ProblemDataReal(ProblemData):
 
         return graph
 
-    def _get_shortest_path_osm(
+    def get_shortest_path_base(
         self, start: NodeId, end: NodeId, weight: str = "length"
     ) -> tuple[float, list[NodeId]]:
-        return get_shortest_path(self.osm_graph, start, end, weight)
+
+        # check if length and path are already in service_graph
+        if "_service_graph_cached" in self.__dict__ and weight == "length":
+            service_graph = self._service_graph_cached
+            edge = service_graph.get_edge_data(start, end, 0, None)
+
+            if edge is not None:
+                # service graph length is in km
+                length_km = edge["length"]
+                path = edge["path"]
+
+                return length_km * 1000.0, path
+
+        # return super().get_shortest_path_base(start, end, weight)
+        return get_shortest_path(self.base_graph, start, end, weight)
 
     def _stop_school_types(self) -> dict[Stop, set[SchoolType]]:
         stop_school_types: dict[Stop, set[SchoolType]] = {}
@@ -699,7 +731,7 @@ class ProblemDataReal(ProblemData):
         if not self.use_r5:
 
             def edge_resolver(start: Place, end: Place):
-                length, path = self._get_shortest_path_osm(start.node_id, end.node_id)
+                length, path = self.get_shortest_path_base(start.node_id, end.node_id)
                 return length, path, {}
 
             for start, end in pairs:

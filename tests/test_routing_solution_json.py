@@ -52,24 +52,24 @@ class TinyProblemData(ProblemData):
         return self._service_graph
 
     @property
-    def stops(self) -> list[Stop]:
-        return self._stops
+    def stops(self) -> tuple[Stop, ...]:
+        return tuple(self._stops)
 
     @property
-    def schools(self) -> list[School]:
-        return self._schools
+    def schools(self) -> tuple[School, ...]:
+        return tuple(self._schools)
 
     @property
-    def depots(self) -> list[Depot]:
-        return self._depots
+    def depots(self) -> tuple[Depot, ...]:
+        return tuple(self._depots)
 
     @property
-    def students(self) -> list[Student]:
-        return self._students
+    def students(self) -> tuple[Student, ...]:
+        return tuple(self._students)
 
     @property
-    def buses(self) -> list[Bus]:
-        return self._buses
+    def buses(self) -> tuple[Bus, ...]:
+        return tuple(self._buses)
 
 
 def _build_bird_problem() -> TinyProblemData:
@@ -116,7 +116,7 @@ def _build_bird_problem() -> TinyProblemData:
             name="bird-bus-1",
             capacity=40,
             range=25,
-            has_wheelchair_access=False,
+            wheelchair_capacity=0,
             depot=depot,
             type=BusType.C,
         )
@@ -175,7 +175,7 @@ def _build_fleet_aware_bird_problem() -> TinyProblemData:
             name="C01",
             capacity=40,
             range=25,
-            has_wheelchair_access=False,
+            wheelchair_capacity=0,
             depot=depot_a,
             type=BusType.C,
         ),
@@ -184,7 +184,7 @@ def _build_fleet_aware_bird_problem() -> TinyProblemData:
             name="M01",
             capacity=30,
             range=25,
-            has_wheelchair_access=False,
+            wheelchair_capacity=2,
             depot=depot_b,
             type=BusType.B,
         ),
@@ -233,7 +233,7 @@ def _build_formulation_problem() -> TinyProblemData:
         name="formulation-bus-1",
         capacity=40,
         range=25,
-        has_wheelchair_access=False,
+        wheelchair_capacity=0,
         depot=depot,
         type=BusType.C,
     )

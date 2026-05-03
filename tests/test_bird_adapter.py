@@ -55,24 +55,24 @@ class TinyProblemData(ProblemData):
         return self._service_graph
 
     @property
-    def stops(self) -> list[Stop]:
-        return self._stops
+    def stops(self) -> tuple[Stop, ...]:
+        return tuple(self._stops)
 
     @property
-    def schools(self) -> list[School]:
-        return self._schools
+    def schools(self) -> tuple[School, ...]:
+        return tuple(self._schools)
 
     @property
-    def depots(self) -> list[Depot]:
-        return self._depots
+    def depots(self) -> tuple[Depot, ...]:
+        return tuple(self._depots)
 
     @property
-    def students(self) -> list[Student]:
-        return self._students
+    def students(self) -> tuple[Student, ...]:
+        return tuple(self._students)
 
     @property
-    def buses(self) -> list[Bus]:
-        return self._buses
+    def buses(self) -> tuple[Bus, ...]:
+        return tuple(self._buses)
 
 
 def _make_problem_data() -> TinyProblemData:
@@ -136,7 +136,7 @@ def _make_problem_data() -> TinyProblemData:
             name="bus-c-1",
             capacity=40,
             range=25,
-            has_wheelchair_access=False,
+            wheelchair_capacity=0,
             depot=depot,
             type=BusType.C,
         ),
@@ -145,7 +145,7 @@ def _make_problem_data() -> TinyProblemData:
             name="bus-c-2",
             capacity=40,
             range=25,
-            has_wheelchair_access=False,
+            wheelchair_capacity=0,
             depot=depot,
             type=BusType.C,
         ),
@@ -154,7 +154,7 @@ def _make_problem_data() -> TinyProblemData:
             name="bus-b-1",
             capacity=30,
             range=25,
-            has_wheelchair_access=True,
+            wheelchair_capacity=2,
             depot=depot,
             type=BusType.B,
         ),
@@ -224,7 +224,7 @@ def _make_reassignment_problem_data() -> TinyProblemData:
             name="bus-c-1",
             capacity=40,
             range=25,
-            has_wheelchair_access=False,
+            wheelchair_capacity=0,
             depot=depot,
             type=BusType.C,
         )
@@ -297,7 +297,7 @@ def _make_fleet_aware_problem_data() -> TinyProblemData:
             name="C01",
             capacity=1,
             range=25,
-            has_wheelchair_access=False,
+            wheelchair_capacity=0,
             depot=depot_a,
             type=BusType.C,
         ),
@@ -306,7 +306,7 @@ def _make_fleet_aware_problem_data() -> TinyProblemData:
             name="M01",
             capacity=2,
             range=25,
-            has_wheelchair_access=True,
+            wheelchair_capacity=2,
             depot=depot_b,
             type=BusType.BWC,
         ),
@@ -315,7 +315,7 @@ def _make_fleet_aware_problem_data() -> TinyProblemData:
             name="M02",
             capacity=2,
             range=25,
-            has_wheelchair_access=False,
+            wheelchair_capacity=0,
             depot=depot_a,
             type=BusType.B,
         ),
@@ -380,7 +380,7 @@ def _make_grade_split_problem_data(bus_count: int = 2) -> TinyProblemData:
             name=f"C{idx:02d}",
             capacity=10,
             range=25,
-            has_wheelchair_access=False,
+            wheelchair_capacity=0,
             depot=depot,
             type=BusType.C,
         )
@@ -452,7 +452,7 @@ def _make_arrival_window_problem_data() -> TinyProblemData:
             name="bus-c-1",
             capacity=40,
             range=25,
-            has_wheelchair_access=False,
+            wheelchair_capacity=0,
             depot=depot,
             type=BusType.C,
         )
@@ -483,8 +483,12 @@ def _make_arrival_window_problem_data() -> TinyProblemData:
 
 def _make_unreachable_stop_problem_data() -> TinyProblemData:
     depot = Depot(name="Depot A", geographic_location=Point(0, 0), node_id=100)
-    reachable_stop = Stop(name="Reachable Stop", geographic_location=Point(1, 0), node_id=101)
-    unreachable_stop = Stop(name="Unreachable Stop", geographic_location=Point(2, 0), node_id=102)
+    reachable_stop = Stop(
+        name="Reachable Stop", geographic_location=Point(1, 0), node_id=101
+    )
+    unreachable_stop = Stop(
+        name="Unreachable Stop", geographic_location=Point(2, 0), node_id=102
+    )
     school = School(
         name="School A",
         geographic_location=Point(3, 0),
@@ -519,7 +523,7 @@ def _make_unreachable_stop_problem_data() -> TinyProblemData:
             name="bus-c-1",
             capacity=40,
             range=25,
-            has_wheelchair_access=False,
+            wheelchair_capacity=0,
             depot=depot,
             type=BusType.C,
         )
@@ -1012,11 +1016,7 @@ class BirdAdapterTests(unittest.TestCase):
         problem_data = _make_problem_data()
         instance = build_bird_export_instance(
             problem_data,
-            BirdAdapterConfig(
-                cohort="conventional", 
-                bus_type="C",
-                method="lbh"
-            ),
+            BirdAdapterConfig(cohort="conventional", bus_type="C", method="lbh"),
         )
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1143,7 +1143,7 @@ class BirdAdapterTests(unittest.TestCase):
                 bus_type="BWC",
                 fleet_aware=True,
                 allow_partial=True,
-                method="lbh"
+                method="lbh",
             ),
         )
 
@@ -1201,7 +1201,7 @@ class BirdAdapterTests(unittest.TestCase):
                 bus_type="BWC",
                 fleet_aware=True,
                 allow_partial=True,
-                method="scenario"
+                method="scenario",
             ),
         )
 
@@ -1259,7 +1259,7 @@ class BirdAdapterTests(unittest.TestCase):
                 constant_stop_time=0.0,
                 stop_time_per_student=0.0,
                 speed_km_per_minute=1.0,
-                method="scenario"
+                method="scenario",
             ),
         )
 
@@ -1356,7 +1356,7 @@ class BirdAdapterTests(unittest.TestCase):
                 cohort="conventional",
                 fleet_aware=True,
                 allow_partial=True,
-                method="lbh"
+                method="lbh",
             ),
         )
 
@@ -1397,7 +1397,9 @@ class BirdAdapterTests(unittest.TestCase):
         self.assertEqual(len(unassigned_grades), 1)
         self.assertTrue(served_grades.isdisjoint(unassigned_grades))
 
-    def test_julia_scenario_driver_does_not_mix_grades_within_one_school_route(self) -> None:
+    def test_julia_scenario_driver_does_not_mix_grades_within_one_school_route(
+        self,
+    ) -> None:
         julia = shutil.which("julia")
         if julia is None:
             self.skipTest("julia executable not available")
@@ -1409,7 +1411,7 @@ class BirdAdapterTests(unittest.TestCase):
                 cohort="conventional",
                 fleet_aware=True,
                 allow_partial=True,
-                method="scenario"
+                method="scenario",
             ),
         )
 
@@ -1464,7 +1466,7 @@ class BirdAdapterTests(unittest.TestCase):
             constant_stop_time=0.0,
             stop_time_per_student=0.0,
             speed_km_per_minute=1.0,
-            method="lbh"
+            method="lbh",
         )
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1556,7 +1558,7 @@ class BirdAdapterTests(unittest.TestCase):
                 constant_stop_time=0.0,
                 stop_time_per_student=0.0,
                 speed_km_per_minute=1.0,
-                method="scenario"
+                method="scenario",
             ),
         )
 

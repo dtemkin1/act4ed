@@ -50,24 +50,24 @@ class TinyProblemData(ProblemData):
         return self._service_graph
 
     @property
-    def stops(self) -> list[Stop]:
-        return self._stops
+    def stops(self) -> tuple[Stop, ...]:
+        return tuple(self._stops)
 
     @property
-    def schools(self) -> list[School]:
-        return self._schools
+    def schools(self) -> tuple[School, ...]:
+        return tuple(self._schools)
 
     @property
-    def depots(self) -> list[Depot]:
-        return self._depots
+    def depots(self) -> tuple[Depot, ...]:
+        return tuple(self._depots)
 
     @property
-    def students(self) -> list[Student]:
-        return self._students
+    def students(self) -> tuple[Student, ...]:
+        return tuple(self._students)
 
     @property
-    def buses(self) -> list[Bus]:
-        return self._buses
+    def buses(self) -> tuple[Bus, ...]:
+        return tuple(self._buses)
 
 
 def _make_tiny_problem(rounds: int = 2) -> Formulation3:
@@ -104,7 +104,7 @@ def _make_tiny_problem(rounds: int = 2) -> Formulation3:
         name="bus-a",
         capacity=40,
         range=25,
-        has_wheelchair_access=True,
+        wheelchair_capacity=2,
         depot=depot,
         type=BusType.C,
     )
@@ -153,7 +153,7 @@ def _make_tiny_problem_no_sped_with_mixed_bus_types() -> Formulation3:
         name="bus-c",
         capacity=40,
         range=25,
-        has_wheelchair_access=False,
+        wheelchair_capacity=0,
         depot=depot,
         type=BusType.C,
     )
@@ -162,7 +162,7 @@ def _make_tiny_problem_no_sped_with_mixed_bus_types() -> Formulation3:
         name="bus-b",
         capacity=30,
         range=25,
-        has_wheelchair_access=True,
+        wheelchair_capacity=2,
         depot=depot,
         type=BusType.B,
     )

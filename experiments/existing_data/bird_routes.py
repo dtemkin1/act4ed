@@ -20,12 +20,15 @@ CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 
 BIRD_CONFIG = BirdAdapterConfig(
     cohort="conventional",
-    # bus_type="C",
     fleet_aware=True,
+    conventional_spillover=True,
+    allow_partial=True,
     school_dwell_time=10,
-    stop_time_per_student=0.1,
+    earliest_arrival_buffer=30,
     max_time_on_bus=60,
-    method="scenario",
+    stop_time_per_student=0.1,
+    stop_time_per_wheelchair_student=1,
+    method="lbh",
 )
 EXISTING_ROUTES_OUTPUT = OUTPUTS_FOLDER / "existing_routes"
 SOLVE_BIRD_BACKEND_PATH = CURRENT_FILE_DIR / ".." / "solve_bird_backend_julia.jl"
@@ -86,7 +89,10 @@ def main() -> None:
     out_dir = EXISTING_ROUTES_OUTPUT
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    get_bird_routes(filtered_problem_data, config, out_dir)
+    normalized_result = get_bird_routes(
+        filtered_problem_data, config, out_dir, save_results=True
+    )
+    print(normalized_result)
 
 
 if __name__ == "__main__":
