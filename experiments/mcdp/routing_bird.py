@@ -501,7 +501,7 @@ def _load_assigned_framingham_problem(
         problem_name: str = DEFAULT_PROBLEM_NAME, 
         place_name: str = DEFAULT_PLACE_NAME    
     ) -> ProblemData:
-    problem_data = setup(DEFAULT_PROBLEM_NAME, DEFAULT_PLACE_NAME, None)
+    problem_data = setup(problem_name, place_name, None)
     assigned_students = get_assigned_students(problem_data.schools, problem_data.stops)
     return FilteredProblemData(
         name=f"{problem_data.name}_assigned",
