@@ -6,6 +6,7 @@ import json
 import os
 import subprocess
 from collections.abc import Iterable, Mapping
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from itertools import product
 from pathlib import Path
@@ -37,6 +38,7 @@ COST_CONFIG = PROJECT_ROOT / "experiments" / "mcdp" / "routing_costs.yaml"
 DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "experiments" / "outputs" / "routing_bird_grid"
 DEFAULT_PLACE_NAME = "Framingham, Massachusetts, USA"
 DEFAULT_PROBLEM_NAME = "framingham"
+DEFAULT_CPUS_PER_SOLVE = 4
 
 BUS_TYPES = ("C", "B", "BWC", "WC")
 
@@ -76,10 +78,11 @@ GRID_METHODS = ("scenario", "lbh")
 GRID_LAMBDAS = ((0, "lambda_0"), (1.0e2, "lambda_1e3"), (1.0e4, "lambda_1e4"), (1.0e5, "lambda_1e5"))
 GRID_PARTIAL = ((False, "partial_false"), (True, "partial_true"))
 GRID_SPILLOVER = ((False, "spillover_false"), (True, "spillover_true"))
-GRID_DWELL = ((0.0, "dwell_0"), (10.0, "dwell_10"))
+GRID_DWELL = ((10.0, "dwell_0"), (15.0, "dwell_10"))
 GRID_ARRIVAL_WINDOWS = (
     (None, None, "arrival_default"),
     (30.0, 10.0, "arrival_early30_late10"),  # Minutes before school bell time
+    (40.0, 10.0, "arrival_early40_late10"),  # Minutes before school bell time
 )
 
 DEFAULT_COSTS: dict[str, Any] = {
@@ -93,6 +96,14 @@ DEFAULT_COSTS: dict[str, Any] = {
     "maintenance_distance_factor": {"C": 0.15, "B": 0.15, "BWC": 0.15, "WC": 0.15},
     "maintenance_runtime_factor": {"C": 0.0, "B": 0.0, "BWC": 0.0, "WC": 0.0},
 }
+
+
+def _available_cpus() -> int:
+    return os.process_cpu_count() or os.cpu_count() or 1
+
+
+def _default_worker_count(cpus_per_solve: int = DEFAULT_CPUS_PER_SOLVE) -> int:
+    return max(1, _available_cpus() // cpus_per_solve)
 
 
 @dataclass(frozen=True)
@@ -116,7 +127,7 @@ class GridPoint:
         count_label = "_".join(f"{bus_type}{self.counts[bus_type]}" for bus_type in BUS_TYPES)
         return (
             f"bird_{count_label}_{self.method}_{self.lambda_label}_"
-            f"{self.partial_label}_{self.dwell_label}_{self.arrival_label}"
+            f"{self.partial_label}_{self.spillover_label}_{self.dwell_label}_{self.arrival_label}"
         )
 
     @property
@@ -523,7 +534,11 @@ def solve_grid_point(
     template: BirdExportInstance | None = None,
     julia_timing_log: bool = True,
     gurobi_verbose: bool = False,
+    cpus_per_solve: int = DEFAULT_CPUS_PER_SOLVE,
 ) -> tuple[dict[str, Any], BirdExportInstance, BirdBackendSolution]:
+    if cpus_per_solve < 1:
+        raise ValueError("cpus_per_solve must be at least 1")
+
     selected_buses = select_buses_by_type_counts(
         problem_data.buses,
         grid_point.counts,
@@ -559,6 +574,7 @@ def solve_grid_point(
     julia_project = os.environ.get("JULIA_PROJECT", "julia")
     command = [
         julia_cmd,
+        f"--threads={cpus_per_solve}",
         f"--project={julia_project}",
         str(PROJECT_ROOT / "experiments" / "solve_bird_backend_julia.jl"),
         "--instance",
@@ -567,6 +583,8 @@ def solve_grid_point(
         str(solution_path),
         "--log-file",
         str(log_file),
+        "--gurobi-threads",
+        str(cpus_per_solve),
     ]
     if julia_timing_log:
         command.append("--timing-log")
@@ -579,6 +597,45 @@ def solve_grid_point(
     if solution.status not in {"OPTIMAL", "PARTIAL"}:
         raise RuntimeError(f"BiRD returned unsupported status {solution.status!r}")
     return summarize_bird_solution_for_mcdp(instance, solution), instance, solution
+
+
+@dataclass(frozen=True)
+class GridPointSolveResult:
+    grid_point: GridPoint
+    summary: dict[str, Any] | None = None
+    status: str | None = None
+    error: str | None = None
+
+
+def solve_grid_point_result(
+    problem_data: ProblemData,
+    grid_point: GridPoint,
+    *,
+    output_dir: Path,
+    bus_order: Mapping[str, list[str]],
+    template: BirdExportInstance | None,
+    julia_timing_log: bool,
+    gurobi_verbose: bool,
+    cpus_per_solve: int,
+) -> GridPointSolveResult:
+    try:
+        summary, _instance, solution = solve_grid_point(
+            problem_data,
+            grid_point,
+            output_dir=output_dir,
+            bus_order=bus_order,
+            template=template,
+            julia_timing_log=julia_timing_log,
+            gurobi_verbose=gurobi_verbose,
+            cpus_per_solve=cpus_per_solve,
+        )
+    except Exception as exc:
+        return GridPointSolveResult(grid_point=grid_point, error=str(exc))
+    return GridPointSolveResult(
+        grid_point=grid_point,
+        summary=summary,
+        status=solution.status,
+    )
 
 
 def write_static_catalogues(
@@ -612,6 +669,22 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--current-routes", action="store_true", default=False)
     parser.add_argument("--julia-timing-log", action="store_true", default=False)
     parser.add_argument("--gurobi-verbose", action="store_true", default=False)
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=None,
+        help=(
+            "Grid points to solve concurrently; defaults to available CPUs divided "
+            "by --cpus-per-solve."
+        ),
+    )
+    parser.add_argument(
+        "--cpus-per-solve",
+        type=int,
+        default=DEFAULT_CPUS_PER_SOLVE,
+        help="CPU/thread budget for each grid point solve and Julia/Gurobi process.",
+    )
+
     return parser.parse_args()
 
 
@@ -641,40 +714,81 @@ def main() -> None:
     partial_result: dict[str, Any] = {}
     errors: list[dict[str, Any]] = []
 
-    attempted = 0
-    for grid_point in tqdm(iter_grid()):
-        if sum(grid_point.counts.values()) == 0:
-            continue
-        attempted += 1
-        try:
-            summary, _instance, solution = solve_grid_point(
-                problem_data,
-                grid_point,
-                output_dir=output_dir,
-                bus_order=bus_order,
-                template=bird_template,
-                julia_timing_log=args.julia_timing_log,
-                gurobi_verbose=args.gurobi_verbose,
-            )
-        except Exception as exc:
-            errors.append({"label": grid_point.label, "error": str(exc)})
-            continue
+    if args.cpus_per_solve < 1:
+        raise ValueError("--cpus-per-solve must be at least 1")
+    if args.workers is not None and args.workers < 1:
+        raise ValueError("--workers must be at least 1")
+
+    grid_points = [
+        grid_point for grid_point in iter_grid()
+        if sum(grid_point.counts.values()) != 0
+    ]
+    worker_count = min(
+        args.workers or _default_worker_count(args.cpus_per_solve),
+        len(grid_points) or 1,
+    )
+
+    def record_result(result: GridPointSolveResult) -> None:
+        grid_point = result.grid_point
+        if result.error is not None:
+            errors.append({"label": grid_point.label, "error": result.error})
+            return
+        if result.summary is None or result.status is None:
+            errors.append({
+                "label": grid_point.label,
+                "error": "grid point solve returned an incomplete result",
+            })
+            return
 
         implementations[grid_point.label] = routing_service_entry(
-            summary,
+            result.summary,
             grid_point.config_labels,
         )
         partial_result[grid_point.label] = {
             "counts": grid_point.counts,
             "method": grid_point.method,
             "lambda_value": grid_point.lambda_value,
+            "conventional_spillover": grid_point.conventional_spillover,
             "allow_partial": grid_point.allow_partial,
             "school_dwell_time": grid_point.school_dwell_time,
             "earliest_arrival_buffer": grid_point.earliest_arrival_buffer,
             "latest_arrival_buffer": grid_point.latest_arrival_buffer,
-            "status": solution.status,
-            "summary": summary,
+            "status": result.status,
+            "summary": result.summary,
         }
+
+    if worker_count == 1:
+        for grid_point in tqdm(grid_points):
+            record_result(
+                solve_grid_point_result(
+                    problem_data,
+                    grid_point,
+                    output_dir=output_dir,
+                    bus_order=bus_order,
+                    template=bird_template,
+                    julia_timing_log=args.julia_timing_log,
+                    gurobi_verbose=args.gurobi_verbose,
+                    cpus_per_solve=args.cpus_per_solve,
+                )
+            )
+    else:
+        with ThreadPoolExecutor(max_workers=worker_count) as executor:
+            futures = [
+                executor.submit(
+                    solve_grid_point_result,
+                    problem_data,
+                    grid_point,
+                    output_dir=output_dir,
+                    bus_order=bus_order,
+                    template=bird_template,
+                    julia_timing_log=args.julia_timing_log,
+                    gurobi_verbose=args.gurobi_verbose,
+                    cpus_per_solve=args.cpus_per_solve,
+                )
+                for grid_point in grid_points
+            ]
+            for future in tqdm(as_completed(futures), total=len(futures)):
+                record_result(future.result())
 
     write_static_catalogues(
         routing_lib=args.routing_lib,

@@ -29,7 +29,7 @@ from formulation.normalized_result import (
     RoutingSolutionRow,
 )
 
-_BIRD_INSTANCE_SCHEMA_VERSION = 12
+_BIRD_INSTANCE_SCHEMA_VERSION = 13
 _BIRD_SOLUTION_SCHEMA_VERSION = 1
 _DEFAULT_BUS_MPH = 40.0
 _DEFAULT_BUS_SPEED_KM_PER_MINUTE = _DEFAULT_BUS_MPH / MPH_TO_KM_PER_MIN
@@ -112,6 +112,7 @@ class BirdDemandRow:
     special_ed_students: int
     wheelchair_students: int
     student_names: list[str]
+    student_ids: list[str]
     stop_node_id: int
 
 
@@ -176,6 +177,9 @@ class BirdExportInstance:
     def to_payload(self) -> dict[str, np.ndarray]:
         demand_student_names_ptr, demand_student_names_values = (
             _encode_ragged_bytes_array([row.student_names for row in self.demand_rows])
+        )
+        demand_student_ids_ptr, demand_student_ids_values = _encode_ragged_bytes_array(
+            [row.student_ids for row in self.demand_rows]
         )
         return {
             "schema_version": np.asarray(_BIRD_INSTANCE_SCHEMA_VERSION, dtype=np.int64),
@@ -305,6 +309,8 @@ class BirdExportInstance:
             ),
             "demand_student_names_ptr": demand_student_names_ptr,
             "demand_student_names_values": demand_student_names_values,
+            "demand_student_ids_ptr": demand_student_ids_ptr,
+            "demand_student_ids_values": demand_student_ids_values,
             "demand_stop_node_ids": np.asarray(
                 [row.stop_node_id for row in self.demand_rows],
                 dtype=np.int64,
@@ -363,6 +369,13 @@ class BirdExportInstance:
                         len(np.asarray(payload["demand_students"], dtype=np.int64))
                     )
                 ]
+            if schema_version >= 13 and "demand_student_ids_ptr" in payload.files:
+                demand_student_ids = _decode_ragged_bytes_array(
+                    np.asarray(payload["demand_student_ids_ptr"], dtype=np.int64),
+                    np.asarray(payload["demand_student_ids_values"]),
+                )
+            else:
+                demand_student_ids = demand_student_names
             demand_students = np.asarray(payload["demand_students"], dtype=np.int64)
             if schema_version >= 5 and "demand_service_groups" in payload.files:
                 demand_service_groups = _decode_bytes_array(
@@ -412,9 +425,10 @@ class BirdExportInstance:
                     special_ed_students=int(special_ed_students),
                     wheelchair_students=int(wheelchair_students),
                     student_names=student_names,
+                    student_ids=student_ids,
                     stop_node_id=int(stop_node_id),
                 )
-                for external_stop_id, source_stop_id, stop_name, school_id, service_group, grade, students, special_ed_students, wheelchair_students, student_names, stop_node_id in zip(
+                for external_stop_id, source_stop_id, stop_name, school_id, service_group, grade, students, special_ed_students, wheelchair_students, student_names, student_ids, stop_node_id in zip(
                     _decode_bytes_array(payload["demand_external_stop_ids"]),
                     _decode_bytes_array(payload["demand_source_stop_ids"]),
                     _decode_bytes_array(payload["demand_stop_names"]),
@@ -425,6 +439,7 @@ class BirdExportInstance:
                     demand_special_ed_students,
                     demand_wheelchair_students,
                     demand_student_names,
+                    demand_student_ids,
                     np.asarray(payload["demand_stop_node_ids"], dtype=np.int64),
                     strict=True,
                 )
@@ -1167,6 +1182,9 @@ def build_bird_export_instance(
                             student_names=[
                                 student.name for student in students_at_stop
                             ],
+                            student_ids=[
+                                str(student.id) for student in students_at_stop
+                            ],
                             stop_node_id=stop.node_id,
                         ),
                     )
@@ -1782,7 +1800,7 @@ def routing_solution_json_from_bird_solution(
         rows_by_bus[int(bus_id)].append(row_idx)
 
     rows: list[RoutingSolutionRow] = []
-    served_student_names: set[str] = set()
+    served_student_ids: set[str] = set()
     for bus_id, bus_rows in sorted(rows_by_bus.items()):
         if instance.fleet_aware and 1 <= int(bus_id) <= len(instance.bus_depot_indices):
             depot_index = int(instance.bus_depot_indices[int(bus_id) - 1])
@@ -1810,12 +1828,12 @@ def routing_solution_json_from_bird_solution(
                 school_demand_rows[int(stop_id) - 1] for stop_id in local_stop_ids
             ]
 
-            student_names = sorted(
-                student_name
+            student_ids = sorted(
+                student_id
                 for _global_demand_idx, demand_row in route_demand_rows
-                for student_name in demand_row.student_names
+                for student_id in demand_row.student_ids
             )
-            served_student_names.update(student_names)
+            served_student_ids.update(student_ids)
             has_sped = any(
                 demand_row.special_ed_students > 0
                 for _global_demand_idx, demand_row in route_demand_rows
@@ -1854,7 +1872,7 @@ def routing_solution_json_from_bird_solution(
                     start_time=start_time,
                     end_time=end_time,
                     time_spent=time_spent,
-                    student_names=student_names,
+                    student_ids=student_ids,
                     has_sped=has_sped,
                 )
             )
@@ -1873,7 +1891,7 @@ def routing_solution_json_from_bird_solution(
             runtime_seconds=solution.runtime_seconds,
             buses_used=solution.buses_used,
             total_distance_km=solution.total_distance_km,
-            total_students_served=len(served_student_names),
+            total_students_served=len(served_student_ids),
         ),
         solution=rows,
     )

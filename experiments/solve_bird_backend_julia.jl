@@ -6,7 +6,7 @@ function parse_args(args)
     parsed = Dict{String, String}()
     index = 1
     flag_args = Set(["--gurobi-verbose", "--timing-log"])
-    value_args = Set(["--instance", "--solution", "--log-file", "--seed"])
+    value_args = Set(["--instance", "--solution", "--log-file", "--seed", "--gurobi-threads"])
     while index <= length(args)
         key = args[index]
         if key in flag_args
@@ -25,7 +25,7 @@ function parse_args(args)
     end
     if !haskey(parsed, "--instance") || !haskey(parsed, "--solution")
         error(
-            "usage: solve_bird_backend_julia.jl --instance <path> --solution <path> [--log-file <path>] [--seed <int>] [--timing-log] [--gurobi-verbose]",
+            "usage: solve_bird_backend_julia.jl --instance <path> --solution <path> [--log-file <path>] [--seed <int>] [--gurobi-threads <int>] [--timing-log] [--gurobi-verbose]",
         )
     end
     return parsed
@@ -38,8 +38,10 @@ function main(args = ARGS)
     solution_path = parsed["--solution"]
     log_file = get(parsed, "--log-file", nothing)
     seed = parse(Int, get(parsed, "--seed", "1"))
+    gurobi_threads = parse(Int, get(parsed, "--gurobi-threads", "0"))
     gurobi_verbose = get(parsed, "--gurobi-verbose", "false") == "true"
     timing_log = get(parsed, "--timing-log", "false") == "true"
+    gurobi_threads < 0 && error("--gurobi-threads must be nonnegative")
 
     data = load_instance(instance_path)
     optimizer_attributes = Pair{String, Any}[]
@@ -48,6 +50,9 @@ function main(args = ARGS)
     end
     if gurobi_verbose
         push!(optimizer_attributes, "OutputFlag" => 1)
+    end
+    if gurobi_threads > 0
+        push!(optimizer_attributes, "Threads" => gurobi_threads)
     end
 
     start_time = time()

@@ -86,7 +86,8 @@ class RoutingSolutionRow:
     start_time: float | None
     end_time: float | None
     time_spent: float | None
-    student_names: list[str] | None
+    student_names: list[str] | None = None
+    student_ids: list[str] | None = None
     has_sped: bool | None = None
 
 
