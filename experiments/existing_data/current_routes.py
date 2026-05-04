@@ -53,7 +53,7 @@ class RouteResult:
         Returns a tuple of all node ids in the route, including the depot, stops, and school.
         Assumes the route goes from depot to stops to school in order.
         """
-        return tuple([self.depot] + list(self.stops) + [self.school])
+        return (self.depot,) + tuple(self.stops) + (self.school,)
 
     @property
     def export(self) -> RouteResultExport:

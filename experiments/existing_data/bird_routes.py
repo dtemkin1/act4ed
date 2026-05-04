@@ -14,34 +14,60 @@ from formulation.bird_adapter import (
     export_bird_instance,
     normalized_result_from_bird_solution,
 )
-from formulation.normalized_result import NormalizedRoutingResult
+from formulation.normalized_result import NormalizedRoutingResult, RoutingSolutionJson
 
 CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 
 BIRD_CONFIG = BirdAdapterConfig(
-    cohort="conventional",
+    cohort="all",
     fleet_aware=True,
-    conventional_spillover=True,
-    allow_partial=True,
-    school_dwell_time=10,
-    earliest_arrival_buffer=30,
     max_time_on_bus=60,
-    stop_time_per_student=0.1,
-    stop_time_per_wheelchair_student=1,
-    method="lbh",
+    school_dwell_time=10,
+    earliest_arrival_buffer=40,
+    bus_mph=30,
+    method="scenario",
+    conventional_spillover=True,
 )
-EXISTING_ROUTES_OUTPUT = OUTPUTS_FOLDER / "existing_routes"
 SOLVE_BIRD_BACKEND_PATH = CURRENT_FILE_DIR / ".." / "solve_bird_backend_julia.jl"
 
 
+def get_bird_routes_json(
+    bird_name: str,
+) -> RoutingSolutionJson:
+
+    out_dir = OUTPUTS_FOLDER / f"bird_{bird_name}"
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    solution = RoutingSolutionJson.load(out_dir / "bird_solution.json")
+    return solution
+
+
 def get_bird_routes(
-    problem_data: ProblemData,
+    bird_name: str,
+    bird_problem: ProblemData,
     config: BirdAdapterConfig,
-    out_dir: Path,
     save_results: bool = False,
 ) -> NormalizedRoutingResult:
 
-    bird_problem = problem_data
+    out_dir = OUTPUTS_FOLDER / f"bird_{bird_name}"
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        normalized = NormalizedRoutingResult.load(out_dir / "bird_all_normalized.json")
+        return normalized
+    except Exception:
+        pass
+
+    # load if already exists
+    try:
+        instance = BirdExportInstance.load(out_dir / "bird_all_instance.npz")
+        solution = BirdBackendSolution.load(out_dir / "bird_all.npz")
+
+        normalized = normalized_result_from_bird_solution(instance, solution)
+        return normalized
+    except Exception:
+        pass
+
     instance_path = export_bird_instance(
         bird_problem,
         out_dir / "bird_all_instance.npz",
@@ -86,11 +112,8 @@ def main() -> None:
 
     config = BIRD_CONFIG
 
-    out_dir = EXISTING_ROUTES_OUTPUT
-    out_dir.mkdir(parents=True, exist_ok=True)
-
     normalized_result = get_bird_routes(
-        filtered_problem_data, config, out_dir, save_results=True
+        "existing_student_routes", filtered_problem_data, config, save_results=True
     )
     print(normalized_result)
 

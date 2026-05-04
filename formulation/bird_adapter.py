@@ -50,7 +50,7 @@ BirdCohort = Literal[
 ]
 
 # TODO currently this is not correctly respected in BiRD. I.e. if you set
-# the policy to "route_assigned", it will just flag all buses as having 
+# the policy to "route_assigned", it will just flag all buses as having
 # monitors rather than trying to minimize the amount of monitors.
 MonitorPolicy = Literal["fleet", "route_assigned"]
 OptimizationMethod = Literal["lbh", "scenario"]
@@ -1305,13 +1305,17 @@ def bird_export_instance_from_template(
     if template.cohort != config.cohort:
         raise ValueError("Bird template cohort does not match requested config")
     if template.stop_assignment_enabled != config.reassign_stops:
-        raise ValueError("Bird template stop reassignment setting does not match requested config")
+        raise ValueError(
+            "Bird template stop reassignment setting does not match requested config"
+        )
     if config.reassign_stops:
         if (
             template.stop_assignment_lambda != config.stop_assignment_lambda
             or template.max_walking_distance_km != config.max_walking_distance_km
         ):
-            raise ValueError("Bird template stop reassignment parameters do not match requested config")
+            raise ValueError(
+                "Bird template stop reassignment parameters do not match requested config"
+            )
     if config.monitor_policy not in ("fleet", "route_assigned"):
         raise ValueError(f"unknown Bird monitor policy {config.monitor_policy!r}")
 
@@ -1335,8 +1339,7 @@ def bird_export_instance_from_template(
             "with wheelchair capacity"
         )
     if any(
-        row.service_group == "sped" and row.students > 0
-        for row in template.demand_rows
+        row.service_group == "sped" and row.students > 0 for row in template.demand_rows
     ) and not any(bus_monitor_flags):
         raise ValueError("fleet-aware Bird export has SPED students but no monitor bus")
 
@@ -1372,7 +1375,10 @@ def bird_export_instance_from_template(
             dtype=np.int64,
         ),
         bus_depot_indices=np.asarray(
-            [_template_depot_index(list(template.depots), bus.depot) for bus in selected_buses],
+            [
+                _template_depot_index(list(template.depots), bus.depot)
+                for bus in selected_buses
+            ],
             dtype=np.int64,
         ),
         bus_has_monitor=np.asarray(
@@ -1837,8 +1843,12 @@ def summarize_bird_solution_for_mcdp(
         )
         type_summary["rounds_used"] = int(type_summary["rounds_used"]) + len(bus_rows)
         type_summary["distance_km"] = float(type_summary["distance_km"]) + distance_km
-        type_summary["runtime_s"] = float(type_summary["runtime_s"]) + runtime_min * 60.0
-        type_summary["students_served"] = int(type_summary["students_served"]) + bus_students
+        type_summary["runtime_s"] = (
+            float(type_summary["runtime_s"]) + runtime_min * 60.0
+        )
+        type_summary["students_served"] = (
+            int(type_summary["students_served"]) + bus_students
+        )
         type_summary["sped_students_served"] = (
             int(type_summary["sped_students_served"]) + bus_sped
         )
@@ -1867,7 +1877,9 @@ def summarize_bird_solution_for_mcdp(
         "total_distance_km": sum(
             float(summary["distance_km"]) for summary in by_bus.values()
         ),
-        "total_runtime_s": sum(float(summary["runtime_s"]) for summary in by_bus.values()),
+        "total_runtime_s": sum(
+            float(summary["runtime_s"]) for summary in by_bus.values()
+        ),
         "by_bus": by_bus,
         "by_type": {key: dict(value) for key, value in by_type.items()},
     }
