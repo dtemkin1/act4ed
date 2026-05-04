@@ -76,8 +76,8 @@ GRID_FLEET = {
     "BWC": (9,),
     "WC":  (1, ),
 }
-GRID_METHODS = ("scenario", "lbh")
-GRID_LAMBDAS = ((0, "lambda_0"), (1.0e2, "lambda_1e3"), (1.0e4, "lambda_1e4"), (1.0e5, "lambda_1e5"))
+GRID_METHODS = ("lbh", "scenario")
+GRID_LAMBDAS = ((1.0e2, "lambda_1e3"), (1.0e4, "lambda_1e4"), (1.0e5, "lambda_1e5"))
 GRID_PARTIAL = ((False, "partial_false"), (True, "partial_true"))
 GRID_SPILLOVER = ((False, "spillover_false"), (True, "spillover_true"))
 GRID_DWELL = ((10.0, "dwell_0"), (15.0, "dwell_10"))
