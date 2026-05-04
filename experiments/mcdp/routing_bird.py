@@ -6,12 +6,13 @@ import json
 import os
 import subprocess
 from collections.abc import Iterable, Mapping
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from itertools import product
 from pathlib import Path
 from typing import Any
 
+from loguru import logger
 import yaml
 
 from experiments.existing_data.utils import get_assigned_students
@@ -39,6 +40,7 @@ DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "experiments" / "outputs" / "routing_bird_gr
 DEFAULT_PLACE_NAME = "Framingham, Massachusetts, USA"
 DEFAULT_PROBLEM_NAME = "framingham"
 DEFAULT_CPUS_PER_SOLVE = 4
+PROGRESS_HEARTBEAT_SECONDS = 60.0
 
 BUS_TYPES = ("C", "B", "BWC", "WC")
 
@@ -104,6 +106,15 @@ def _available_cpus() -> int:
 
 def _default_worker_count(cpus_per_solve: int = DEFAULT_CPUS_PER_SOLVE) -> int:
     return max(1, _available_cpus() // cpus_per_solve)
+
+
+def _problem_size_summary(problem_data: ProblemData) -> dict[str, int]:
+    return {
+        "schools": len(problem_data.schools),
+        "stops": len(problem_data.stops),
+        "students": len(problem_data.students),
+        "buses": len(problem_data.buses),
+    }
 
 
 @dataclass(frozen=True)
@@ -690,25 +701,57 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    available_cpus = _available_cpus()
 
     output_dir = (
         args.output_dir.with_name(f"{args.output_dir.name}_current_routes")
         if args.current_routes
         else args.output_dir
     )
+    logger.info(
+        "routing_bird starting: output_dir={}, routing_lib={}, cost_config={}, "
+        "current_routes={}, available_cpus={}, requested_workers={}, cpus_per_solve={}",
+        output_dir,
+        args.routing_lib,
+        args.cost_config,
+        args.current_routes,
+        available_cpus,
+        args.workers,
+        args.cpus_per_solve,
+    )
     output_dir.mkdir(parents=True, exist_ok=True)
+    logger.info("Output directory ready: {}", output_dir)
 
+    logger.info("Loading routing costs from {}", args.cost_config)
     costs = load_routing_costs(args.cost_config)
+    logger.info("Routing costs loaded")
+
     if args.current_routes:
+        logger.info("Loading assigned Framingham problem data")
         problem_data = _load_assigned_framingham_problem()
     else:
+        logger.info("Loading full Framingham problem data")
         problem_data = _load_full_framingham_problem()
+    logger.info("Problem data loaded: {}", _problem_size_summary(problem_data))
+
+    logger.info("Building reusable Bird export template")
     bird_template = build_bird_export_instance(
         problem_data,
         BirdAdapterConfig(cohort="all", fleet_aware=True),
     )
+    logger.info(
+        "Bird export template built: demand_rows={}, schools={}, fleet_size={}",
+        len(bird_template.demand_rows),
+        len(bird_template.schools),
+        bird_template.fleet_size,
+    )
 
+    logger.info("Reading bus inventory order from {}", BUS_CSV)
     bus_order = read_bus_inventory_order()
+    logger.info(
+        "Bus inventory order loaded: {}",
+        {bus_type: len(names) for bus_type, names in bus_order.items()},
+    )
 
     implementations: dict[str, dict[str, list[str]]] = {}
     partial_result: dict[str, Any] = {}
@@ -727,17 +770,32 @@ def main() -> None:
         args.workers or _default_worker_count(args.cpus_per_solve),
         len(grid_points) or 1,
     )
+    success_count = 0
+    error_count = 0
+
+    logger.info(
+        "Grid prepared: grid_points={}, worker_count={}, cpus_per_solve={}, "
+        "julia_timing_log={}, gurobi_verbose={}",
+        len(grid_points),
+        worker_count,
+        args.cpus_per_solve,
+        args.julia_timing_log,
+        args.gurobi_verbose,
+    )
 
     def record_result(result: GridPointSolveResult) -> None:
+        nonlocal success_count, error_count
         grid_point = result.grid_point
         if result.error is not None:
             errors.append({"label": grid_point.label, "error": result.error})
+            error_count += 1
             return
         if result.summary is None or result.status is None:
             errors.append({
                 "label": grid_point.label,
                 "error": "grid point solve returned an incomplete result",
             })
+            error_count += 1
             return
 
         implementations[grid_point.label] = routing_service_entry(
@@ -756,9 +814,18 @@ def main() -> None:
             "status": result.status,
             "summary": result.summary,
         }
+        success_count += 1
+
+    def update_progress(progress: tqdm, *, pending: int | None = None) -> None:
+        postfix: dict[str, int] = {"ok": success_count, "errors": error_count}
+        if pending is not None:
+            postfix["pending"] = pending
+        progress.set_postfix(postfix, refresh=False)
 
     if worker_count == 1:
-        for grid_point in tqdm(grid_points):
+        logger.info("Starting routing grid solve in serial mode")
+        progress = tqdm(grid_points, desc="routing grid", unit="solve")
+        for grid_point in progress:
             record_result(
                 solve_grid_point_result(
                     problem_data,
@@ -771,9 +838,11 @@ def main() -> None:
                     cpus_per_solve=args.cpus_per_solve,
                 )
             )
+            update_progress(progress)
     else:
+        logger.info("Starting routing grid solve with {} worker threads", worker_count)
         with ThreadPoolExecutor(max_workers=worker_count) as executor:
-            futures = [
+            pending = {
                 executor.submit(
                     solve_grid_point_result,
                     problem_data,
@@ -786,23 +855,64 @@ def main() -> None:
                     cpus_per_solve=args.cpus_per_solve,
                 )
                 for grid_point in grid_points
-            ]
-            for future in tqdm(as_completed(futures), total=len(futures)):
-                record_result(future.result())
+            }
+            logger.info("Submitted {} grid point solves", len(pending))
+            with tqdm(
+                total=len(pending),
+                desc=f"routing grid ({worker_count} workers)",
+                unit="solve",
+            ) as progress:
+                while pending:
+                    done, pending = wait(
+                        pending,
+                        timeout=PROGRESS_HEARTBEAT_SECONDS,
+                        return_when=FIRST_COMPLETED,
+                    )
+                    if not done:
+                        update_progress(progress, pending=len(pending))
+                        logger.info(
+                            "Routing grid progress: {}/{} complete, {} ok, "
+                            "{} errors, {} pending",
+                            progress.n,
+                            progress.total,
+                            success_count,
+                            error_count,
+                            len(pending),
+                        )
+                        continue
+                    for future in done:
+                        record_result(future.result())
+                        progress.update()
+                    update_progress(progress, pending=len(pending))
 
+    logger.info(
+        "Routing grid solve finished: attempted={}, ok={}, errors={}",
+        len(grid_points),
+        success_count,
+        error_count,
+    )
+
+    logger.info("Writing static routing catalogues to {}", args.routing_lib)
     write_static_catalogues(
         routing_lib=args.routing_lib,
         costs=costs,
         routing_implementations=implementations or None,
     )
-    (output_dir / "routing_bird_catalogue_partial_result.json").write_text(
+    partial_result_path = output_dir / "routing_bird_catalogue_partial_result.json"
+    errors_path = output_dir / "routing_bird_errors.json"
+    partial_result_path.write_text(
         json.dumps(partial_result, indent=2, sort_keys=True),
         encoding="utf-8",
     )
-    (output_dir / "routing_bird_errors.json").write_text(
+    errors_path.write_text(
         json.dumps(errors, indent=2, sort_keys=True),
         encoding="utf-8",
     )
+    logger.info("Wrote partial results to {}", partial_result_path)
+    if errors:
+        logger.warning("Wrote {} routing errors to {}", len(errors), errors_path)
+    else:
+        logger.info("Wrote empty routing error log to {}", errors_path)
 
 
 if __name__ == "__main__":
