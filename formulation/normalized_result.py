@@ -87,6 +87,7 @@ class RoutingSolutionRow:
     end_time: float | None
     time_spent: float | None
     student_names: list[str] | None
+    has_sped: bool | None = None
 
 
 @dataclass(frozen=True, slots=True)

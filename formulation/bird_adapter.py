@@ -1816,6 +1816,10 @@ def routing_solution_json_from_bird_solution(
                 for student_name in demand_row.student_names
             )
             served_student_names.update(student_names)
+            has_sped = any(
+                demand_row.special_ed_students > 0
+                for _global_demand_idx, demand_row in route_demand_rows
+            )
 
             end_time = float(solution.assignment_arrival_times[row_idx])
             service_time = float(solution.assignment_service_time_min[row_idx])
@@ -1851,6 +1855,7 @@ def routing_solution_json_from_bird_solution(
                     end_time=end_time,
                     time_spent=time_spent,
                     student_names=student_names,
+                    has_sped=has_sped,
                 )
             )
 

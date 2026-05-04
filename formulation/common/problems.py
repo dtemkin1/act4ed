@@ -1095,18 +1095,29 @@ class ProblemDataReal(ProblemData):
         return_buses: list[Bus] = []
         for _, row in buses_df.iterrows():
             depot = next(d for d in self.depots if d.name == row["depot_name"])
+            bus_type = (
+                BusType[row["type"]]
+                if row.get("type") in BusType.__members__
+                else None
+            )
+            if "wheelchair_capacity" in buses_df.columns and not pd.isna(
+                row["wheelchair_capacity"]
+            ):
+                wheelchair_capacity = int(row["wheelchair_capacity"])
+            elif bus_type == BusType.WC:
+                wheelchair_capacity = 4
+            elif bus_type == BusType.BWC:
+                wheelchair_capacity = 2
+            else:
+                wheelchair_capacity = 0
             bus = Bus(
                 id=row["id"],
                 name=row["num"],
                 capacity=row["capacity"],
                 range=row["range"],
                 depot=depot,
-                wheelchair_capacity=row["wheelchair_capacity"],
-                type=(
-                    BusType[row["type"]]
-                    if row.get("type") in BusType.__members__
-                    else None
-                ),
+                wheelchair_capacity=wheelchair_capacity,
+                type=bus_type,
             )
             return_buses.append(bus)
         return tuple(return_buses)
