@@ -8,10 +8,10 @@ from experiments.existing_data.bird_routes import (
     EXISTING_ROUTES_OUTPUT,
     get_bird_routes,
 )
-from experiments.existing_data.current_routes import get_existing_routes
+from experiments.existing_data.current_routes import RouteResult, get_existing_routes
 from experiments.existing_data.utils import get_assigned_students
 from experiments.helpers import setup_framingham
-from formulation.common.classes import Place, Stop
+from formulation.common.classes import Place, Stop, Student
 from formulation.common.problems import (
     FilteredProblemData,
     ProblemData,
@@ -19,7 +19,7 @@ from formulation.common.problems import (
 from formulation.common.utils import get_travel_time
 
 
-def get_route_time(route: list[Place], problem_data: ProblemData) -> float:
+def get_route_time(route: tuple[Place, ...], problem_data: ProblemData) -> float:
     _, path = problem_data.get_shortest_paths_base(
         tuple(place.node_id for place in route)
     )
@@ -27,6 +27,47 @@ def get_route_time(route: list[Place], problem_data: ProblemData) -> float:
         tuple(path),
         problem_data.base_graph,
     )
+
+
+def get_student_time_on_bus(
+    student: Student, route: tuple[Place, ...], problem_data: ProblemData
+) -> float:
+    """note: does not account for time spent at a stop, only time spent traveling"""
+    stop_gets_on = student.stop
+    places_after_getting_on = route[route.index(stop_gets_on) :]
+    node_ids_after_getting_on = tuple(
+        place.node_id for place in places_after_getting_on
+    )
+
+    _, full_path = problem_data.get_shortest_paths_base(node_ids_after_getting_on)
+
+    travel_time = get_travel_time(
+        tuple(full_path),
+        problem_data.base_graph,
+    )
+
+    return travel_time
+
+
+def avg_time_on_bus_for_students(
+    students: tuple[Student, ...], route: tuple[Place, ...], problem_data: ProblemData
+) -> float:
+    total_time = 0.0
+    for student in students:
+        time_on_bus = get_student_time_on_bus(student, route, problem_data)
+        total_time += time_on_bus
+
+    avg_time = total_time / len(students) if len(students) > 0 else 0.0
+    return avg_time
+
+
+def get_route_for_student(
+    student: Student, routes: list[RouteResult]
+) -> RouteResult | None:
+    for route in routes:
+        if student.stop in route.stops:
+            return route
+    return None
 
 
 def main() -> None:
@@ -72,7 +113,7 @@ def main() -> None:
                 )
             )[0]
 
-            places = [depot] + stops + [school]
+            places = (depot,) + tuple(stops) + (school,)
             time = get_route_time(places, filtered_problem_data)
 
             identifier = (
@@ -107,7 +148,7 @@ def main() -> None:
                 )
             )[0]
 
-            places = [depot] + stops + [school]
+            places = (depot,) + tuple(stops) + (school,)
             time = get_route_time(places, framingham_problem_data)
 
             identifier = (

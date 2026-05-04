@@ -1468,6 +1468,22 @@ wheels = [
 ]
 
 [[package]]
+name = "matplot2tikz"
+version = "0.5.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "matplotlib" },
+    { name = "numpy" },
+    { name = "pillow" },
+    { name = "typing-extensions" },
+    { name = "webcolors" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d0/a7/952991db4181420427634d5e3d228071c481324d8482f46c87f34e0468c1/matplot2tikz-0.5.4.tar.gz", hash = "sha256:0a95bd4b2323eb4c3e6219735be3ef4f45196edfea486061e2545dc18dde2566", size = 163876, upload-time = "2026-03-23T13:33:22.206Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a4/46/c7ff04dbf136e0ea9c405671114d719a05da9a9aef9217f0b851aaf1f0bf/matplot2tikz-0.5.4-py3-none-any.whl", hash = "sha256:479532e529d7447c35fa2a637c94d4e9305bee25d9d428eaa18c9ef20062cadd", size = 61398, upload-time = "2026-03-23T13:33:20.595Z" },
+]
+
+[[package]]
 name = "matplotlib"
 version = "3.10.8"
 source = { registry = "https://pypi.org/simple" }
@@ -2765,6 +2781,7 @@ dependencies = [
     { name = "jupyterlab" },
     { name = "loguru" },
     { name = "mapclassify" },
+    { name = "matplot2tikz" },
     { name = "matplotlib" },
     { name = "mcdp-format2-py" },
     { name = "networkx", extra = ["default"] },
@@ -2803,6 +2820,7 @@ requires-dist = [
     { name = "jupyterlab", specifier = ">=4.5.7" },
     { name = "loguru", specifier = ">=0.7.3" },
     { name = "mapclassify", specifier = ">=2.10.0" },
+    { name = "matplot2tikz", specifier = ">=0.5.4" },
     { name = "matplotlib", specifier = ">=3.10.7" },
     { name = "mcdp-format2-py", specifier = ">=2.17.2507141632" },
     { name = "networkx", extras = ["default"], specifier = ">=3.5" },

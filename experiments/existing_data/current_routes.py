@@ -14,7 +14,7 @@ from experiments.helpers import (
 )
 from experiments.existing_data.utils import RawBusRoutes, get_raw_assigned_buses
 from formulation.common.problems import ProblemData
-from formulation.common.classes import Bus, Depot, NodeId, School, Stop, Student
+from formulation.common.classes import Bus, Depot, NodeId, Place, School, Stop, Student
 
 OUTPUT_ROUTES = OUTPUTS_FOLDER / "existing_routes.json"
 
@@ -48,16 +48,12 @@ class RouteResult:
     path: tuple[NodeId, ...]
 
     @property
-    def all_nodes(self) -> tuple[NodeId, ...]:
+    def all_places(self) -> tuple[Place, ...]:
         """
         Returns a tuple of all node ids in the route, including the depot, stops, and school.
         Assumes the route goes from depot to stops to school in order.
         """
-        return tuple(
-            [self.depot.node_id]
-            + [stop.node_id for stop in self.stops]
-            + [self.school.node_id]
-        )
+        return tuple([self.depot] + list(self.stops) + [self.school])
 
     @property
     def export(self) -> RouteResultExport:
@@ -328,6 +324,14 @@ def main() -> None:
 
     existing_routes = get_existing_routes(problem_data)
     metadata = get_solution_metadata(existing_routes)
+
+    print(
+        "There are currently {} routes, serving a total of {} students with a total distance of {:.2f} km.".format(
+            metadata["buses_used"],
+            metadata["total_students_served"],
+            metadata["total_distance_km"],
+        )
+    )
 
     plot_existing_routes(existing_routes, problem_data)
 

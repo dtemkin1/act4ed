@@ -82,9 +82,10 @@ def plot_special_education_students(problem_data: ProblemDataReal) -> None:
 
     # plot students, color based on how far they are from their school
     all_distances = [
-        problem_data.service_graph.edges[
-            student.stop.node_id, student.school.node_id, 0
-        ]["length"]
+        problem_data.get_shortest_path_base(
+            student.stop.node_id, student.school.node_id
+        )[0]
+        / 1000.0
         for student in special_education_students
         if student.school is not None
     ]
@@ -94,9 +95,10 @@ def plot_special_education_students(problem_data: ProblemDataReal) -> None:
     sm.set_array([])
 
     for student in special_education_students:
-        distance = problem_data.service_graph.edges[
-            student.stop.node_id, student.school.node_id, 0
-        ]["length"]
+        distance_m, _ = problem_data.get_shortest_path_base(
+            student.stop.node_id, student.school.node_id
+        )
+        distance = distance_m / 1000.0  # convert to km
 
         ax.scatter(
             student.geographic_location.x,
@@ -121,12 +123,14 @@ def plot_special_education_students(problem_data: ProblemDataReal) -> None:
 def main() -> None:
     problem_data = setup_framingham()
 
-    print("Number of assigned students: ", len(get_raw_assigned_students()))
+    print(f"Number of assigned students: {len(get_raw_assigned_students())}")
 
     make_students_csv(
         more_realistic_students(problem_data),
         path=DATA_FOLDER / "students_with_special_ed_inferred.csv",
     )
+
+    plot_special_education_students(problem_data)
 
 
 if __name__ == "__main__":

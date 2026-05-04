@@ -44,7 +44,7 @@ except Exception:
 
 
 try:
-    from shapely.geometry import Point
+    from shapely.geometry import Point, Polygon
 except Exception as exc:
     raise ImportError(
         "Shapely not found. Please install it with 'pip install shapely'"
@@ -556,14 +556,16 @@ class ProblemDataReal(ProblemData):
     def _make_osm_graph(self):
         # get boundary polygon (similar to analysis.ipynb)
         gdf = self.gdf
+        crs = gdf.crs
+        assert crs is not None
 
         # project to utm for meters-based buffering
         projected = gdf.to_crs(gdf.estimate_utm_crs())
         projected["geometry"] = projected.buffer(self.boundary_buffer_km * 1000)
 
         # project back to original crs for osmnx
-        buffered = projected.to_crs(gdf.crs)
-        buffered_poly = buffered.geometry.iloc[0]
+        buffered = projected.to_crs(crs)
+        buffered_poly = cast(Polygon, buffered.geometry.iloc[0])
 
         # download street network
         graph = ox.graph_from_polygon(buffered_poly, network_type=NETWORK_TYPE)
@@ -730,12 +732,12 @@ class ProblemDataReal(ProblemData):
 
         if not self.use_r5:
 
-            def edge_resolver(start: Place, end: Place):
+            def edge_resolver_not_r5(start: Place, end: Place):
                 length, path = self.get_shortest_path_base(start.node_id, end.node_id)
                 return length, path, {}
 
             for start, end in pairs:
-                add_edge(start, end, edge_resolver)
+                add_edge(start, end, edge_resolver_not_r5)
 
         else:
             if not self.osm_pbf_path:
@@ -761,7 +763,7 @@ class ProblemDataReal(ProblemData):
                 )
             )
 
-            def edge_resolver(start: Place, end: Place):
+            def edge_resolver_r5(start: Place, end: Place):
                 entry = itinerary_lookup[(place_ids[id(start)], place_ids[id(end)])]
                 extra_attrs: dict[str, object] = {}
                 geometry = entry.get("geometry")
@@ -770,7 +772,7 @@ class ProblemDataReal(ProblemData):
                 return float(entry["distance"]), [], extra_attrs
 
             for start, end in pairs:
-                add_edge(start, end, edge_resolver)
+                add_edge(start, end, edge_resolver_r5)
 
         return service_graph
 
@@ -896,7 +898,9 @@ class ProblemDataReal(ProblemData):
             geographic_location = Point(row["lon"], row["lat"])
 
             # check if in gdf bounds
-            if not self.gdf.geometry.iloc[0].contains(geographic_location):
+            if not (
+                cast(Polygon, self.gdf.geometry.iloc[0]).contains(geographic_location)
+            ):
                 outside_boundary += 1
                 continue
 

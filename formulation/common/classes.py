@@ -1,10 +1,10 @@
 from dataclasses import dataclass
-from enum import IntEnum
+from enum import IntEnum, auto
 from functools import cache, cached_property
 import json
 import os
-from random import random
-from typing import NamedTuple, cast
+import random
+from typing import NamedTuple, TypedDict, cast
 
 from dotenv import load_dotenv
 import re
@@ -62,7 +62,42 @@ class CensusGeoData(NamedTuple):
     tract: str
 
 
-class CensusTractInfo(NamedTuple):
+class IncomeLevel(IntEnum):
+    LESS_THAN_10K = auto()
+    """less than $10,000"""
+    BETWEEN_10K_TO_15K = auto()
+    """$10,000 to $14,999"""
+    BETWEEN_15K_TO_20K = auto()
+    """$15,000 to $19,999"""
+    BETWEEN_20K_TO_25K = auto()
+    """$20,000 to $24,999"""
+    BETWEEN_25K_TO_30K = auto()
+    """$25,000 to $29,999"""
+    BETWEEN_30K_TO_35K = auto()
+    """$30,000 to $34,999"""
+    BETWEEN_35K_TO_40K = auto()
+    """$35,000 to $39,999"""
+    BETWEEN_40K_TO_45K = auto()
+    """$40,000 to $44,999"""
+    BETWEEN_45K_TO_50K = auto()
+    """$45,000 to $49,999"""
+    BETWEEN_50K_TO_60K = auto()
+    """$50,000 to $59,999"""
+    BETWEEN_60K_TO_75K = auto()
+    """$60,000 to $74,999"""
+    BETWEEN_75K_TO_100K = auto()
+    """$75,000 to $99,999"""
+    BETWEEN_100K_TO_125K = auto()
+    """$100,000 to $124,999"""
+    BETWEEN_125K_TO_150K = auto()
+    """$125,000 to $149,999"""
+    BETWEEN_150K_TO_200K = auto()
+    """$150,000 to $199,999"""
+    MORE_THAN_200K = auto()
+    """$200,000 or more"""
+
+
+class CensusTractInfo(TypedDict):
     """demographic info for a student"""
 
     total_population: float
@@ -73,10 +108,14 @@ class CensusTractInfo(NamedTuple):
     total_vehicle_households: float
     not_car_owning_households: float
 
+    income_brackets: dict[IncomeLevel, float]
+    """proportion of households in each income bracket"""
+
 
 class CensusDemographics(NamedTuple):
     english_at_home: bool
-    not_car_owning_household: bool
+    owns_car: bool
+    income_level: IncomeLevel
 
 
 _CACHE_CENSUS_GEOCODE = CACHE_DIR / "census_geocode_cache.json"
@@ -148,14 +187,24 @@ def _get_census_tract_info(
         state in cache_data
         and county in cache_data[state]
         and tract in cache_data[state][county]
+        and all(
+            keys in cache_data[state][county][tract]
+            for keys in CensusTractInfo.__annotations__.keys()
+        )
     ):
-        cached = cache_data[state][county][tract]
+        cached = cast(CensusTractInfo, cache_data[state][county][tract])
         return CensusTractInfo(
             total_population=cached["total_population"],
             total_language_at_home=cached["total_language_at_home"],
             english_only_language_at_home=cached["english_only_language_at_home"],
             total_vehicle_households=cached["total_vehicle_households"],
             not_car_owning_households=cached["not_car_owning_households"],
+            income_brackets={
+                IncomeLevel(int(key)): value
+                for key, value in (
+                    cast(dict[str, float], cached["income_brackets"])
+                ).items()
+            },
         )
 
     census_api_key = os.getenv("CENSUS_API_KEY")
@@ -170,6 +219,23 @@ def _get_census_tract_info(
             "C16001_002E",  # english only language at home
             "B08201_001E",  # total households
             "B08201_002E",  # not car owning households
+            "B19001_001E",  # total income households
+            "B19001_002E",  # less than $10,000
+            "B19001_003E",  # $10,000 to $14,999
+            "B19001_004E",  # $15,000 to $19,999
+            "B19001_005E",  # $20,000 to $24,999
+            "B19001_006E",  # $25,000 to $29,999
+            "B19001_007E",  # $30,000 to $34,999
+            "B19001_008E",  # $35,000 to $39,999
+            "B19001_009E",  # $40,000 to $44,999
+            "B19001_010E",  # $45,000 to $49,999
+            "B19001_011E",  # $50,000 to $59,999
+            "B19001_012E",  # $60,000 to $74,999
+            "B19001_013E",  # $75,000 to $99,999
+            "B19001_014E",  # $100,000 to $124,999
+            "B19001_015E",  # $125,000 to $149,999
+            "B19001_016E",  # $150,000 to $199,999
+            "B19001_017E",  # $200,000 or more
         ],
         state_fips=state,
         county_fips=county,
@@ -189,6 +255,24 @@ def _get_census_tract_info(
         "english_only_language_at_home": tract_data[0]["C16001_002E"],
         "total_vehicle_households": tract_data[0]["B08201_001E"],
         "not_car_owning_households": tract_data[0]["B08201_002E"],
+        "income_brackets": {
+            IncomeLevel.LESS_THAN_10K: tract_data[0]["B19001_002E"],
+            IncomeLevel.BETWEEN_10K_TO_15K: tract_data[0]["B19001_003E"],
+            IncomeLevel.BETWEEN_15K_TO_20K: tract_data[0]["B19001_004E"],
+            IncomeLevel.BETWEEN_20K_TO_25K: tract_data[0]["B19001_005E"],
+            IncomeLevel.BETWEEN_25K_TO_30K: tract_data[0]["B19001_006E"],
+            IncomeLevel.BETWEEN_30K_TO_35K: tract_data[0]["B19001_007E"],
+            IncomeLevel.BETWEEN_35K_TO_40K: tract_data[0]["B19001_008E"],
+            IncomeLevel.BETWEEN_40K_TO_45K: tract_data[0]["B19001_009E"],
+            IncomeLevel.BETWEEN_45K_TO_50K: tract_data[0]["B19001_010E"],
+            IncomeLevel.BETWEEN_50K_TO_60K: tract_data[0]["B19001_011E"],
+            IncomeLevel.BETWEEN_60K_TO_75K: tract_data[0]["B19001_012E"],
+            IncomeLevel.BETWEEN_75K_TO_100K: tract_data[0]["B19001_013E"],
+            IncomeLevel.BETWEEN_100K_TO_125K: tract_data[0]["B19001_014E"],
+            IncomeLevel.BETWEEN_125K_TO_150K: tract_data[0]["B19001_015E"],
+            IncomeLevel.BETWEEN_150K_TO_200K: tract_data[0]["B19001_016E"],
+            IncomeLevel.MORE_THAN_200K: tract_data[0]["B19001_017E"],
+        },
     }
 
     with open(_CACHE_CENSUS_DEMOGRAPHIC, "w") as f:
@@ -200,6 +284,24 @@ def _get_census_tract_info(
         english_only_language_at_home=tract_data[0]["C16001_002E"],
         total_vehicle_households=tract_data[0]["B08201_001E"],
         not_car_owning_households=tract_data[0]["B08201_002E"],
+        income_brackets={
+            IncomeLevel.LESS_THAN_10K: tract_data[0]["B19001_002E"],
+            IncomeLevel.BETWEEN_10K_TO_15K: tract_data[0]["B19001_003E"],
+            IncomeLevel.BETWEEN_15K_TO_20K: tract_data[0]["B19001_004E"],
+            IncomeLevel.BETWEEN_20K_TO_25K: tract_data[0]["B19001_005E"],
+            IncomeLevel.BETWEEN_25K_TO_30K: tract_data[0]["B19001_006E"],
+            IncomeLevel.BETWEEN_30K_TO_35K: tract_data[0]["B19001_007E"],
+            IncomeLevel.BETWEEN_35K_TO_40K: tract_data[0]["B19001_008E"],
+            IncomeLevel.BETWEEN_40K_TO_45K: tract_data[0]["B19001_009E"],
+            IncomeLevel.BETWEEN_45K_TO_50K: tract_data[0]["B19001_010E"],
+            IncomeLevel.BETWEEN_50K_TO_60K: tract_data[0]["B19001_011E"],
+            IncomeLevel.BETWEEN_60K_TO_75K: tract_data[0]["B19001_012E"],
+            IncomeLevel.BETWEEN_75K_TO_100K: tract_data[0]["B19001_013E"],
+            IncomeLevel.BETWEEN_100K_TO_125K: tract_data[0]["B19001_014E"],
+            IncomeLevel.BETWEEN_125K_TO_150K: tract_data[0]["B19001_015E"],
+            IncomeLevel.BETWEEN_150K_TO_200K: tract_data[0]["B19001_016E"],
+            IncomeLevel.MORE_THAN_200K: tract_data[0]["B19001_017E"],
+        },
     )
 
 
@@ -333,28 +435,37 @@ class Student(LocationData):
 
         english_at_home = (
             (
-                random()
+                random.random()
                 < (
-                    census_data.english_only_language_at_home
-                    / census_data.total_language_at_home
+                    census_data["english_only_language_at_home"]
+                    / census_data["total_language_at_home"]
                 )
             )
-            if census_data.total_language_at_home > 0
+            if census_data["total_language_at_home"] > 0
             else False
         )
-        not_car_owning_household = (
-            random()
+        owns_car = (
+            random.random()
             < (
-                census_data.not_car_owning_households
-                / census_data.total_vehicle_households
+                1
+                - census_data["not_car_owning_households"]
+                / census_data["total_vehicle_households"]
             )
-            if census_data.total_vehicle_households > 0
+            if census_data["total_vehicle_households"] > 0
             else False
         )
 
+        # select income level according to percentage likelihood
+        income_level = random.choices(
+            population=list(census_data["income_brackets"].keys()),
+            weights=list(census_data["income_brackets"].values()),
+            k=1,
+        )[0]
+
         return CensusDemographics(
             english_at_home=english_at_home,
-            not_car_owning_household=not_car_owning_household,
+            owns_car=owns_car,
+            income_level=income_level,
         )
 
 

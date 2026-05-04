@@ -39,6 +39,7 @@ dependencies = [
     "haversine>=2.9.0",
     "juliacall>=0.9.31",
     "dotenv>=0.9.9",
+    "matplot2tikz>=0.5.4",
 ]
 
 [tool.uv]
