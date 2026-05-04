@@ -627,6 +627,21 @@ class BirdBackendSolution:
         default_factory=lambda: np.asarray([], dtype=np.int64),
     )
 
+    def student_ride_times(
+        self,
+        instance: BirdExportInstance,
+        *,
+        validate_service_time: bool = True,
+        tolerance_min: float = 1.0e-6,
+    ) -> list[dict[str, object]]:
+        """Return one timing record per served student using this solution."""
+        return bird_student_ride_times(
+            instance,
+            self,
+            validate_service_time=validate_service_time,
+            tolerance_min=tolerance_min,
+        )
+
     @classmethod
     def load(cls, path: str | Path) -> "BirdBackendSolution":
         with np.load(Path(path), allow_pickle=False) as payload:
@@ -1411,6 +1426,64 @@ def _bird_bus_display_name(instance: BirdExportInstance, bus_id: int) -> str:
     return f"bird_bus_{bus_id}"
 
 
+def _bird_school_matrix_index(instance: BirdExportInstance, school_idx: int) -> int:
+    return len(instance.demand_rows) + school_idx - 1
+
+
+def _bird_depot_matrix_index(instance: BirdExportInstance, depot_idx: int) -> int:
+    return len(instance.demand_rows) + len(instance.schools) + depot_idx - 1
+
+
+def _bird_travel_time_min(
+    instance: BirdExportInstance,
+    from_matrix_idx: int,
+    to_matrix_idx: int,
+) -> float:
+    value = float(instance.travel_time_min[from_matrix_idx, to_matrix_idx])
+    if not math.isfinite(value):
+        raise ValueError(
+            "Bird instance has no finite travel time between matrix indices "
+            f"{from_matrix_idx} and {to_matrix_idx}"
+        )
+    return value
+
+
+def _bird_stop_dwell_time_min(
+    instance: BirdExportInstance,
+    demand_row: BirdDemandRow,
+) -> float:
+    return (
+        float(instance.constant_stop_time)
+        + float(instance.stop_time_per_student) * int(demand_row.students)
+        + float(instance.stop_time_per_wheelchair_student)
+        * int(demand_row.wheelchair_students)
+    )
+
+
+def _bird_route_service_time_min(
+    instance: BirdExportInstance,
+    route_rows: list[tuple[int, BirdDemandRow]],
+    school_idx: int,
+) -> float:
+    if not route_rows:
+        return 0.0
+
+    service_time = 0.0
+    for idx, (global_demand_idx, demand_row) in enumerate(route_rows):
+        current_matrix_idx = global_demand_idx - 1
+        if idx + 1 == len(route_rows):
+            next_matrix_idx = _bird_school_matrix_index(instance, school_idx)
+        else:
+            next_matrix_idx = route_rows[idx + 1][0] - 1
+        service_time += _bird_stop_dwell_time_min(instance, demand_row)
+        service_time += _bird_travel_time_min(
+            instance,
+            current_matrix_idx,
+            next_matrix_idx,
+        )
+    return service_time
+
+
 def _bird_unassigned_demand_rows(
     instance: BirdExportInstance,
     solution: BirdBackendSolution,
@@ -1466,6 +1539,135 @@ def bird_student_assignments(
                 )
 
     return assignments
+
+
+def bird_student_ride_times(
+    instance: BirdExportInstance,
+    solution: BirdBackendSolution,
+    *,
+    validate_service_time: bool = True,
+    tolerance_min: float = 1.0e-6,
+) -> list[dict[str, object]]:
+    """Return one timing record per served student in a BiRD solution.
+
+    The solution stores school arrival times and route stop order, but not
+    per-student times. This reconstructs latest feasible stop service times
+    from the exported travel-time matrix and route-level school arrivals.
+    """
+    demand_rows_by_school = _bird_demand_rows_by_school(instance)
+    rows_by_bus: dict[int, list[int]] = defaultdict(list)
+    for row_idx, bus_id in enumerate(solution.assignment_bus_ids.tolist()):
+        rows_by_bus[int(bus_id)].append(row_idx)
+
+    records: list[dict[str, object]] = []
+    for bus_id, bus_rows in sorted(rows_by_bus.items()):
+        bus_name = _bird_bus_display_name(instance, bus_id)
+        if instance.fleet_aware and 1 <= bus_id <= len(instance.bus_depot_indices):
+            depot_idx = int(instance.bus_depot_indices[bus_id - 1])
+        else:
+            depot_idx = 1
+        current_matrix_idx = _bird_depot_matrix_index(instance, depot_idx)
+
+        for route_idx in sorted(
+            bus_rows,
+            key=lambda idx: int(solution.assignment_orders[idx]),
+        ):
+            school_idx = int(solution.assignment_school_indices[route_idx])
+            school = instance.schools[school_idx - 1]
+            school_matrix_idx = _bird_school_matrix_index(instance, school_idx)
+            school_rows = demand_rows_by_school[school_idx]
+            start = int(solution.assignment_stop_ptr[route_idx])
+            end = int(solution.assignment_stop_ptr[route_idx + 1])
+            local_stop_ids = solution.assignment_stop_values[start:end].tolist()
+            route_rows = [school_rows[int(stop_id) - 1] for stop_id in local_stop_ids]
+
+            route_service_time = _bird_route_service_time_min(
+                instance,
+                route_rows,
+                school_idx,
+            )
+            stored_service_time = float(
+                solution.assignment_service_time_min[route_idx]
+            )
+            if (
+                validate_service_time
+                and abs(route_service_time - stored_service_time) > tolerance_min
+            ):
+                raise ValueError(
+                    "reconstructed Bird route service time does not match solution "
+                    f"for route index {route_idx}: reconstructed "
+                    f"{route_service_time}, solution {stored_service_time}"
+                )
+
+            school_arrival_time = float(solution.assignment_arrival_times[route_idx])
+            deadhead_time = (
+                _bird_travel_time_min(
+                    instance,
+                    current_matrix_idx,
+                    route_rows[0][0] - 1,
+                )
+                if route_rows
+                else 0.0
+            )
+            route_start_time = school_arrival_time - deadhead_time - route_service_time
+            current_route_time = route_start_time
+            previous_matrix_idx = current_matrix_idx
+
+            for route_stop_order, (global_demand_idx, demand_row) in enumerate(
+                route_rows
+            ):
+                demand_matrix_idx = global_demand_idx - 1
+                current_route_time += _bird_travel_time_min(
+                    instance,
+                    previous_matrix_idx,
+                    demand_matrix_idx,
+                )
+                boarding_time = current_route_time
+                dwell_time = _bird_stop_dwell_time_min(instance, demand_row)
+                departure_time = boarding_time + dwell_time
+                ride_time = school_arrival_time - boarding_time
+                in_vehicle_time = school_arrival_time - departure_time
+
+                for student_id, student_name in zip(
+                    demand_row.student_ids,
+                    demand_row.student_names,
+                    strict=True,
+                ):
+                    records.append(
+                        {
+                            "student_id": student_id,
+                            "student_name": student_name,
+                            "bus_id": bus_id,
+                            "bus_name": bus_name,
+                            "route_order": int(
+                                solution.assignment_orders[route_idx]
+                            ),
+                            "route_index": route_idx,
+                            "route_stop_order": route_stop_order,
+                            "school_id": str(school.id),
+                            "school_name": school.name,
+                            "school_arrival_time_min": school_arrival_time,
+                            "assigned_stop_id": demand_row.source_stop_id,
+                            "assigned_stop_name": demand_row.stop_name,
+                            "assigned_stop_node_id": int(demand_row.stop_node_id),
+                            "service_group": demand_row.service_group,
+                            "grade": demand_row.grade,
+                            "boarding_time_min": boarding_time,
+                            "boarding_departure_time_min": departure_time,
+                            "ride_time_min": ride_time,
+                            "in_vehicle_time_min": in_vehicle_time,
+                            "stop_dwell_time_min": dwell_time,
+                            "route_start_time_min": route_start_time,
+                            "route_service_time_min": route_service_time,
+                        }
+                    )
+
+                current_route_time = departure_time
+                previous_matrix_idx = demand_matrix_idx
+
+            current_matrix_idx = school_matrix_idx
+
+    return records
 
 
 def bird_stop_assignments(
