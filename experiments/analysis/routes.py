@@ -294,9 +294,9 @@ def main() -> None:
     #     f"Average time on bus for current routes: {current_routes_average_time:.2f} minutes (±{current_routes_std_dev:.2f})"
     # )
 
-    for current_route in current_routes:
-        time = get_travel_time(current_route.path, filtered_problem_data.base_graph)
-        print(f"Route {current_route.bus.name} time: {time:.2f} minutes")
+    # for current_route in current_routes:
+    #     time = get_travel_time(current_route.path, filtered_problem_data.base_graph)
+    #     print(f"Route {current_route.bus.name} time: {time:.2f} minutes")
 
     filtered_bird_results = get_bird_routes_json(
         "existing_student_routes",

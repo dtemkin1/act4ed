@@ -21,6 +21,8 @@ except Exception as exc:
         " and ensure Java is properly configured."
     ) from exc
 
+random.seed(42)  # set random seed for reproducibility
+
 load_dotenv()  # load environment variables from .env file
 
 type NodeId = int
