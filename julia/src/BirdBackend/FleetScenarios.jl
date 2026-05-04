@@ -13,6 +13,8 @@ end
 
 
 const FLEET_SCENARIO_EXACT_CANDIDATE_LIMIT = 600
+const FLEET_SCENARIO_LINK_VARIABLE_LIMIT = 500_000
+const FLEET_SCENARIO_TIMING_BIG_M = 1.0e6
 
 
 function _aff_sum(terms)
@@ -98,6 +100,9 @@ function _add_fleet_route_candidate!(
     isempty(compatible) && return candidates
     push!(seen, key)
     route = BirdRoute(0, stops)
+    route_service_time = service_time(data, school_idx, route)
+    route_cost = sum_individual_travel_times(data, school_idx, route)
+    isfinite(route_service_time) && isfinite(route_cost) || return candidates
     push!(
         candidates,
         FleetRouteCandidate(
@@ -108,8 +113,8 @@ function _add_fleet_route_candidate!(
             _route_grade_id(data, school_idx, stops),
             _route_passenger_load(data, school_idx, stops),
             _route_wheelchair_load(data, school_idx, stops),
-            service_time(data, school_idx, route),
-            sum_individual_travel_times(data, school_idx, route),
+            route_service_time,
+            route_cost,
             compatible,
         ),
     )
@@ -287,8 +292,9 @@ function _reduce_fleet_route_candidates(
     label::AbstractString;
     optimizer = Gurobi.Optimizer,
     optimizer_attributes = Pair{String, Any}[],
+    force::Bool = false,
 )
-    length(candidates) <= FLEET_SCENARIO_EXACT_CANDIDATE_LIMIT && return candidates
+    !force && length(candidates) <= FLEET_SCENARIO_EXACT_CANDIDATE_LIMIT && return candidates
 
     stage_keys = Set{Tuple{Int, Int, Int}}()
     for (school_idx, stop_idx) in stage_stops
@@ -349,6 +355,39 @@ function _reduce_fleet_route_candidates(
 end
 
 
+function _compatible_route_arcs_by_bus(
+    bus_ids::Vector{Int},
+    route_ids::Vector{Int},
+    route_arcs::Vector{Tuple{Int, Int}},
+    compatible_bus_sets::Vector{Set{Int}},
+)
+    bus_route_arcs = Dict{Int, Vector{Tuple{Int, Int}}}(
+        bus_idx => Tuple{Int, Int}[] for bus_idx in bus_ids
+    )
+    incoming_arcs = Dict{Tuple{Int, Int}, Vector{Tuple{Int, Int}}}(
+        (bus_idx, route_idx) => Tuple{Int, Int}[]
+        for bus_idx in bus_ids
+        for route_idx in route_ids
+    )
+    outgoing_arcs = Dict{Tuple{Int, Int}, Vector{Tuple{Int, Int}}}(
+        (bus_idx, route_idx) => Tuple{Int, Int}[]
+        for bus_idx in bus_ids
+        for route_idx in route_ids
+    )
+    for bus_idx in bus_ids
+        for arc in route_arcs
+            first_idx, second_idx = arc
+            if bus_idx in compatible_bus_sets[first_idx] && bus_idx in compatible_bus_sets[second_idx]
+                push!(bus_route_arcs[bus_idx], arc)
+                push!(outgoing_arcs[(bus_idx, first_idx)], arc)
+                push!(incoming_arcs[(bus_idx, second_idx)], arc)
+            end
+        end
+    end
+    return bus_route_arcs, incoming_arcs, outgoing_arcs
+end
+
+
 function _route_start_cost(data::BirdData, bus_idx::Int, candidate::FleetRouteCandidate)
     depot = data.depots[data.fleet[bus_idx].depot]
     first_stop = data.stops[candidate.school][candidate.stops[1]]
@@ -403,6 +442,8 @@ function _solve_fleet_stage_mip!(
             rng = rng,
         )
     end
+    bus_ids = collect(eligible_remaining)
+    count_reduction_requested = length(candidates) > FLEET_SCENARIO_EXACT_CANDIDATE_LIMIT
     candidates = _timed_value("fleet scenario $(label) candidate reduction", timing_log) do
         _reduce_fleet_route_candidates(
             data,
@@ -413,10 +454,34 @@ function _solve_fleet_stage_mip!(
             optimizer_attributes = optimizer_attributes,
         )
     end
-    covering = _timed_value("fleet scenario $(label) coverage indexing", timing_log) do
-        _coverage_by_stop(candidates, stage_stops)
+    route_arcs = _timed_value("fleet scenario $(label) arc construction", timing_log) do
+        _candidate_route_arcs(data, candidates)
+    end
+    projected_link_vars = length(bus_ids) * length(route_arcs)
+    if !count_reduction_requested && projected_link_vars > FLEET_SCENARIO_LINK_VARIABLE_LIMIT
+        _log_timing_message(
+            "fleet scenario $(label) reducing candidates because projected dense link vars=$(projected_link_vars) exceeds $(FLEET_SCENARIO_LINK_VARIABLE_LIMIT)",
+            timing_log,
+        )
+        candidates = _timed_value("fleet scenario $(label) link-triggered candidate reduction", timing_log) do
+            _reduce_fleet_route_candidates(
+                data,
+                candidates,
+                stage_stops,
+                label;
+                optimizer = optimizer,
+                optimizer_attributes = optimizer_attributes,
+                force = true,
+            )
+        end
+        route_arcs = _timed_value("fleet scenario $(label) arc reconstruction after reduction", timing_log) do
+            _candidate_route_arcs(data, candidates)
+        end
     end
     if fail_if_unserved
+        covering = _timed_value("fleet scenario $(label) coverage indexing", timing_log) do
+            _coverage_by_stop(candidates, stage_stops)
+        end
         for (position, routes_covering_stop) in enumerate(covering)
             if isempty(routes_covering_stop)
                 school_idx, stop_idx = stage_stops[position]
@@ -424,17 +489,24 @@ function _solve_fleet_stage_mip!(
                 error("insufficient fleet for $(label) Bird demand: no feasible route candidate covers stop $(stop.external_id)")
             end
         end
+    else
+        covering = _timed_value("fleet scenario $(label) coverage indexing", timing_log) do
+            _coverage_by_stop(candidates, stage_stops)
+        end
     end
     isempty(candidates) && return Int[]
 
-    bus_ids = collect(eligible_remaining)
     route_ids = collect(eachindex(candidates))
-    route_arcs = _timed_value("fleet scenario $(label) arc construction", timing_log) do
-        _candidate_route_arcs(data, candidates)
-    end
     compatible_bus_sets = [Set(candidate.compatible_buses) for candidate in candidates]
+    bus_route_arcs, incoming_arcs, outgoing_arcs =
+        _compatible_route_arcs_by_bus(bus_ids, route_ids, route_arcs, compatible_bus_sets)
+    sparse_link_vars = sum(length(arcs) for arcs in values(bus_route_arcs))
+    route_link_costs = Dict(
+        arc => _route_link_cost(data, candidates[arc[1]], candidates[arc[2]])
+        for arc in route_arcs
+    )
     _log_timing_message(
-        "fleet scenario $(label) size: stops=$(length(stage_stops)), buses=$(length(bus_ids)), candidates=$(length(route_ids)), arcs=$(length(route_arcs)), assign_vars=$(length(bus_ids) * length(route_ids)), link_vars=$(length(bus_ids) * length(route_arcs))",
+        "fleet scenario $(label) size: stops=$(length(stage_stops)), buses=$(length(bus_ids)), candidates=$(length(route_ids)), arcs=$(length(route_arcs)), assign_vars=$(length(bus_ids) * length(route_ids)), dense_link_vars=$(length(bus_ids) * length(route_arcs)), link_vars=$(sparse_link_vars)",
         timing_log,
     )
 
@@ -444,7 +516,13 @@ function _solve_fleet_stage_mip!(
     @variable(model, used[bus_ids], Bin)
     @variable(model, start_route[bus_ids, route_ids], Bin)
     @variable(model, finish_route[bus_ids, route_ids], Bin)
-    @variable(model, link_route[bus_ids, route_arcs], Bin)
+    @variable(model, arrival_time[bus_ids, route_ids] >= 0)
+    link_route = Dict{Tuple{Int, Tuple{Int, Int}}, VariableRef}()
+    for bus_idx in bus_ids
+        for arc in bus_route_arcs[bus_idx]
+            link_route[(bus_idx, arc)] = @variable(model, binary = true)
+        end
+    end
     @variable(model, served[1:length(stage_stops)], Bin)
 
     for bus_idx in bus_ids, route_idx in route_ids
@@ -452,12 +530,6 @@ function _solve_fleet_stage_mip!(
             @constraint(model, assign[bus_idx, route_idx] == 0)
             @constraint(model, start_route[bus_idx, route_idx] == 0)
             @constraint(model, finish_route[bus_idx, route_idx] == 0)
-        end
-    end
-
-    for bus_idx in bus_ids, (first_idx, second_idx) in route_arcs
-        if !(bus_idx in compatible_bus_sets[first_idx]) || !(bus_idx in compatible_bus_sets[second_idx])
-            @constraint(model, link_route[bus_idx, (first_idx, second_idx)] == 0)
         end
     end
 
@@ -469,11 +541,33 @@ function _solve_fleet_stage_mip!(
         @constraint(model, _aff_sum(start_route[bus_idx, route_idx] for route_idx in route_ids) == used[bus_idx])
         @constraint(model, _aff_sum(finish_route[bus_idx, route_idx] for route_idx in route_ids) == used[bus_idx])
         for route_idx in route_ids
-            incoming = _aff_sum(link_route[bus_idx, arc] for arc in route_arcs if arc[2] == route_idx)
-            outgoing = _aff_sum(link_route[bus_idx, arc] for arc in route_arcs if arc[1] == route_idx)
+            incoming = _aff_sum(link_route[(bus_idx, arc)] for arc in incoming_arcs[(bus_idx, route_idx)])
+            outgoing = _aff_sum(link_route[(bus_idx, arc)] for arc in outgoing_arcs[(bus_idx, route_idx)])
             @constraint(model, assign[bus_idx, route_idx] == start_route[bus_idx, route_idx] + incoming)
             @constraint(model, assign[bus_idx, route_idx] == finish_route[bus_idx, route_idx] + outgoing)
             @constraint(model, assign[bus_idx, route_idx] <= used[bus_idx])
+            school = data.schools[candidates[route_idx].school]
+            @constraint(
+                model,
+                arrival_time[bus_idx, route_idx] >= earliest_arrival_time(school) - FLEET_SCENARIO_TIMING_BIG_M * (1 - assign[bus_idx, route_idx]),
+            )
+            @constraint(
+                model,
+                arrival_time[bus_idx, route_idx] <= latest_arrival_time(school) + FLEET_SCENARIO_TIMING_BIG_M * (1 - assign[bus_idx, route_idx]),
+            )
+        end
+        for arc in bus_route_arcs[bus_idx]
+            first_idx, second_idx = arc
+            first_school = data.schools[candidates[first_idx].school]
+            @constraint(
+                model,
+                arrival_time[bus_idx, second_idx] >=
+                arrival_time[bus_idx, first_idx] +
+                first_school.dwell_time +
+                route_link_costs[arc] +
+                candidates[second_idx].service_time -
+                FLEET_SCENARIO_TIMING_BIG_M * (1 - link_route[(bus_idx, arc)]),
+            )
         end
         for school_idx in eachindex(data.schools)
             @constraint(
@@ -547,9 +641,9 @@ function _solve_fleet_stage_mip!(
     end
     cost_objective += _timed_value("fleet scenario $(label) objective route link term", timing_log) do
         _aff_sum(
-            link_route[bus_idx, arc] * _route_link_cost(data, candidates[arc[1]], candidates[arc[2]])
+            link_route[(bus_idx, arc)] * route_link_costs[arc]
             for bus_idx in bus_ids
-            for arc in route_arcs
+            for arc in bus_route_arcs[bus_idx]
         )
     end
     _timed_value("fleet scenario $(label) objective attach", timing_log) do
@@ -574,7 +668,11 @@ function _solve_fleet_stage_mip!(
         current_route = start_candidates[1]
         while true
             push!(route_path, current_route)
-            next_routes = [arc[2] for arc in route_arcs if arc[1] == current_route && value(link_route[bus_idx, arc]) >= 0.5]
+            next_routes = [
+                arc[2]
+                for arc in outgoing_arcs[(bus_idx, current_route)]
+                if value(link_route[(bus_idx, arc)]) >= 0.5
+            ]
             if isempty(next_routes)
                 break
             end

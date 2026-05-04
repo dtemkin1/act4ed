@@ -294,11 +294,149 @@ class FilteredProblemData(ProblemData):
 
     @cached_property
     def _service_graph_cached(self) -> "nx.MultiDiGraph[NodeId]":
-        node_ids = {node.node_id for node in self.all_nodes}
-        service_graph = self.base_problem_data.service_graph.subgraph(node_ids).copy()
+        if (
+            self._stops is None
+            and self._schools is None
+            and self._depots is None
+            and self._students is None
+        ):
+            return self.base_problem_data.service_graph
+
+        service_graph: "nx.MultiDiGraph[NodeId]" = nx.MultiDiGraph()
         service_graph.graph.update(self.base_problem_data.service_graph.graph)
+        service_graph.graph["distance_unit"] = "km"
+
+        stop_school_types: dict[Stop, set[SchoolType]] = {}
+        for student in self.students:
+            stop_school_types.setdefault(student.stop, set()).add(student.school.type)
+
+        for start, end in self._service_graph_pairs():
+            self._add_service_edge(service_graph, start, end, stop_school_types)
+
         ensure_service_graph_kilometers(service_graph)
         return service_graph
+
+    def _service_graph_pairs(self) -> tuple[tuple[Place, Place], ...]:
+        pairs: list[tuple[Place, Place]] = []
+
+        for depot in self.depots:
+            for stop in self.stops:
+                pairs.append((depot, stop))
+
+        for stop1 in self.stops:
+            for stop2 in self.stops:
+                if stop1 != stop2:
+                    pairs.append((stop1, stop2))
+
+            for school in self.schools:
+                pairs.append((stop1, school))
+
+        for school in self.schools:
+            for stop in self.stops:
+                pairs.append((school, stop))
+            for other_school in self.schools:
+                if school != other_school:
+                    pairs.append((school, other_school))
+            for depot in self.depots:
+                pairs.append((school, depot))
+
+        return tuple(pairs)
+
+    def _service_edge_allowed(
+        self,
+        start: Place,
+        end: Place,
+        stop_school_types: dict[Stop, set[SchoolType]],
+        length: float | None = None,
+    ) -> bool:
+        if isinstance(start, Stop) and isinstance(end, School):
+            return end.type in stop_school_types.get(start, set())
+
+        if isinstance(start, Stop) and isinstance(end, Stop):
+            if start.node_id == end.node_id:
+                return True
+            if stop_school_types.get(start, set()).isdisjoint(
+                stop_school_types.get(end, set())
+            ):
+                return False
+
+        if start.node_id == end.node_id:
+            return True
+
+        prune = getattr(self.base_problem_data, "prune", None)
+        if (
+            length is not None
+            and prune is not None
+            and isinstance(start, Stop)
+            and isinstance(end, Stop)
+        ):
+            return length <= prune
+
+        return True
+
+    def _add_service_edge(
+        self,
+        service_graph: "nx.MultiDiGraph[NodeId]",
+        start: Place,
+        end: Place,
+        stop_school_types: dict[Stop, set[SchoolType]],
+    ) -> None:
+        start_id = start.node_id
+        end_id = end.node_id
+
+        if service_graph.has_edge(start_id, end_id):
+            return
+
+        if not self._service_edge_allowed(start, end, stop_school_types):
+            return
+
+        if start_id == end_id:
+            service_graph.add_edge(
+                start_id,
+                end_id,
+                length=0.0,
+                path=[start_id, end_id],
+            )
+            return
+
+        base_edge = self.base_problem_data.service_graph.get_edge_data(
+            start_id,
+            end_id,
+            key=0,
+        )
+        if base_edge is not None:
+            length = float(base_edge["length"])
+            if not self._service_edge_allowed(
+                start,
+                end,
+                stop_school_types,
+                length=length,
+            ):
+                return
+            service_graph.add_edge(start_id, end_id, **dict(base_edge))
+            return
+
+        try:
+            length_m, path = get_shortest_path(self.base_graph, start_id, end_id)
+        except (KeyError, nx.NetworkXNoPath):
+            print(f"Warning: no path between {start} and {end} in the graph")
+            return
+
+        length_km = meters_to_kilometers(length_m)
+        if not self._service_edge_allowed(
+            start,
+            end,
+            stop_school_types,
+            length=length_km,
+        ):
+            return
+
+        service_graph.add_edge(
+            start_id,
+            end_id,
+            length=length_km,
+            path=path,
+        )
 
     @property
     def base_graph(self) -> "nx.MultiDiGraph[NodeId]":
@@ -1102,10 +1240,12 @@ class ProblemDataRealSurrogate(ProblemDataReal):
         nearest_node = min(
             self.hex_graph.nodes(),
             key=lambda node: (
-                (self.hex_graph.nodes[node]["x"] - x) ** 2
-                + (self.hex_graph.nodes[node]["y"] - y) ** 2
-            )
-            ** 0.5,
+                (
+                    (self.hex_graph.nodes[node]["x"] - x) ** 2
+                    + (self.hex_graph.nodes[node]["y"] - y) ** 2
+                )
+                ** 0.5
+            ),
         )
 
         return nearest_node
@@ -1134,9 +1274,8 @@ class ProblemDataRealSurrogate(ProblemDataReal):
         nearest_stop_location = min(
             stop_locations,
             key=lambda loc: (
-                (loc.x - geo_location.x) ** 2 + (loc.y - geo_location.y) ** 2
-            )
-            ** 0.5,
+                ((loc.x - geo_location.x) ** 2 + (loc.y - geo_location.y) ** 2) ** 0.5
+            ),
         )
 
         # get stop assigned to this hex node
