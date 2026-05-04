@@ -232,8 +232,8 @@ def normalized_result_from_formulation3_solution(
             itineraries.append(
                 NormalizedBusItinerary(
                     bus_id=str(bus.name),
-                    route_orders=route_orders,
-                    school_ids=school_ids,
+                    route_orders=tuple(route_orders),
+                    school_ids=tuple(school_ids),
                     distance_km=float(bus_distance),
                 )
             )
