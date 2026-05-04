@@ -805,11 +805,7 @@ def _demand_stop_external_id(
 
 
 def _wheelchair_capacity_for_bus(bus: Bus) -> int:
-    if bus.type == BusType.WC:
-        return 4
-    if bus.type == BusType.BWC:
-        return 2
-    return 0
+    return bus.wheelchair_capacity
 
 
 def _bus_type_name(bus: Bus) -> str:
@@ -1092,8 +1088,7 @@ def build_bird_export_instance(
                 "with wheelchair capacity"
             )
         has_sped_students = any(
-            _student_is_special_ed(student)
-            and not _student_is_wheelchair_user(student)
+            _student_is_special_ed(student) and not _student_is_wheelchair_user(student)
             for student in selected_students
         )
         if has_sped_students and not any(bus_has_monitor(bus) for bus in buses):

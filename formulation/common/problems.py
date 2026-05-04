@@ -7,7 +7,7 @@ from typing import Any, Callable, Optional, cast
 
 import datetime as dt
 import pickle
-from collections.abc import Hashable, Iterable
+from collections.abc import Hashable, Iterable, Sequence
 
 import geopandas as gpd
 import networkx as nx
@@ -44,7 +44,7 @@ except Exception:
 
 
 try:
-    from shapely.geometry import Point
+    from shapely.geometry import Point, Polygon
 except Exception as exc:
     raise ImportError(
         "Shapely not found. Please install it with 'pip install shapely'"
@@ -125,6 +125,29 @@ class ProblemData(ABC):
     def all_nodes(self) -> tuple[Place, ...]:
         """all nodes in the problem, including stops, schools, and depots"""
         return self.stops + self.schools + self.depots
+
+    def get_shortest_path_base(
+        self, start: NodeId, end: NodeId, weight: str = "length"
+    ) -> tuple[float, list[NodeId]]:
+        """get shortest path and length in meters between two nodes in the base graph"""
+        return get_shortest_path(self.base_graph, start, end, weight)
+
+    def get_shortest_paths_base(
+        self, nodes: Sequence[NodeId], weight: str = "length"
+    ) -> tuple[float, list[NodeId]]:
+        length = 0.0
+        all_path: list[NodeId] = []
+        for i in range(len(nodes) - 1):
+            start = nodes[i]
+            end = nodes[i + 1]
+            length_m, path = self.get_shortest_path_base(start, end, weight)
+            length += length_m
+
+            while all_path and path and path[0] == all_path[-1]:
+                path = path[1:]
+            all_path.extend(path)
+
+        return length, all_path
 
     def special_ed_students_in_stop(self, stop: Stop) -> tuple[Student, ...]:
         """Return students with special educational needs who are assigned to a specific stop."""
@@ -224,29 +247,31 @@ class ProblemData(ABC):
             raise ValueError("no schools matched the requested restriction")
 
         selected_school_ids = {school.id for school in selected_schools}
-        selected_students = [
+        selected_students = tuple(
             student
             for student in self.students
             if student.school.id in selected_school_ids
-        ]
+        )
         if not selected_students:
             raise ValueError("no students matched the requested school restriction")
 
         selected_school_ids = {student.school.id for student in selected_students}
-        selected_schools = [
+        selected_schools = tuple(
             school for school in selected_schools if school.id in selected_school_ids
-        ]
+        )
         selected_stops_set = {student.stop for student in selected_students}
-        selected_stops = [stop for stop in self.stops if stop in selected_stops_set]
+        selected_stops = tuple(
+            stop for stop in self.stops if stop in selected_stops_set
+        )
 
         return FilteredProblemData(
             name=f"{self.name}_{_restriction_suffix(school_ids, school_types)}",
             base_problem_data=self,
             _stops=selected_stops,
             _schools=selected_schools,
-            _depots=list(self.depots),
+            _depots=self.depots,
             _students=selected_students,
-            _buses=list(self.buses),
+            _buses=self.buses,
         )
 
     def restrict_to_school(self, school: School | str | int) -> "FilteredProblemData":
@@ -509,11 +534,6 @@ class ProblemDataToy(ProblemData):
     def buses(self) -> tuple[Bus, ...]:
         return self._buses
 
-    def _get_shortest_path_base(
-        self, start: NodeId, end: NodeId, weight: str = "length"
-    ) -> tuple[float, list[NodeId]]:
-        return get_shortest_path(self.base_graph, start, end, weight)
-
     @property
     def service_graph(self) -> "nx.MultiDiGraph[NodeId]":
         service_graph: "nx.MultiDiGraph[NodeId]" = nx.MultiDiGraph()
@@ -533,7 +553,7 @@ class ProblemDataToy(ProblemData):
                 return
 
             try:
-                length, path_list = self._get_shortest_path_base(start_id, end_id)
+                length, path_list = self.get_shortest_path_base(start_id, end_id)
                 path = tuple(path_list)
                 service_graph.add_edge(
                     start_id,
@@ -674,14 +694,16 @@ class ProblemDataReal(ProblemData):
     def _make_osm_graph(self):
         # get boundary polygon (similar to analysis.ipynb)
         gdf = self.gdf
+        crs = gdf.crs
+        assert crs is not None
 
         # project to utm for meters-based buffering
         projected = gdf.to_crs(gdf.estimate_utm_crs())
         projected["geometry"] = projected.buffer(self.boundary_buffer_km * 1000)
 
         # project back to original crs for osmnx
-        buffered = projected.to_crs(gdf.crs)
-        buffered_poly = buffered.geometry.iloc[0]
+        buffered = projected.to_crs(crs)
+        buffered_poly = cast(Polygon, buffered.geometry.iloc[0])
 
         # download street network
         graph = ox.graph_from_polygon(buffered_poly, network_type=NETWORK_TYPE)
@@ -699,10 +721,24 @@ class ProblemDataReal(ProblemData):
 
         return graph
 
-    def _get_shortest_path_osm(
+    def get_shortest_path_base(
         self, start: NodeId, end: NodeId, weight: str = "length"
     ) -> tuple[float, list[NodeId]]:
-        return get_shortest_path(self.osm_graph, start, end, weight)
+
+        # check if length and path are already in service_graph
+        if "_service_graph_cached" in self.__dict__ and weight == "length":
+            service_graph = self._service_graph_cached
+            edge = service_graph.get_edge_data(start, end, 0, None)
+
+            if edge is not None:
+                # service graph length is in km
+                length_km = edge["length"]
+                path = edge["path"]
+
+                return length_km * 1000.0, path
+
+        # return super().get_shortest_path_base(start, end, weight)
+        return get_shortest_path(self.base_graph, start, end, weight)
 
     def _stop_school_types(self) -> dict[Stop, set[SchoolType]]:
         stop_school_types: dict[Stop, set[SchoolType]] = {}
@@ -834,12 +870,12 @@ class ProblemDataReal(ProblemData):
 
         if not self.use_r5:
 
-            def edge_resolver(start: Place, end: Place):
-                length, path = self._get_shortest_path_osm(start.node_id, end.node_id)
+            def edge_resolver_not_r5(start: Place, end: Place):
+                length, path = self.get_shortest_path_base(start.node_id, end.node_id)
                 return length, path, {}
 
             for start, end in pairs:
-                add_edge(start, end, edge_resolver)
+                add_edge(start, end, edge_resolver_not_r5)
 
         else:
             if not self.osm_pbf_path:
@@ -865,7 +901,7 @@ class ProblemDataReal(ProblemData):
                 )
             )
 
-            def edge_resolver(start: Place, end: Place):
+            def edge_resolver_r5(start: Place, end: Place):
                 entry = itinerary_lookup[(place_ids[id(start)], place_ids[id(end)])]
                 extra_attrs: dict[str, object] = {}
                 geometry = entry.get("geometry")
@@ -874,7 +910,7 @@ class ProblemDataReal(ProblemData):
                 return float(entry["distance"]), [], extra_attrs
 
             for start, end in pairs:
-                add_edge(start, end, edge_resolver)
+                add_edge(start, end, edge_resolver_r5)
 
         return service_graph
 
@@ -1000,7 +1036,9 @@ class ProblemDataReal(ProblemData):
             geographic_location = Point(row["lon"], row["lat"])
 
             # check if in gdf bounds
-            if not self.gdf.geometry.iloc[0].contains(geographic_location):
+            if not (
+                cast(Polygon, self.gdf.geometry.iloc[0]).contains(geographic_location)
+            ):
                 outside_boundary += 1
                 continue
 
@@ -1050,7 +1088,7 @@ class ProblemDataReal(ProblemData):
                 "depot_name": str,
                 "capacity": int,
                 "range": float,
-                "has_wheelchair_access": bool,
+                "wheelchair_capacity": int,
                 "type": str,
             },
         )
@@ -1063,7 +1101,7 @@ class ProblemDataReal(ProblemData):
                 capacity=row["capacity"],
                 range=row["range"],
                 depot=depot,
-                has_wheelchair_access=bool(row["has_wheelchair_access"]),
+                wheelchair_capacity=row["wheelchair_capacity"],
                 type=(
                     BusType[row["type"]]
                     if row.get("type") in BusType.__members__
@@ -1217,19 +1255,23 @@ class ProblemDataRealSurrogate(ProblemDataReal):
             mapping[node] = i
         return mapping
 
-    @cached_property
+    @property
     def base_graph(self) -> "nx.MultiDiGraph[NodeId]":
+        return self._make_base_graph
+
+    @cached_property
+    def _make_base_graph(self) -> "nx.MultiDiGraph[NodeId]":
         hex_graph = self.hex_graph
 
-        base_graph: "nx.MultiDiGraph[NodeId]" = nx.MultiDiGraph()
+        base_graph_return: "nx.MultiDiGraph[NodeId]" = nx.MultiDiGraph()
         for node, data in hex_graph.nodes.items():
-            base_graph.add_node(self.mapping_hex_base[node], **data)
+            base_graph_return.add_node(self.mapping_hex_base[node], **data)
         for u, v, data in hex_graph.edges(data=True):
-            base_graph.add_edge(
+            base_graph_return.add_edge(
                 self.mapping_hex_base[u], self.mapping_hex_base[v], **data
             )
 
-        return base_graph
+        return base_graph_return
 
     def _get_nearest_hex_node_id(self, geographic_location: Point) -> tuple[int, int]:
         """Get the nearest node in the hex graph to a given point."""
@@ -1260,7 +1302,10 @@ class ProblemDataRealSurrogate(ProblemDataReal):
                 stop.geographic_location
             )
 
-            geo_point = self.mapping_hex_geo[nearest_hex_node_id]
+            geo_point = (
+                self.base_graph.nodes[self.mapping_hex_base[nearest_hex_node_id]]["x"],
+                self.base_graph.nodes[self.mapping_hex_base[nearest_hex_node_id]]["y"],
+            )
             new_stop = Stop(
                 name=stop.name,
                 node_id=self.mapping_hex_base[nearest_hex_node_id],

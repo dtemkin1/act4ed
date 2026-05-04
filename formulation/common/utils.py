@@ -12,7 +12,12 @@ from formulation.common.classes import (
     Student,
     Depot,
 )
-from formulation.common.constants import METERS_PER_KM
+from formulation.common.constants import (
+    BUS_SPEED_NOT_HIGHWAY,
+    BUS_SPEED_SCHOOL_ZONE,
+    METERS_PER_KM,
+    MPH_TO_KM_PER_MIN,
+)
 
 
 @cache
@@ -101,7 +106,7 @@ def C_b(b: Bus):
 
 def Wh_b(b: Bus):
     """1 if bus b has wheelchair access"""
-    return 1 if b.has_wheelchair_access else 0
+    return 1 if b.wheelchair_capacity > 0 else 0
 
 
 def R_b(b: Bus):
@@ -122,3 +127,71 @@ def slack_s(s: School):
 def l_s(s: School):
     """latest allowable arrival time at school s in minutes from midnight"""
     return h_s(s) - slack_s(s)
+
+
+@cache
+def get_paths_between_nodes(
+    nodes: tuple[NodeId, ...], service_graph: "nx.MultiDiGraph[NodeId]"
+) -> list[tuple[NodeId, ...]]:
+    """utility function to get paths between consecutive nodes in a list"""
+    paths = []
+    for k in range(len(nodes) - 1):
+        edge_data = service_graph.get_edge_data(
+            nodes[k], nodes[k + 1], key=0, default=None
+        )
+        if edge_data is not None:
+            paths.append(tuple(edge_data["path"]))
+
+    return paths
+
+
+@cache
+def get_travel_time(
+    path: tuple[NodeId, ...],
+    base_graph: "nx.MultiDiGraph[NodeId]",
+) -> float:
+    """utility function to get travel time along a path, used for caching travel times"""
+
+    travel_time = 0.0
+    unit = base_graph.graph.get("distance_unit")
+    for k in range(len(path) - 1):
+        travel_time += get_time_between_nodes(path[k], path[k + 1], base_graph, unit)
+
+    return travel_time
+
+
+@cache
+def get_time_between_nodes(
+    node1: NodeId,
+    node2: NodeId,
+    base_graph: "nx.MultiDiGraph[NodeId]",
+    unit: str | None = None,
+) -> float:
+    """utility function to get travel time between two nodes, used for caching travel times"""
+
+    edge_data = base_graph.get_edge_data(node1, node2, 0)
+    speed = BUS_SPEED_NOT_HIGHWAY  # default speed if no edge data
+    if edge_data is not None:
+        is_school_zone: bool = edge_data.get("hazard", "") == "school_zone"
+        is_highway: bool = edge_data.get("highway", "") == "motorway"
+        maxspeed = edge_data.get("maxspeed", "40 mph")
+        if isinstance(maxspeed, list):
+            maxspeed = maxspeed[0]
+            speed_limit_mph: float = float(
+                maxspeed.split()[0]
+            )  # in the format '30 mph'
+            speed_limit = speed_limit_mph / MPH_TO_KM_PER_MIN
+
+            if is_school_zone:
+                speed = min(BUS_SPEED_SCHOOL_ZONE, speed_limit)
+            elif is_highway:
+                speed = speed_limit
+            else:
+                speed = min(BUS_SPEED_NOT_HIGHWAY, speed_limit)
+
+        length_km = (
+            edge_data["length"] if unit == "km" else (edge_data["length"] / 1000.0)
+        )
+        return length_km / speed
+    else:
+        return 0.0

@@ -61,18 +61,18 @@ def _make_problem_data(
     object.__setattr__(problem_data, "name", "test")
     object.__setattr__(problem_data, "prune", prune)
     object.__setattr__(problem_data, "use_r5", False)
-    object.__setattr__(problem_data, "_stops_cached", stops)
-    object.__setattr__(problem_data, "_schools_cached", schools)
-    object.__setattr__(problem_data, "_students_cached", students)
-    object.__setattr__(problem_data, "_depots_cached", depots or [])
-    object.__setattr__(problem_data, "_buses_cached", [])
+    object.__setattr__(problem_data, "_stops_cached", tuple(stops))
+    object.__setattr__(problem_data, "_schools_cached", tuple(schools))
+    object.__setattr__(problem_data, "_students_cached", tuple(students))
+    object.__setattr__(problem_data, "_depots_cached", tuple(depots or []))
+    object.__setattr__(problem_data, "_buses_cached", tuple())
 
     path_lengths = lengths or {}
 
     def shortest_path(start: int, end: int, weight: str = "length"):
         return path_lengths.get((start, end), 1.0), [start, end]
 
-    object.__setattr__(problem_data, "_get_shortest_path_osm", shortest_path)
+    object.__setattr__(problem_data, "get_shortest_path_base", shortest_path)
     return problem_data
 
 
@@ -105,7 +105,7 @@ class CommonServiceGraphTests(unittest.TestCase):
                 "restricted view should reuse the cached service graph"
             )
 
-        object.__setattr__(problem_data, "_get_shortest_path_osm", should_not_recompute)
+        object.__setattr__(problem_data, "get_shortest_path_base", should_not_recompute)
 
         restricted = problem_data.restrict_to_school(school_e.id)
         graph = restricted.service_graph

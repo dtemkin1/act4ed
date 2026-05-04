@@ -4,13 +4,12 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 
-
 CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 
 OUTPUT_FILE = CURRENT_FILE_DIR / ".." / "outputs" / "pareto.png"
 
 
-def get_antichain(points: list[tuple[int, int]]) -> list[tuple[int, int]]:
+def get_antichain(points: list[tuple[float, float]]) -> list[tuple[float, float]]:
     # sort by x value
     points = sorted(points, key=lambda x: x[0])
     antichain = []

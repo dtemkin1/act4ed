@@ -1,14 +1,14 @@
 import os
 from pathlib import Path
+from shapely import Point
 import yaml
 
 import pandas as pd
 
 from formulation.common.classes import (
-    Bus, 
-    BusType, 
-    Depot, 
-    Point,
+    Bus,
+    BusType,
+    Depot,
 )
 
 CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
@@ -66,7 +66,7 @@ def get_all_fleet_data():
             capacity=row["capacity"],
             range=row["range"],
             depot=depot,
-            has_wheelchair_access=bool(row["has_wheelchair_access"]),
+            wheelchair_capacity=row["wheelchair_capacity"],
             type=BusType[row["type"]] if row["type"] in BusType.__members__ else None,
         )
         fleet_data.append(bus)

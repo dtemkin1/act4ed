@@ -153,7 +153,7 @@ def make_buses(
     if depots is None:
         depots = make_depots(graph)
     if ranges is None:
-        ranges = [len(graph.nodes)] * num_buses
+        ranges = [float(len(graph.nodes))] * num_buses
     buses: list[Bus] = []
     for i in range(num_buses):
         bus = Bus(
@@ -162,10 +162,12 @@ def make_buses(
             capacity=capacities[i % len(capacities)],
             range=ranges[i % len(ranges)],
             depot=depots[i % len(depots)],
-            has_wheelchair_access=(i % 2 == 0),  # every other bus has wheelchair access
+            wheelchair_capacity=(
+                2 if i % 2 == 0 else 0
+            ),  # every other bus has wheelchair access
         )
         buses.append(bus)
-    return buses
+    return tuple(buses)
 
 
 def make_toy_problem_data(
@@ -177,14 +179,26 @@ def make_toy_problem_data(
     num_students: int | None,
     num_buses: int | None,
 ) -> ProblemDataToy:
-    graph = make_graph(size=size)
-    schools = make_schools(graph, num_schools=num_schools)
-    depots = make_depots(graph, num_depots=num_depots)
-    stops = make_stops(graph, num_stops=num_stops)
-    students = make_students(
-        graph, num_students=num_students, schools=schools, stops=stops
+    graph = make_graph(size=size) if size else make_graph()
+    schools = (
+        make_schools(graph, num_schools=num_schools)
+        if num_schools
+        else make_schools(graph)
     )
-    buses = make_buses(graph, num_buses=num_buses, depots=depots)
+    depots = (
+        make_depots(graph, num_depots=num_depots) if num_depots else make_depots(graph)
+    )
+    stops = make_stops(graph, num_stops=num_stops) if num_stops else make_stops(graph)
+    students = (
+        make_students(graph, num_students=num_students, schools=schools, stops=stops)
+        if num_students
+        else make_students(graph, schools=schools, stops=stops)
+    )
+    buses = (
+        make_buses(graph, num_buses=num_buses, depots=depots)
+        if num_buses
+        else make_buses(graph, depots=depots)
+    )
 
     return ProblemDataToy(
         name=name,

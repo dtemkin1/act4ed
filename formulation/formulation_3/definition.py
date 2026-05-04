@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field, replace
-from functools import cache, cached_property
+from functools import cached_property
 from pathlib import Path
 import networkx as nx
 from dataclasses_json import dataclass_json
@@ -17,15 +17,12 @@ from formulation.common.classes import (
 from formulation.common.problems import ProblemData, ProblemDataReal
 from formulation.common.utils import (
     C_b,
+    get_paths_between_nodes,
+    get_travel_time,
     l_s,
     make_depot_end_copy,
     make_depot_start_copy,
     make_school_copy,
-)
-from formulation.common.constants import (
-    MPH_TO_KM_PER_MIN,
-    BUS_SPEED_NOT_HIGHWAY,
-    BUS_SPEED_SCHOOL_ZONE,
 )
 
 
@@ -289,7 +286,6 @@ class Formulation3:
             travel_time += get_travel_time(
                 path,
                 self.problem_data.base_graph,
-                meters=(isinstance(self.problem_data, ProblemDataReal)),
             )
 
         return travel_time
@@ -312,56 +308,6 @@ class Formulation3:
         return C_b(b) * max(
             self.KAPPA[school.type] for school in self.problem_data.schools
         )
-
-
-@cache
-def get_paths_between_nodes(
-    nodes: tuple[NodeId, ...], service_graph: "nx.MultiDiGraph[NodeId]"
-) -> list[tuple[NodeId, ...]]:
-    """utility function to get paths between consecutive nodes in a list"""
-    paths = []
-    for k in range(len(nodes) - 1):
-        edge_data = service_graph.get_edge_data(
-            nodes[k], nodes[k + 1], key=0, default=None
-        )
-        if edge_data is not None:
-            paths.append(tuple(edge_data["path"]))
-
-    return paths
-
-
-@cache
-def get_travel_time(
-    path: tuple[NodeId, ...],
-    base_graph: "nx.MultiDiGraph[NodeId]",
-    meters: bool = False,
-) -> float:
-    """utility function to get travel time along a path, used for caching travel times"""
-
-    travel_time = 0.0
-    for k in range(len(path) - 1):
-        edge_data = base_graph.get_edge_data(path[k], path[k + 1], key=0)
-        speed = BUS_SPEED_NOT_HIGHWAY  # default speed if no edge data
-        if edge_data is not None:
-            is_school_zone: bool = edge_data.get("hazard", "") == "school_zone"
-            is_highway: bool = edge_data.get("highway", "") == "motorway"
-            maxspeed = edge_data.get("maxspeed", "40 mph")
-            if isinstance(maxspeed, list):
-                maxspeed = maxspeed[0]
-            speed_limit_mph: str = float(maxspeed.split()[0])  # in the format '30 mph'
-            speed_limit = speed_limit_mph / MPH_TO_KM_PER_MIN
-
-            if is_school_zone:
-                speed = min(BUS_SPEED_SCHOOL_ZONE, speed_limit)
-            elif is_highway:
-                speed = speed_limit
-            else:
-                speed = min(BUS_SPEED_NOT_HIGHWAY, speed_limit)
-
-        length_km = (edge_data["length"] / 1000.0) if meters else edge_data["length"]
-        travel_time += length_km / speed
-
-    return travel_time
 
 
 if __name__ == "__main__":

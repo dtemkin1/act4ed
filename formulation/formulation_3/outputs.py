@@ -147,7 +147,6 @@ def plot_bus_routes(
     # raise NotImplementedError("plotting not implemented yet :(")
     prob, model_vars = coerce_reporting_inputs(prob, model_vars)
 
-    G = formulation.G
     B = formulation.B
     A = formulation.A
     A_PATH = formulation.A_PATH

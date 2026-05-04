@@ -1,6 +1,7 @@
 from dataclasses import replace
 from random import random
 
+from matplotlib.colors import Normalize
 import matplotlib.pyplot as plt
 
 from experiments.helpers import (
@@ -40,7 +41,7 @@ def more_realistic_students(problem_data: ProblemDataReal) -> tuple[Student, ...
     for stop_name, group in assigned_students.groupby("BUS STOP"):
         special_ed_count = group["Student_Program"].str.contains("SPED").sum()
         total_count = len(group)
-        stop_name_to_special_ed_ratio[stop_name] = special_ed_count / total_count
+        stop_name_to_special_ed_ratio[str(stop_name)] = special_ed_count / total_count
 
     for student in students:
         stop_name = student.stop.name
@@ -66,7 +67,7 @@ def plot_special_education_students(problem_data: ProblemDataReal) -> None:
     colored by how far they are from their school.
     """
 
-    students = get_assigned_students(problem_data)
+    students = get_assigned_students(problem_data.schools, problem_data.stops)
     special_education_students = [
         student
         for student in students
@@ -81,21 +82,23 @@ def plot_special_education_students(problem_data: ProblemDataReal) -> None:
 
     # plot students, color based on how far they are from their school
     all_distances = [
-        problem_data.service_graph.edges[
-            student.stop.node_id, student.school.node_id, 0
-        ]["length"]
+        problem_data.get_shortest_path_base(
+            student.stop.node_id, student.school.node_id
+        )[0]
+        / 1000.0
         for student in special_education_students
         if student.school is not None
     ]
     color_gradient = plt.cm.get_cmap("RdYlGn_r")
-    norm = plt.Normalize(vmin=min(all_distances), vmax=max(all_distances))
+    norm = Normalize(vmin=min(all_distances), vmax=max(all_distances))
     sm = plt.cm.ScalarMappable(cmap=color_gradient, norm=norm)
     sm.set_array([])
 
     for student in special_education_students:
-        distance = problem_data.service_graph.edges[
-            student.stop.node_id, student.school.node_id, 0
-        ]["length"]
+        distance_m, _ = problem_data.get_shortest_path_base(
+            student.stop.node_id, student.school.node_id
+        )
+        distance = distance_m / 1000.0  # convert to km
 
         ax.scatter(
             student.geographic_location.x,
@@ -120,12 +123,14 @@ def plot_special_education_students(problem_data: ProblemDataReal) -> None:
 def main() -> None:
     problem_data = setup_framingham()
 
-    print("Number of assigned students: ", len(get_raw_assigned_students()))
+    print(f"Number of assigned students: {len(get_raw_assigned_students())}")
 
     make_students_csv(
         more_realistic_students(problem_data),
         path=DATA_FOLDER / "students_with_special_ed_inferred.csv",
     )
+
+    plot_special_education_students(problem_data)
 
 
 if __name__ == "__main__":
