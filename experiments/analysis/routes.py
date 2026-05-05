@@ -234,9 +234,7 @@ def get_relevant_stats(
     student_filters: list[tuple[str, Callable[[Student], bool]]],
 ) -> None:
 
-    for (filter_name, student_filter), identifier in zip(
-        student_filters, student_filters
-    ):
+    for filter_name, student_filter in student_filters:
         filtered_students = tuple(filter(student_filter, problem_data.students))
         avg_time, std_dev = stats_time_on_bus_for_students_find_route(
             filtered_students, routes, problem_data
