@@ -7,8 +7,8 @@ from formulation.formulation_3.definition import Formulation3
 from formulation.formulation_3.gurobipy import (
     build_model_from_definition,
     solve_problem,
-    plot_bus_routes,
 )
+from formulation.formulation_3.outputs import plot_bus_routes
 
 CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 
@@ -31,6 +31,10 @@ def get_problems_from_json(json_file: Path) -> list[Formulation3]:
         assert (
             len(item["size"]) == 2
         ), f"Expected 'size' to have 2 elements, got {len(item['size'])}"
+        size_tuple: tuple[int, int] = tuple(item["size"])
+        assert (
+            len(item["size"]) == 2
+        ), f"Expected 'size' to have 2 elements, got {len(item['size'])}"
         assert (
             "num_schools" in item
         ), "Each problem data must have a 'num_schools' field"
@@ -42,7 +46,7 @@ def get_problems_from_json(json_file: Path) -> list[Formulation3]:
         assert "num_buses" in item, "Each problem data must have a 'num_buses' field"
         prob_data = make_toy_problem_data(
             name=item.get("name", "toy_network"),
-            size=item["size"],
+            size=size_tuple,
             num_schools=item["num_schools"],
             num_depots=item["num_depots"],
             num_stops=item["num_stops"],
@@ -81,27 +85,27 @@ def main() -> None:
             f"Solving problem: {toy_data.problem_data.name} with rounds={toy_data.rounds}"
         )
 
-        model, vals = build_model_from_definition(toy_data)
+        bundle = build_model_from_definition(toy_data)
         print(f"Model built for problem: {toy_data.problem_data.name}")
 
-        solve_problem(model)
+        solve_problem(bundle.model)
         print(f"Problem solved: {toy_data.problem_data.name}")
 
         results.append(
             {
                 "problem_name": toy_data.problem_data.name,
                 "rounds": toy_data.rounds,
-                "objective_value": model.ObjVal,
-                "runtime_seconds": model.Runtime,
+                "objective_value": bundle.model.ObjVal,
+                "runtime_seconds": bundle.model.Runtime,
                 # TODO: ask riccardo about gurobi vars/values and how to extract them
-                # "results": vals,
+                # "results": bundle.vars,
             }
         )
 
         plot_bus_routes(
-            prob=model,
+            prob=bundle.model,
             formulation=toy_data,
-            model_vars=vals,
+            model_vars=bundle.variables,
             save_path=CURRENT_FILE_DIR
             / "outputs"
             / f"{toy_data.problem_data.name}_rounds_{toy_data.rounds}_routes.png",

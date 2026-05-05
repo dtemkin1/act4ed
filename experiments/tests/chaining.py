@@ -48,7 +48,7 @@ def main() -> None:
         capacity=41,
         range=1000,
         depot=depot,
-        has_wheelchair_access=True,
+        wheelchair_capacity=2,
     )
 
     stop_node = 1
@@ -63,7 +63,7 @@ def main() -> None:
         name="School 1",
         geographic_location=make_point_from_node_id(graph, school_1_node),
         node_id=2,
-        id=1,
+        id="1",
         type=SchoolType.E,
         start_time=8 * 60,  # 8:00 AM in minutes
     )
@@ -73,7 +73,7 @@ def main() -> None:
         name="School 2",
         geographic_location=make_point_from_node_id(graph, school_2_node),
         node_id=3,
-        id=2,
+        id="2",
         type=SchoolType.E,
         start_time=8 * 60 + 15,  # 8:15 AM in minutes
     )

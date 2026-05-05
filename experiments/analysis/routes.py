@@ -3,20 +3,19 @@
 # (income bins, race, english proficiency, car ownership))
 
 
-from functools import cache
+from dataclasses import replace
 import statistics
 from typing import Callable, overload
-from dataclasses import replace
 
 from experiments.existing_data.bird_routes import (
     BIRD_CONFIG,
     get_bird_routes,
-    get_bird_routes_json,
 )
 from experiments.existing_data.current_routes import RouteResult, get_existing_routes
 from experiments.existing_data.utils import get_assigned_students
 from experiments.helpers import setup_framingham
-from formulation.common.classes import Place, School, Stop, Student
+from formulation.common.classes import Place, Stop, Student
+from formulation.common.constants import KM_PER_MILE
 from formulation.common.problems import (
     FilteredProblemData,
     ProblemData,
@@ -31,13 +30,15 @@ from formulation.normalized_result import (
 
 
 def get_dwell_time(students_at_stop: tuple[Student, ...], place: Place) -> float:
-    if isinstance(place, Stop):
+    if isinstance(place, Stop) and len(students_at_stop) > 0:
         return (
             BIRD_CONFIG.stop_time_per_student * len(students_at_stop)
+            + BIRD_CONFIG.stop_time_per_wheelchair_student
+            * sum(
+                1 for student in students_at_stop if student.attributes.wheelchair_user
+            )
             + BIRD_CONFIG.constant_stop_time
         )
-    elif isinstance(place, School):
-        return BIRD_CONFIG.school_dwell_time
 
     return 0.0
 
@@ -89,12 +90,13 @@ def get_student_time_on_bus(
 def avg_time_on_bus_for_students(
     students: tuple[Student, ...], route: tuple[Place, ...], problem_data: ProblemData
 ) -> float:
-    total_time = 0.0
+    total_time: list[float] = []
     for student in students:
         time_on_bus = get_student_time_on_bus(student, route, problem_data)
-        total_time += time_on_bus
+        if time_on_bus != 0.0:
+            total_time.append(time_on_bus)
 
-    avg_time = total_time / len(students) if len(students) > 0 else 0.0
+    avg_time = statistics.mean(total_time) if len(total_time) > 0 else 0.0
     return avg_time
 
 
@@ -102,7 +104,9 @@ def stats_time_on_bus_for_students_find_route(
     students: tuple[Student, ...],
     routes: list[RouteResult] | NormalizedRoutingResult | RoutingSolutionJson,
     problem_data: ProblemData,
-) -> tuple[float, float]:  # (average time, standard deviation)
+) -> tuple[
+    float, float, float, float
+]:  # (average time, standard deviation, minimum time, maximum time)
 
     total_time: list[float] = []
     for student in students:
@@ -122,22 +126,55 @@ def stats_time_on_bus_for_students_find_route(
                 )
 
                 for i, route_json in enumerate(route_orders):
-                    depot = problem_data.depots[0]
+                    student_set = set(
+                        s
+                        for s in problem_data.students
+                        if s.name in (route_json.student_names or [])
+                        or s.id in (route_json.student_ids or [])
+                    )
+                    student_stops = set(s.stop for s in student_set)
+                    origin = list(
+                        filter(
+                            lambda d: d.node_id == route_json.origin_node_id,
+                            (problem_data.depots + problem_data.schools),
+                        )
+                    )
+
                     stops: list[Stop] = []
                     for stop_id in route_json.stop_node_ids or []:
-                        stop_filter = filter(
-                            lambda s: s.node_id == stop_id, problem_data.stops
+                        stop_filter = list(
+                            filter(
+                                lambda s: s.node_id == stop_id and s in student_stops,
+                                problem_data.stops,
+                            )
                         )
-                        stops.extend(list(stop_filter))
-                    school = list(
+                        if len(stop_filter) > 1:
+                            # if student's stop is in stop_filter, use that. else, use the first one
+                            if (
+                                student.stop in stop_filter
+                                and student.stop not in total_route
+                            ):
+                                stop_filter = [student.stop]
+                            else:
+                                stop_filter = [
+                                    list(
+                                        filter(lambda s: s != student.stop, stop_filter)
+                                    )[0]
+                                ]
+                        stops.extend(stop_filter)
+                    destination = list(
                         filter(
-                            lambda s: s.name == route_json.school_name,
-                            problem_data.schools,
+                            lambda s: s.node_id == route_json.destination_node_id,
+                            (problem_data.depots + problem_data.schools),
                         )
-                    )[0]
+                    )
 
-                    places = ((depot,) if i == 0 else ()) + tuple(stops) + (school,)
-                    total_route += places
+                    places = origin + stops + destination
+                    while total_route and places and total_route[-1] == places[0]:
+                        # if the last place in the current total route matches the first place in the new route, we can chain them together
+                        places = places[1:]
+
+                    total_route.extend(places)
 
                 time_on_bus = get_student_time_on_bus(
                     student, tuple(total_route), problem_data
@@ -172,7 +209,9 @@ def stats_time_on_bus_for_students_find_route(
 
     avg_time = statistics.mean(total_time) if len(total_time) > 0 else 0.0
     std_dev = statistics.stdev(total_time) if len(total_time) > 1 else 0.0
-    return avg_time, std_dev
+    min_time = min(total_time) if len(total_time) > 0 else 0.0
+    max_time = max(total_time) if len(total_time) > 0 else 0.0
+    return avg_time, std_dev, min_time, max_time
 
 
 @overload
@@ -231,20 +270,21 @@ def get_relevant_stats(
     student_filters: list[tuple[str, Callable[[Student], bool]]],
 ) -> None:
 
-    for (filter_name, student_filter), identifier in zip(
-        student_filters, student_filters
-    ):
+    for filter_name, student_filter in student_filters:
         filtered_students = tuple(filter(student_filter, problem_data.students))
-        avg_time, std_dev = stats_time_on_bus_for_students_find_route(
-            filtered_students, routes, problem_data
+        avg_time, std_dev, min_time, max_time = (
+            stats_time_on_bus_for_students_find_route(
+                filtered_students, routes, problem_data
+            )
         )
         print(
-            f"Average time on bus for {filter_name}: {avg_time:.2f} minutes (±{std_dev:.2f})"
+            f"Average time on bus for {filter_name}: {avg_time:.2f} minutes (±{std_dev:.2f}), min: {min_time:.2f} minutes, max: {max_time:.2f} minutes)"
         )
 
 
 def is_student_served(
-    student: Student, routes: NormalizedRoutingResult | list[RouteResult]
+    student: Student,
+    routes: NormalizedRoutingResult | RoutingSolutionJson | list[RouteResult],
 ) -> bool:
     return get_route_for_student(student, routes) is not None
 
@@ -274,7 +314,7 @@ def main() -> None:
     )
 
     filtered_problem_data = FilteredProblemData(
-        "framingham_filtered",
+        "framingham_filtered_assigned",
         base_problem_data=framingham_problem_data,
         _students=assigned_students,
     )
@@ -284,79 +324,35 @@ def main() -> None:
     print("STATS FOR CURRENT STUDENTS")
     get_relevant_stats(current_routes, filtered_problem_data, RELEVANT_STATS)
 
-    # current_routes_average_time, current_routes_std_dev = (
-    #     stats_time_on_bus_for_students_find_route(
-    #         filtered_problem_data.students, current_routes, filtered_problem_data
-    #     )
-    # )
-    # print(f"Current routes: {len(current_routes)}")
-    # print(
-    #     f"Average time on bus for current routes: {current_routes_average_time:.2f} minutes (±{current_routes_std_dev:.2f})"
-    # )
-
-    # for current_route in current_routes:
-    #     time = get_travel_time(current_route.path, filtered_problem_data.base_graph)
-    #     print(f"Route {current_route.bus.name} time: {time:.2f} minutes")
-
-    filtered_bird_results = get_bird_routes_json(
-        "existing_student_routes",
+    filtered_bird_results = get_bird_routes(
+        "existing_student_routes", filtered_problem_data, BIRD_CONFIG
     )
 
     print("STATS FOR BIRD ROUTES (EXISTING STUDENTS)")
     get_relevant_stats(filtered_bird_results, filtered_problem_data, RELEVANT_STATS)
 
-    # filtered_bird_results_avg_time, filtered_bird_results_std_dev = (
-    #     stats_time_on_bus_for_students_find_route(
-    #         filtered_problem_data.students, filtered_bird_results, filtered_problem_data
-    #     )
-    # )
+    # only for students living over 1mi away (actual driving distance)
+    filtered_distance_students: tuple[Student, ...] = tuple(
+        filter(
+            lambda s: framingham_problem_data.service_graph.get_edge_data(
+                s.stop.node_id, s.school.node_id, 0
+            )["length"]
+            > (1.0 * KM_PER_MILE),
+            framingham_problem_data.students,
+        )
+    )
 
-    # filtered_route_names: set[str] = set()
-    # for solution in filtered_bird_results.solution:
-    #     filtered_route_names.add(solution.bus_name)
-
-    # print(f"BIRD itineraries (filtered): {len(filtered_route_names)}")
-    # print(
-    #     f"Average time on bus for BIRD filtered routes: {filtered_bird_results_avg_time:.2f} minutes (±{filtered_bird_results_std_dev:.2f})"
-    # )
-
-    # for route_name in filtered_route_names:
-    #     route_orders = list(
-    #         filter(lambda r: r.bus_name == route_name, filtered_bird_results.solution)
-    #     )
-    #     for round, route_json in enumerate(route_orders):
-    #         depot = filtered_problem_data.depots[0]
-    #         stops: list[Stop] = []
-    #         for stop_id in route_json.stop_node_ids or []:
-    #             stop_filter = filter(
-    #                 lambda s: s.node_id == stop_id, filtered_problem_data.stops
-    #             )
-    #             stops.extend(list(stop_filter))
-    #         school = list(
-    #             filter(
-    #                 lambda s: s.name == route_json.school_name,
-    #                 filtered_problem_data.schools,
-    #             )
-    #         )[0]
-
-    #         places = ((depot,) if round == 0 else ()) + tuple(stops) + (school,)
-    #         time = get_route_time(places, filtered_problem_data)
-
-    #         identifier = (
-    #             route_name
-    #             if len(route_orders) <= 1
-    #             else route_name + " (round " + str(round + 1) + ")"
-    #         )
-
-    #         print(f"BIRD Route (filtered) {identifier} time: {time:.2f} minutes")
-
-    config_allow_partial = replace(BIRD_CONFIG, allow_partial=True)
+    filtered_distance_problem_data = FilteredProblemData(
+        "framingham_filtered_distance",
+        base_problem_data=framingham_problem_data,
+        _students=filtered_distance_students,
+    )
 
     all_bird_results = get_bird_routes(
         "new_routes",
-        framingham_problem_data,
-        config=config_allow_partial,
-        save_results=False,
+        filtered_distance_problem_data,
+        config=replace(BIRD_CONFIG, allow_partial=True),
+        save_results=True,
     )
     served_students = tuple(
         filter(
@@ -371,43 +367,6 @@ def main() -> None:
 
     print("STATS FOR BIRD ROUTES (ALL STUDENTS)")
     get_relevant_stats(all_bird_results, framingham_problem_data, RELEVANT_STATS)
-
-    # all_bird_results_avg_time, all_bird_results_std_dev = (
-    #     stats_time_on_bus_for_students_find_route(
-    #         served_students, all_bird_results, framingham_problem_data
-    #     )
-    # )
-    # print(f"BIRD itineraries (all students): {len(all_bird_results.itineraries)}")
-    # print(
-    #     f"Average time on bus for BIRD all students routes: {all_bird_results_avg_time:.2f} minutes (±{all_bird_results_std_dev:.2f})"
-    # )
-    # for bird_itinerary in all_bird_results.itineraries:
-    #     for round, route_order in enumerate(bird_itinerary.route_orders):
-    #         route = all_bird_results.routes[route_order]
-    #         depot = framingham_problem_data.depots[0]
-    #         stops: list[Stop] = []
-    #         for stop_id in route.stop_ids:
-    #             stop_filter = filter(
-    #                 lambda s: s.name == stop_id, framingham_problem_data.stops
-    #             )
-    #             stops.extend(list(stop_filter))
-    #         school = list(
-    #             filter(
-    #                 lambda s: s.name == route.school_id,
-    #                 framingham_problem_data.schools,
-    #             )
-    #         )[0]
-
-    #         places = (depot,) + tuple(stops) + (school,)
-    #         time = get_route_time(places, framingham_problem_data)
-
-    #         identifier = (
-    #             bird_itinerary.bus_id
-    #             if len(bird_itinerary.route_orders) == 1
-    #             else bird_itinerary.bus_id + " (round " + str(round + 1) + ")"
-    #         )
-
-    #         print(f"BIRD Route (all_students) {identifier} time: {time:.2f} minutes")
 
 
 if __name__ == "__main__":
