@@ -14,7 +14,12 @@ end
 
 const FLEET_SCENARIO_EXACT_CANDIDATE_LIMIT = 600
 const FLEET_SCENARIO_LINK_VARIABLE_LIMIT = 500_000
-const FLEET_SCENARIO_TIMING_BIG_M = 1.0e6
+const FLEET_SCENARIO_SERVED_TIME_LIMIT = 300.0
+const FLEET_SCENARIO_SERVED_MIP_GAP_ABS = 10.0
+const FLEET_SCENARIO_COST_TIME_LIMIT = 300.0
+const FLEET_SCENARIO_COST_MIP_GAP = 0.02
+const FLEET_SCENARIO_COST_HEURISTICS = 0.5
+const FLEET_SCENARIO_COST_NO_REL_HEUR_TIME = 30.0
 
 
 function _aff_sum(terms)
@@ -547,26 +552,29 @@ function _solve_fleet_stage_mip!(
             @constraint(model, assign[bus_idx, route_idx] == finish_route[bus_idx, route_idx] + outgoing)
             @constraint(model, assign[bus_idx, route_idx] <= used[bus_idx])
             school = data.schools[candidates[route_idx].school]
-            @constraint(
-                model,
-                arrival_time[bus_idx, route_idx] >= earliest_arrival_time(school) - FLEET_SCENARIO_TIMING_BIG_M * (1 - assign[bus_idx, route_idx]),
-            )
-            @constraint(
-                model,
-                arrival_time[bus_idx, route_idx] <= latest_arrival_time(school) + FLEET_SCENARIO_TIMING_BIG_M * (1 - assign[bus_idx, route_idx]),
-            )
+            @constraint(model, arrival_time[bus_idx, route_idx] >= earliest_arrival_time(school))
+            @constraint(model, arrival_time[bus_idx, route_idx] <= latest_arrival_time(school))
         end
         for arc in bus_route_arcs[bus_idx]
             first_idx, second_idx = arc
             first_school = data.schools[candidates[first_idx].school]
+            second_school = data.schools[candidates[second_idx].school]
+            route_link_time =
+                first_school.dwell_time +
+                route_link_costs[arc] +
+                candidates[second_idx].service_time
+            arc_timing_m = max(
+                0.0,
+                latest_arrival_time(first_school) +
+                route_link_time -
+                earliest_arrival_time(second_school),
+            )
             @constraint(
                 model,
                 arrival_time[bus_idx, second_idx] >=
                 arrival_time[bus_idx, first_idx] +
-                first_school.dwell_time +
-                route_link_costs[arc] +
-                candidates[second_idx].service_time -
-                FLEET_SCENARIO_TIMING_BIG_M * (1 - link_route[(bus_idx, arc)]),
+                route_link_time -
+                arc_timing_m * (1 - link_route[(bus_idx, arc)]),
             )
         end
         for school_idx in eachindex(data.schools)
@@ -602,21 +610,46 @@ function _solve_fleet_stage_mip!(
     if data.allow_partial
         @objective(model, Max, served_objective)
         _log_timing("fleet scenario $(label) model build", timing_log, time() - model_build_start)
+        set_optimizer_attribute(model, "TimeLimit", FLEET_SCENARIO_SERVED_TIME_LIMIT)
+        set_optimizer_attribute(model, "MIPGapAbs", FLEET_SCENARIO_SERVED_MIP_GAP_ABS)
         _timed_value("fleet scenario $(label) served optimize", timing_log) do
             optimize!(model)
         end
         status = termination_status(model)
-        status == MOI.OPTIMAL || error("fleet-aware scenario $(label) served-count solve failed with $(status)")
+        if status != MOI.OPTIMAL && !(status == MOI.TIME_LIMIT && result_count(model) > 0)
+            error("fleet-aware scenario $(label) served-count solve failed with $(status)")
+        end
         best_served = objective_value(model)
         @constraint(model, served_objective >= best_served - BIRD_TIMING_EPS)
+        set_optimizer_attribute(model, "TimeLimit", Inf)
+        set_optimizer_attribute(model, "MIPGapAbs", 1.0e-10)
     else
         _log_timing("fleet scenario $(label) model build", timing_log, time() - model_build_start)
     end
 
-    bus_fixed_cost = max(data.default_lambda_value * 100.0, 1.0e6)
+    bus_count_objective = _aff_sum(used[bus_idx] for bus_idx in bus_ids)
+    if data.allow_partial
+        _timed_value("fleet scenario $(label) bus-count optimize", timing_log) do
+            @objective(model, Min, bus_count_objective)
+            optimize!(model)
+        end
+        status = termination_status(model)
+        if status != MOI.OPTIMAL
+            fail_if_unserved && error("fleet-aware scenario $(label) bus-count solve failed with $(status)")
+            return Int[]
+        end
+        best_bus_count = round(Int, objective_value(model))
+        @constraint(model, bus_count_objective <= best_bus_count + BIRD_TIMING_EPS)
+        _log_timing_message("fleet scenario $(label) fixed bus count: $(best_bus_count)", timing_log)
+    end
+
     objective_build_start = time()
-    cost_objective = _timed_value("fleet scenario $(label) objective bus fixed term", timing_log) do
-        bus_fixed_cost * _aff_sum(used[bus_idx] for bus_idx in bus_ids)
+    cost_objective = AffExpr(0.0)
+    if !data.allow_partial
+        bus_fixed_cost = max(data.default_lambda_value * 100.0, 1.0e6)
+        cost_objective += _timed_value("fleet scenario $(label) objective bus fixed term", timing_log) do
+            bus_fixed_cost * bus_count_objective
+        end
     end
     cost_objective += _timed_value("fleet scenario $(label) objective route assignment term", timing_log) do
         _aff_sum(
@@ -639,22 +672,39 @@ function _solve_fleet_stage_mip!(
             for route_idx in route_ids
         )
     end
-    cost_objective += _timed_value("fleet scenario $(label) objective route link term", timing_log) do
-        _aff_sum(
-            link_route[(bus_idx, arc)] * route_link_costs[arc]
+    _log_timing_message(
+        "fleet scenario $(label) objective route link term size: link_vars=$(sparse_link_vars)",
+        timing_log,
+    )
+    route_link_objective_terms = _timed_value("fleet scenario $(label) objective route link term precompute", timing_log) do
+        [
+            (link_route[(bus_idx, arc)], route_link_costs[arc])
             for bus_idx in bus_ids
             for arc in bus_route_arcs[bus_idx]
+        ]
+    end
+
+    cost_objective += _timed_value("fleet scenario $(label) objective route link term", timing_log) do
+        @expression(
+            model,
+            sum(coef * var for (var, coef) in route_link_objective_terms)
         )
     end
+
     _timed_value("fleet scenario $(label) objective attach", timing_log) do
         @objective(model, Min, cost_objective)
     end
     _log_timing("fleet scenario $(label) objective build", timing_log, time() - objective_build_start)
+    set_optimizer_attribute(model, "TimeLimit", FLEET_SCENARIO_COST_TIME_LIMIT)
+    set_optimizer_attribute(model, "MIPGap", FLEET_SCENARIO_COST_MIP_GAP)
+    set_optimizer_attribute(model, "MIPFocus", 1)
+    set_optimizer_attribute(model, "Heuristics", FLEET_SCENARIO_COST_HEURISTICS)
+    set_optimizer_attribute(model, "NoRelHeurTime", FLEET_SCENARIO_COST_NO_REL_HEUR_TIME)
     _timed_value("fleet scenario $(label) cost optimize", timing_log) do
         optimize!(model)
     end
     status = termination_status(model)
-    if status != MOI.OPTIMAL
+    if status != MOI.OPTIMAL && !(status == MOI.TIME_LIMIT && result_count(model) > 0)
         fail_if_unserved && error("fleet-aware scenario $(label) solve failed with $(status)")
         return Int[]
     end
