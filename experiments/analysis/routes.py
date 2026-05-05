@@ -10,7 +10,6 @@ from typing import Callable, overload
 from experiments.existing_data.bird_routes import (
     BIRD_CONFIG,
     get_bird_routes,
-    get_bird_routes_json,
 )
 from experiments.existing_data.current_routes import RouteResult, get_existing_routes
 from experiments.existing_data.utils import get_assigned_students
@@ -21,6 +20,7 @@ from formulation.common.problems import (
     FilteredProblemData,
     ProblemData,
 )
+from formulation.common.utils import get_travel_time
 from formulation.normalized_result import (
     NormalizedBusItinerary,
     NormalizedRoutingResult,
@@ -44,28 +44,13 @@ def get_dwell_time(students_at_stop: tuple[Student, ...], place: Place) -> float
 
 
 def get_route_time(route: tuple[Place, ...], problem_data: ProblemData) -> float:
-    overall_time = 0.0
-
-    for i in range(len(route) - 1):
-        u = route[i]
-        v = route[i + 1]
-
-        dwell_time = get_dwell_time(
-            tuple(
-                student
-                for student in problem_data.students
-                if student.stop == u and student.school in route
-            ),
-            u,
-        )
-        overall_time += dwell_time
-
-        unit = problem_data.base_graph.graph.get("distance_unit")
-        length_m, _ = problem_data.get_shortest_paths_base((u.node_id, v.node_id))
-        length_km = length_m if unit == "km" else (length_m / 1000.0)
-        overall_time += length_km / (BIRD_CONFIG.bus_mph * KM_PER_MILE / 60)
-
-    return overall_time
+    _, path = problem_data.get_shortest_paths_base(
+        tuple(place.node_id for place in route)
+    )
+    return get_travel_time(
+        tuple(path),
+        problem_data.base_graph,
+    )
 
 
 def get_student_time_on_bus(
@@ -74,34 +59,32 @@ def get_student_time_on_bus(
     """note: does not account for time spent at intersection, only time spent traveling"""
     stop_gets_on = student.stop
     school_gets_off = student.school
+    all_places_after = route[route.index(stop_gets_on) :]
+    places_visited = route[route.index(stop_gets_on) : route.index(school_gets_off) + 1]
+    node_ids_visiting = tuple(place.node_id for place in places_visited)
 
-    idx_start = route.index(stop_gets_on)
-    idx_end = route.index(school_gets_off)
-    places_visited = route[idx_start : idx_end + 1]
-    all_places_after = route[idx_start:]
-
-    overall_time = 0.0
-
-    for i in range(len(places_visited) - 1):
-        u = places_visited[i]
-        v = places_visited[i + 1]
-
-        dwell_time = get_dwell_time(
+    overall_dwell_time = 0.0
+    for place in places_visited[:-1]:  # exclude school where student gets off
+        overall_dwell_time += get_dwell_time(
             tuple(
-                s
-                for s in problem_data.students
-                if s.stop == u and s.school in all_places_after
+                student
+                for student in problem_data.students
+                if student.stop == place and student.school in all_places_after
             ),
-            u,
+            place,
         )
-        overall_time += dwell_time
 
-        unit = problem_data.base_graph.graph.get("distance_unit")
-        length_m, _ = problem_data.get_shortest_paths_base((u.node_id, v.node_id))
-        length_km = length_m if unit == "km" else (length_m / 1000.0)
-        overall_time += length_km / (BIRD_CONFIG.bus_mph * KM_PER_MILE / 60)
+    _, full_path = problem_data.get_shortest_paths_base(node_ids_visiting)
 
-    return overall_time
+    travel_time = (
+        get_travel_time(
+            tuple(full_path),
+            problem_data.base_graph,
+        )
+        + overall_dwell_time
+    )
+
+    return travel_time
 
 
 def avg_time_on_bus_for_students(
@@ -341,12 +324,12 @@ def main() -> None:
     print("STATS FOR CURRENT STUDENTS")
     get_relevant_stats(current_routes, filtered_problem_data, RELEVANT_STATS)
 
-    filtered_bird_results = get_bird_routes_json(
-        "existing_student_routes",
+    filtered_bird_results = get_bird_routes(
+        "existing_student_routes", filtered_problem_data, BIRD_CONFIG
     )
 
     print("STATS FOR BIRD ROUTES (EXISTING STUDENTS)")
-    # get_relevant_stats(filtered_bird_results, filtered_problem_data, RELEVANT_STATS)
+    get_relevant_stats(filtered_bird_results, filtered_problem_data, RELEVANT_STATS)
 
     # only for students living over 1mi away (actual driving distance)
     filtered_distance_students: tuple[Student, ...] = tuple(
