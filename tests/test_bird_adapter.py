@@ -5,7 +5,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import networkx as nx
@@ -20,6 +20,7 @@ from formulation.bird_adapter import (
     bird_export_instance_from_template,
     bird_stop_assignments,
     bird_student_assignments,
+    bird_student_ride_times,
     build_bird_export_instance,
     normalized_result_from_bird_solution,
     summarize_bird_solution_for_mcdp,
@@ -1049,6 +1050,75 @@ class BirdAdapterTests(unittest.TestCase):
                 ("bird_bus_1", 1, "school-b", "Shared Stop", ["conv-b"]),
             ],
         )
+
+    def test_student_ride_times_reconstruct_boarding_times(self) -> None:
+        problem_data = _make_problem_data()
+        instance = build_bird_export_instance(
+            problem_data,
+            BirdAdapterConfig(
+                cohort="conventional",
+                bus_type="C",
+                speed_km_per_minute=1.0,
+                constant_stop_time=0.1,
+                stop_time_per_student=0.2,
+            ),
+        )
+        solution = BirdBackendSolution(
+            status="OPTIMAL",
+            objective_value=1.0,
+            runtime_seconds=2.5,
+            buses_used=1,
+            total_distance_km=28.0,
+            total_service_time_min=10.6,
+            assignment_bus_ids=np.asarray([1, 1], dtype=np.int64),
+            assignment_orders=np.asarray([0, 1], dtype=np.int64),
+            assignment_school_indices=np.asarray([1, 2], dtype=np.int64),
+            assignment_arrival_times=np.asarray([450.0, 510.0], dtype=np.float64),
+            assignment_distance_km=np.asarray([9.0, 10.0], dtype=np.float64),
+            assignment_service_time_min=np.asarray([4.3, 6.3], dtype=np.float64),
+            assignment_stop_ptr=np.asarray([0, 1, 2], dtype=np.int64),
+            assignment_stop_values=np.asarray([1, 1], dtype=np.int64),
+        )
+
+        ride_rows = bird_student_ride_times(instance, solution)
+        method_rows = solution.student_ride_times(instance)
+
+        self.assertEqual(ride_rows, method_rows)
+        self.assertEqual(
+            [
+                (
+                    row["student_id"],
+                    row["bus_name"],
+                    row["route_order"],
+                    row["school_id"],
+                    row["assigned_stop_id"],
+                )
+                for row in ride_rows
+            ],
+            [
+                ("conv-a", "bird_bus_1", 0, "school-a", "Shared Stop"),
+                ("conv-b", "bird_bus_1", 1, "school-b", "Shared Stop"),
+            ],
+        )
+        self.assertAlmostEqual(float(ride_rows[0]["route_start_time_min"]), 440.7)
+        self.assertAlmostEqual(float(ride_rows[0]["boarding_time_min"]), 445.7)
+        self.assertAlmostEqual(
+            float(ride_rows[0]["boarding_departure_time_min"]),
+            446.0,
+        )
+        self.assertAlmostEqual(float(ride_rows[0]["ride_time_min"]), 4.3)
+        self.assertAlmostEqual(float(ride_rows[0]["in_vehicle_time_min"]), 4.0)
+        self.assertAlmostEqual(float(ride_rows[1]["route_start_time_min"]), 499.7)
+        self.assertAlmostEqual(float(ride_rows[1]["boarding_time_min"]), 503.7)
+        self.assertAlmostEqual(float(ride_rows[1]["ride_time_min"]), 6.3)
+        self.assertAlmostEqual(float(ride_rows[1]["in_vehicle_time_min"]), 6.0)
+
+        mismatched_solution = replace(
+            solution,
+            assignment_service_time_min=np.asarray([4.0, 6.3], dtype=np.float64),
+        )
+        with self.assertRaisesRegex(ValueError, "service time does not match"):
+            bird_student_ride_times(instance, mismatched_solution)
 
     def test_julia_lbh_driver_solves_exported_instance(self) -> None:
         julia = shutil.which("julia")

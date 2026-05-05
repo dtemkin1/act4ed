@@ -14,12 +14,10 @@ end
 
 const FLEET_SCENARIO_EXACT_CANDIDATE_LIMIT = 600
 const FLEET_SCENARIO_LINK_VARIABLE_LIMIT = 500_000
-const FLEET_SCENARIO_SERVED_TIME_LIMIT = 300.0
+const FLEET_SCENARIO_SERVED_TIME_LIMIT = 60.0
 const FLEET_SCENARIO_SERVED_MIP_GAP_ABS = 10.0
-const FLEET_SCENARIO_COST_TIME_LIMIT = 300.0
+const FLEET_SCENARIO_COST_TIME_LIMIT = 60.0
 const FLEET_SCENARIO_COST_MIP_GAP = 0.02
-const FLEET_SCENARIO_COST_HEURISTICS = 0.5
-const FLEET_SCENARIO_COST_NO_REL_HEUR_TIME = 30.0
 
 
 function _aff_sum(terms)
@@ -627,29 +625,11 @@ function _solve_fleet_stage_mip!(
         _log_timing("fleet scenario $(label) model build", timing_log, time() - model_build_start)
     end
 
-    bus_count_objective = _aff_sum(used[bus_idx] for bus_idx in bus_ids)
-    if data.allow_partial
-        _timed_value("fleet scenario $(label) bus-count optimize", timing_log) do
-            @objective(model, Min, bus_count_objective)
-            optimize!(model)
-        end
-        status = termination_status(model)
-        if status != MOI.OPTIMAL
-            fail_if_unserved && error("fleet-aware scenario $(label) bus-count solve failed with $(status)")
-            return Int[]
-        end
-        best_bus_count = round(Int, objective_value(model))
-        @constraint(model, bus_count_objective <= best_bus_count + BIRD_TIMING_EPS)
-        _log_timing_message("fleet scenario $(label) fixed bus count: $(best_bus_count)", timing_log)
-    end
-
     objective_build_start = time()
-    cost_objective = AffExpr(0.0)
-    if !data.allow_partial
-        bus_fixed_cost = max(data.default_lambda_value * 100.0, 1.0e6)
-        cost_objective += _timed_value("fleet scenario $(label) objective bus fixed term", timing_log) do
-            bus_fixed_cost * bus_count_objective
-        end
+    bus_fixed_cost = max(data.default_lambda_value * 100.0, 1.0e6)
+    bus_count_objective = _aff_sum(used[bus_idx] for bus_idx in bus_ids)
+    cost_objective = _timed_value("fleet scenario $(label) objective bus fixed term", timing_log) do
+        bus_fixed_cost * bus_count_objective
     end
     cost_objective += _timed_value("fleet scenario $(label) objective route assignment term", timing_log) do
         _aff_sum(
@@ -697,9 +677,6 @@ function _solve_fleet_stage_mip!(
     _log_timing("fleet scenario $(label) objective build", timing_log, time() - objective_build_start)
     set_optimizer_attribute(model, "TimeLimit", FLEET_SCENARIO_COST_TIME_LIMIT)
     set_optimizer_attribute(model, "MIPGap", FLEET_SCENARIO_COST_MIP_GAP)
-    set_optimizer_attribute(model, "MIPFocus", 1)
-    set_optimizer_attribute(model, "Heuristics", FLEET_SCENARIO_COST_HEURISTICS)
-    set_optimizer_attribute(model, "NoRelHeurTime", FLEET_SCENARIO_COST_NO_REL_HEUR_TIME)
     _timed_value("fleet scenario $(label) cost optimize", timing_log) do
         optimize!(model)
     end
