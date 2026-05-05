@@ -47,17 +47,17 @@ def main() -> None:
 
     # only use 1 buses total, wheelchair accessible
     buses_to_use = list(
-        filter(lambda b: b.has_wheelchair_access, problem_data_original.buses)
+        filter(lambda b: b.wheelchair_capacity > 0, problem_data_original.buses)
     )[:1]
 
     problem_data = ProblemDataToy(
         "no_chaining_toy",
         _base_graph=osm_graph_km,
-        _stops=stops_with_students,
-        _schools=[fuller],
+        _stops=tuple(stops_with_students),
+        _schools=(fuller,),
         _depots=problem_data_original.depots,
-        _students=nearby_students,
-        _buses=buses_to_use,
+        _students=tuple(nearby_students),
+        _buses=tuple(buses_to_use),
     )
 
     # formulation time baby
@@ -127,11 +127,11 @@ def main() -> None:
     problem_data = ProblemDataToy(
         "chaining_toy",
         _base_graph=osm_graph_km,
-        _stops=stops_with_students,
-        _schools=[fuller, mcc],
+        _stops=tuple(stops_with_students),
+        _schools=(fuller, mcc),
         _depots=problem_data_original.depots,
-        _students=both_nearby_students,
-        _buses=buses_to_use,
+        _students=tuple(both_nearby_students),
+        _buses=tuple(buses_to_use),
     )
     chaining = Formulation3(
         problem_data=problem_data,
@@ -145,6 +145,9 @@ def main() -> None:
     chaining_solution = solve_problem(chaining_bundle)
     print("Chaining problem solved!")
 
+    if chaining_solution is None:
+        print("No solution found for chaining formulation.")
+        return
     report_chaining = make_report(chaining_solution, chaining)
 
     with open(

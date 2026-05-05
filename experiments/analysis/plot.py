@@ -1,11 +1,15 @@
 # plots bird routes similarly to other map
 
+from dataclasses import replace
+
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 import osmnx as ox
 import matplotlib as mpl
 
 from experiments.existing_data.bird_routes import (
+    BIRD_CONFIG,
+    get_bird_routes,
     get_bird_routes_json,
 )
 from experiments.existing_data.utils import get_assigned_students
@@ -269,6 +273,20 @@ def main() -> None:
     plot_bird_routes(
         "existing_student_routes",
         filtered_bird_results,
+        problem_data=filtered_problem_data,
+        save_fig=True,
+    )
+
+    full_bird_results = get_bird_routes(
+        "new_routes",
+        framingham_problem_data,
+        config=replace(BIRD_CONFIG, allow_partial=True),
+        save_results=True,
+    )
+
+    plot_bird_routes(
+        "new_routes",
+        full_bird_results,
         problem_data=filtered_problem_data,
         save_fig=True,
     )

@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from dataclasses import dataclass
 
-from experiments.all_gurobi_julia import _build_run_scopes
+from experiments.tests.all_gurobi_julia import _build_run_scopes
 from formulation.common import SchoolType
 
 

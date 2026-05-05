@@ -29,10 +29,11 @@ def build_problem(rounds: int = 1) -> Formulation3:
     )
     bus = Bus(
         name="Bus 1",
+        id="bus_1",
         capacity=41,
         range=1000,
         depot=depot,
-        has_wheelchair_access=True,
+        wheelchair_capacity=2,
     )
 
     stop_node = 1
@@ -47,7 +48,7 @@ def build_problem(rounds: int = 1) -> Formulation3:
         name="School 1",
         geographic_location=graph.nodes[school_1_node]["location"],
         node_id=2,
-        id=1,
+        id="1",
         type=SchoolType.E,
         start_time=8 * 60,
     )
@@ -57,7 +58,7 @@ def build_problem(rounds: int = 1) -> Formulation3:
         name="School 2",
         geographic_location=graph.nodes[school_2_node]["location"],
         node_id=3,
-        id=2,
+        id="2",
         type=SchoolType.E,
         start_time=8 * 60 + 15,
     )
@@ -88,12 +89,12 @@ def build_problem(rounds: int = 1) -> Formulation3:
 
     problem_data = ProblemDataToy(
         name="chaining_test",
-        base_graph=graph,
-        _depots=[depot],
-        _buses=[bus],
-        _stops=[stop],
-        _schools=[school_1, school_2],
-        _students=students_1 + students_2,
+        _base_graph=graph,
+        _depots=(depot,),
+        _buses=(bus,),
+        _stops=(stop,),
+        _schools=(school_1, school_2),
+        _students=tuple(students_1 + students_2),
     )
 
     return Formulation3(problem_data=problem_data, rounds=rounds)

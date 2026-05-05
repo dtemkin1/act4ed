@@ -10,7 +10,9 @@ from typing import Any
 from formulation.bird_adapter import (
     BirdAdapterConfig,
     BirdBackendSolution,
+    BirdCohort,
     BirdExportInstance,
+    OptimizationMethod,
     export_bird_instance,
     normalized_result_from_bird_solution,
     routing_solution_json_from_bird_solution,
@@ -202,7 +204,7 @@ def _solve_with_bird(
     *,
     label: str,
     output_dir: Path,
-    cohort: str,
+    cohort: BirdCohort,
     bus_type: str | None,
     lambda_value: float,
     reassign_stops: bool,
@@ -211,7 +213,7 @@ def _solve_with_bird(
     fleet_aware: bool,
     conventional_spillover: bool,
     allow_partial: bool,
-    method: str,
+    method: OptimizationMethod,
 ) -> NormalizedRoutingResult:
     adapter_config = BirdAdapterConfig(
         cohort=cohort,
