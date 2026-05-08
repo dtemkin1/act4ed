@@ -26,6 +26,60 @@ using .BirdBackend
 end
 
 
+function _stop_time_test_data()
+    return BirdData(
+        BirdParameters(66, 120.0, 1.0, 2.0, 3.0, 5.0),
+        BirdSchool[],
+        BirdDepot[],
+        Vector{Vector{BirdDemandStop}}(),
+        zeros(Float64, 0, 0),
+        zeros(Float64, 0, 0),
+        66,
+        0,
+        "test",
+        "test",
+        false,
+        false,
+        false,
+        BirdFleetBus[],
+        1.0e4,
+        Vector{Vector{BirdScenario}}(),
+        Vector{Vector{BirdRoute}}(),
+        Int[],
+        BirdBus[],
+        Tuple{Int, Int}[],
+        "lbh",
+    )
+end
+
+
+function _stop_time_test_stop(n_students::Int; n_wheelchair::Int = 0, n_sped::Int = 0)
+    return BirdDemandStop(
+        1,
+        1,
+        "stop",
+        "stop",
+        1,
+        1,
+        n_students,
+        n_wheelchair,
+        n_sped,
+        BirdBackend.SERVICE_GROUP_CONVENTIONAL,
+        1,
+    )
+end
+
+
+@testset "BirdBackend stop time" begin
+    data = _stop_time_test_data()
+
+    @test BirdBackend.stop_time(data, _stop_time_test_stop(2)) == 5.0
+    @test BirdBackend.stop_time(data, _stop_time_test_stop(2; n_sped = 2)) == 15.0
+    @test BirdBackend.stop_time(data, _stop_time_test_stop(2; n_wheelchair = 2)) == 11.0
+    @test BirdBackend.stop_time(data, _stop_time_test_stop(1; n_wheelchair = 1, n_sped = 1)) == 8.0
+end
+
+
 @testset "BirdBackend" begin
     schools_path = normpath(joinpath(@__DIR__, "..", "..", "bird", "data", "input", "CSCB01", "Schools.txt"))
     stops_path = normpath(joinpath(@__DIR__, "..", "..", "bird", "data", "input", "CSCB01", "Stops.txt"))

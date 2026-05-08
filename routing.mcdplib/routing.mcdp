@@ -1,4 +1,8 @@
 mcdp {
+    provides students_served [Nat]
+    provides sped_students_served [Nat]
+    provides wheelchair_students_served [Nat]
+
     requires total_cost [USD]
     requires emissions [kg]
     requires students_unserved [Nat]
@@ -13,7 +17,6 @@ mcdp {
     requires bird_dwell [`bird_dwell]
     requires bird_arrival_window [`bird_arrival_window]
 
-    sub rp = instance `routing_policy
     sub rs = instance `routing_service
     sub bc = instance `fleet_bus_count
     sub dr = instance `driver
@@ -21,14 +24,10 @@ mcdp {
     sub mt = instance `maintenance
     sub fu = instance `fuel
 
-    # route plan must serve at least the requested policy targets
-    students_served provided by rs >= students_served provided by rp
-    sped_students_served provided by rs >= sped_students_served provided by rp
-    wheelchair_students_served provided by rs >= wheelchair_students_served provided by rp
-
-    provides students_served = students_served provided by rs
-    provides sped_students_served = sped_students_served provided by rs
-    provides wheelchair_students_served = wheelchair_students_served provided by rs
+    # expose the route catalogue functionality to the top-level query
+    provided students_served <= students_served provided by rs
+    provided sped_students_served <= sped_students_served provided by rs
+    provided wheelchair_students_served <= wheelchair_students_served provided by rs
 
     # expose route catalogue requirements to the top-level query
     required students_unserved >= students_unserved required by rs
@@ -40,15 +39,6 @@ mcdp {
     required bird_partial >= bird_partial required by rs
     required bird_dwell >= bird_dwell required by rs
     required bird_arrival_window >= bird_arrival_window required by rs
-
-    # budget cap from routing policy
-    (
-        fuel_cost required by fu +
-        maintenance_cost required by mt +
-        driver_cost required by dr +
-        monitor_cost required by mo +
-        capital_cost required by bc
-    ) <= policy_cost required by rp
 
     required total_cost >= (
         fuel_cost required by fu +

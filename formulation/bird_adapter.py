@@ -29,7 +29,7 @@ from formulation.normalized_result import (
     RoutingSolutionRow,
 )
 
-_BIRD_INSTANCE_SCHEMA_VERSION = 13
+_BIRD_INSTANCE_SCHEMA_VERSION = 14
 _BIRD_SOLUTION_SCHEMA_VERSION = 1
 _DEFAULT_BUS_MPH = 40.0
 _DEFAULT_BUS_SPEED_KM_PER_MINUTE = _DEFAULT_BUS_MPH / MPH_TO_KM_PER_MIN
@@ -64,6 +64,7 @@ class BirdAdapterConfig:
     constant_stop_time: float = 0.0
     stop_time_per_student: float = 0.3
     stop_time_per_wheelchair_student: float = 0.0
+    stop_time_per_sped: float = 0.0
     school_dwell_time: float = 0.0
     earliest_arrival_buffer: float | None = None
     latest_arrival_buffer: float | None = None
@@ -136,6 +137,7 @@ class BirdExportInstance:
     constant_stop_time: float
     stop_time_per_student: float
     stop_time_per_wheelchair_student: float
+    stop_time_per_sped: float
     school_dwell_time: float
     earliest_arrival_buffer: float
     latest_arrival_buffer: float
@@ -191,6 +193,10 @@ class BirdExportInstance:
             ),
             "stop_time_per_wheelchair_student": np.asarray(
                 self.stop_time_per_wheelchair_student,
+                dtype=np.float64,
+            ),
+            "stop_time_per_sped": np.asarray(
+                self.stop_time_per_sped,
                 dtype=np.float64,
             ),
             "school_dwell_time": np.asarray(self.school_dwell_time, dtype=np.float64),
@@ -514,6 +520,11 @@ class BirdExportInstance:
                     )
                     if schema_version >= 8
                     and "stop_time_per_wheelchair_student" in payload.files
+                    else 0.0
+                ),
+                stop_time_per_sped=(
+                    float(np.asarray(payload["stop_time_per_sped"]).item())
+                    if schema_version >= 14 and "stop_time_per_sped" in payload.files
                     else 0.0
                 ),
                 school_dwell_time=school_dwell_time,
@@ -1236,6 +1247,7 @@ def build_bird_export_instance(
         constant_stop_time=config.constant_stop_time,
         stop_time_per_student=config.stop_time_per_student,
         stop_time_per_wheelchair_student=config.stop_time_per_wheelchair_student,
+        stop_time_per_sped=config.stop_time_per_sped,
         school_dwell_time=config.school_dwell_time,
         earliest_arrival_buffer=earliest_arrival_buffer,
         latest_arrival_buffer=latest_arrival_buffer,
@@ -1354,6 +1366,7 @@ def bird_export_instance_from_template(
         constant_stop_time=config.constant_stop_time,
         stop_time_per_student=config.stop_time_per_student,
         stop_time_per_wheelchair_student=config.stop_time_per_wheelchair_student,
+        stop_time_per_sped=config.stop_time_per_sped,
         school_dwell_time=config.school_dwell_time,
         earliest_arrival_buffer=earliest_arrival_buffer,
         latest_arrival_buffer=latest_arrival_buffer,
@@ -1458,11 +1471,19 @@ def _bird_stop_dwell_time_min(
     instance: BirdExportInstance,
     demand_row: BirdDemandRow,
 ) -> float:
+    wheelchair_students = int(demand_row.wheelchair_students)
+    special_ed_students = int(demand_row.special_ed_students)
+    overlap = min(wheelchair_students, special_ed_students)
+    wheelchair_only = wheelchair_students - overlap
+    sped_only = special_ed_students - overlap
+    wheelchair_rate = float(instance.stop_time_per_wheelchair_student)
+    sped_rate = float(instance.stop_time_per_sped)
     return (
         float(instance.constant_stop_time)
         + float(instance.stop_time_per_student) * int(demand_row.students)
-        + float(instance.stop_time_per_wheelchair_student)
-        * int(demand_row.wheelchair_students)
+        + wheelchair_rate * wheelchair_only
+        + sped_rate * sped_only
+        + max(wheelchair_rate, sped_rate) * overlap
     )
 
 

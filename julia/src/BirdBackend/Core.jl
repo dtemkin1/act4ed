@@ -1,5 +1,5 @@
 const MOI = MathOptInterface
-const BIRD_INSTANCE_SCHEMA_VERSION = 13
+const BIRD_INSTANCE_SCHEMA_VERSION = 14
 const BIRD_SOLUTION_SCHEMA_VERSION = 1
 const DEFAULT_LAMBDA_VALUE = 1.0e4
 const BIRD_TIMING_EPS = 1.0e-6
@@ -14,7 +14,23 @@ struct BirdParameters
     constant_stop_time::Float64
     stop_time_per_student::Float64
     stop_time_per_wheelchair_student::Float64
+    stop_time_per_sped::Float64
 end
+
+BirdParameters(
+    bus_capacity,
+    max_time_on_bus,
+    constant_stop_time,
+    stop_time_per_student,
+    stop_time_per_wheelchair_student,
+) = BirdParameters(
+    bus_capacity,
+    max_time_on_bus,
+    constant_stop_time,
+    stop_time_per_student,
+    stop_time_per_wheelchair_student,
+    0.0,
+)
 
 
 struct BirdSchool
@@ -55,9 +71,35 @@ struct BirdDemandStop
     node_index::Int
     n_students::Int
     n_wheelchair::Int
+    n_sped::Int
     group_id::Int
     grade_id::Int
 end
+
+BirdDemandStop(
+    id,
+    unique_id,
+    external_id,
+    source_stop_id,
+    school_id,
+    node_index,
+    n_students,
+    n_wheelchair,
+    group_id,
+    grade_id,
+) = BirdDemandStop(
+    id,
+    unique_id,
+    external_id,
+    source_stop_id,
+    school_id,
+    node_index,
+    n_students,
+    n_wheelchair,
+    0,
+    group_id,
+    grade_id,
+)
 
 
 struct BirdScenario
@@ -292,10 +334,18 @@ uses_original_dwell_timing(school::BirdSchool) =
     abs(school.latest_arrival_buffer - school.dwell_time) <= BIRD_TIMING_EPS
 uses_original_dwell_timing(data::BirdData) = all(uses_original_dwell_timing, data.schools)
 n_students(stop::BirdDemandStop) = stop.n_students
-stop_time(data::BirdData, stop::BirdDemandStop) =
-    data.params.constant_stop_time +
-    data.params.stop_time_per_student * stop.n_students +
-    data.params.stop_time_per_wheelchair_student * stop.n_wheelchair
+function stop_time(data::BirdData, stop::BirdDemandStop)
+    overlap = min(stop.n_wheelchair, stop.n_sped)
+    wheelchair_only = stop.n_wheelchair - overlap
+    sped_only = stop.n_sped - overlap
+    return (
+        data.params.constant_stop_time +
+        data.params.stop_time_per_student * stop.n_students +
+        data.params.stop_time_per_wheelchair_student * wheelchair_only +
+        data.params.stop_time_per_sped * sped_only +
+        max(data.params.stop_time_per_wheelchair_student, data.params.stop_time_per_sped) * overlap
+    )
+end
 max_travel_time(data::BirdData, _stop::BirdDemandStop) = data.params.max_time_on_bus
 route_grade_id(data::BirdData, school_idx::Int, route::BirdRoute) =
     isempty(route.stops) ? 0 : data.stops[school_idx][route.stops[1]].grade_id

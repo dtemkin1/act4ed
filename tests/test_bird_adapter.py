@@ -24,6 +24,7 @@ from formulation.bird_adapter import (
     build_bird_export_instance,
     normalized_result_from_bird_solution,
     summarize_bird_solution_for_mcdp,
+    _bird_stop_dwell_time_min,
 )
 from formulation.common import (
     Bus,
@@ -621,12 +622,18 @@ class BirdAdapterTests(unittest.TestCase):
                 fleet_aware=True,
                 conventional_spillover=True,
                 stop_time_per_wheelchair_student=2.5,
+                stop_time_per_sped=1.5,
             ),
         )
 
         self.assertTrue(instance.fleet_aware)
         self.assertTrue(instance.conventional_spillover)
         self.assertEqual(instance.stop_time_per_wheelchair_student, 2.5)
+        self.assertEqual(instance.stop_time_per_sped, 1.5)
+        self.assertEqual(
+            int(np.asarray(instance.to_payload()["schema_version"]).item()),
+            14,
+        )
         self.assertEqual(instance.bus_names, ["C01", "M01", "M02"])
         np.testing.assert_array_equal(instance.bus_capacities, [1, 2, 2])
         np.testing.assert_array_equal(instance.bus_depot_indices, [1, 2, 1])
@@ -651,6 +658,30 @@ class BirdAdapterTests(unittest.TestCase):
             ],
         )
 
+    def test_bird_stop_dwell_time_uses_max_for_wheelchair_sped_overlap(self) -> None:
+        problem_data = _make_fleet_aware_problem_data()
+        instance = build_bird_export_instance(
+            problem_data,
+            BirdAdapterConfig(
+                cohort="all",
+                fleet_aware=True,
+                constant_stop_time=1.0,
+                stop_time_per_student=2.0,
+                stop_time_per_wheelchair_student=9.0,
+                stop_time_per_sped=4.0,
+            ),
+        )
+
+        rows_by_group = {row.service_group: row for row in instance.demand_rows}
+        self.assertEqual(
+            _bird_stop_dwell_time_min(instance, rows_by_group["wheelchair"]),
+            12.0,
+        )
+        self.assertEqual(
+            _bird_stop_dwell_time_min(instance, rows_by_group["sped"]),
+            7.0,
+        )
+
     def test_fleet_aware_template_reuses_demand_and_distance_matrix(self) -> None:
         problem_data = _make_fleet_aware_problem_data()
         template = build_bird_export_instance(
@@ -670,6 +701,7 @@ class BirdAdapterTests(unittest.TestCase):
                 school_dwell_time=5.0,
                 bus_mph=MPH_TO_KM_PER_MIN,
                 method="scenario",
+                stop_time_per_sped=1.25,
             ),
         )
 
@@ -681,6 +713,7 @@ class BirdAdapterTests(unittest.TestCase):
         )
         self.assertEqual(instance.method, "scenario")
         self.assertEqual(instance.lambda_value, 7.0)
+        self.assertEqual(instance.stop_time_per_sped, 1.25)
         self.assertTrue(instance.allow_partial)
         self.assertTrue(instance.conventional_spillover)
         np.testing.assert_array_equal(instance.school_dwell_times, [5.0])
@@ -820,10 +853,12 @@ class BirdAdapterTests(unittest.TestCase):
                 school_dwell_time=10.0,
                 earliest_arrival_buffer=60.0,
                 stop_time_per_wheelchair_student=3.0,
+                stop_time_per_sped=4.0,
             ),
         )
 
         self.assertEqual(instance.stop_time_per_wheelchair_student, 3.0)
+        self.assertEqual(instance.stop_time_per_sped, 4.0)
         self.assertEqual(instance.latest_arrival_buffer, 10.0)
         self.assertEqual(instance.earliest_arrival_buffer, 60.0)
         np.testing.assert_array_equal(
@@ -841,6 +876,7 @@ class BirdAdapterTests(unittest.TestCase):
         self.assertEqual(loaded_instance.latest_arrival_buffer, 10.0)
         self.assertEqual(loaded_instance.earliest_arrival_buffer, 60.0)
         self.assertEqual(loaded_instance.stop_time_per_wheelchair_student, 3.0)
+        self.assertEqual(loaded_instance.stop_time_per_sped, 4.0)
         np.testing.assert_array_equal(
             loaded_instance.school_latest_arrival_buffers, [10.0, 10.0]
         )
@@ -870,7 +906,7 @@ class BirdAdapterTests(unittest.TestCase):
                 ),
             )
 
-    def test_julia_loader_uses_wheelchair_stop_time_component(self) -> None:
+    def test_julia_loader_uses_specialized_stop_time_components(self) -> None:
         julia = shutil.which("julia")
         if julia is None:
             self.skipTest("julia executable not available")
@@ -884,6 +920,7 @@ class BirdAdapterTests(unittest.TestCase):
                 constant_stop_time=1.0,
                 stop_time_per_student=2.0,
                 stop_time_per_wheelchair_student=3.0,
+                stop_time_per_sped=5.0,
             ),
         )
 
@@ -909,7 +946,7 @@ class BirdAdapterTests(unittest.TestCase):
                 text=True,
             )
 
-        self.assertEqual(float(result.stdout.strip()), 6.0)
+        self.assertEqual(float(result.stdout.strip()), 8.0)
 
     @unittest.skipUnless(
         importlib.util.find_spec("gurobipy") is not None, "gurobipy not installed"

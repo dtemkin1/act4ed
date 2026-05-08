@@ -6,6 +6,7 @@ function load_legacy_benchmark(
     constant_stop_time::Float64 = 19.0 / 60.0,
     stop_time_per_student::Float64 = 2.6 / 60.0,
     stop_time_per_wheelchair_student::Float64 = 0.0,
+    stop_time_per_sped::Float64 = 0.0,
     speed_units_per_minute::Float64 = 29.3333333 * 60.0,
     school_dwell_time::Float64 = 154.4 / 60.0,
 )
@@ -51,6 +52,7 @@ function load_legacy_benchmark(
                 0,
                 parse(Int, row["STUDENT_COUNT"]),
                 0,
+                0,
                 SERVICE_GROUP_CONVENTIONAL,
                 1,
             ),
@@ -95,6 +97,7 @@ function load_legacy_benchmark(
                 global_stop_idx,
                 stop.n_students,
                 stop.n_wheelchair,
+                stop.n_sped,
                 stop.group_id,
                 stop.grade_id,
             )
@@ -123,6 +126,7 @@ function load_legacy_benchmark(
             constant_stop_time,
             stop_time_per_student,
             stop_time_per_wheelchair_student,
+            stop_time_per_sped,
         ),
         schools,
         depots,
@@ -200,6 +204,9 @@ function load_instance(path::AbstractString)
     if schema_version >= 12
         push!(keys, "method_id")
     end
+    if schema_version >= 14
+        append!(keys, ["stop_time_per_sped", "demand_special_ed_students"])
+    end
     data = NPZ.npzread(path, keys)
     default_lambda_value = schema_version >= 2 ? _scalar(data, "lambda_value", Float64) : DEFAULT_LAMBDA_VALUE
     method_id = schema_version >= 12 ? _scalar(data, "method_id", Int) : 1
@@ -217,6 +224,8 @@ function load_instance(path::AbstractString)
         schema_version >= 5 ? _ivec(data, "demand_group_ids") : fill(SERVICE_GROUP_CONVENTIONAL, length(demand_students))
     demand_wheelchair_students =
         schema_version >= 5 ? _ivec(data, "demand_wheelchair_students") : zeros(Int, length(demand_students))
+    demand_special_ed_students =
+        schema_version >= 14 ? _ivec(data, "demand_special_ed_students") : zeros(Int, length(demand_students))
     demand_grade_ids =
         schema_version >= 9 ? _ivec(data, "demand_grade_ids") : ones(Int, length(demand_students))
     cohort = "exported"
@@ -252,6 +261,7 @@ function load_instance(path::AbstractString)
                 row_idx,
                 demand_students[row_idx],
                 demand_wheelchair_students[row_idx],
+                demand_special_ed_students[row_idx],
                 demand_group_ids[row_idx],
                 demand_grade_ids[row_idx],
             ),
@@ -292,6 +302,7 @@ function load_instance(path::AbstractString)
             _scalar(data, "constant_stop_time", Float64),
             _scalar(data, "stop_time_per_student", Float64),
             schema_version >= 8 ? _scalar(data, "stop_time_per_wheelchair_student", Float64) : 0.0,
+            schema_version >= 14 ? _scalar(data, "stop_time_per_sped", Float64) : 0.0,
         ),
         schools,
         depots,

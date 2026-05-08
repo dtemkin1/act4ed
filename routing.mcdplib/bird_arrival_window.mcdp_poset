@@ -1,3 +1,3 @@
 poset {
-    arrival_default arrival_early30_late10
+    arrival_default arrival_early30_late10 arrival_early40_late10
 }
