@@ -10,6 +10,7 @@ from typing import Callable, overload
 from experiments.existing_data.bird_routes import (
     BIRD_CONFIG,
     get_bird_routes,
+    get_bird_routes_json,
 )
 from experiments.existing_data.current_routes import RouteResult, get_existing_routes
 from experiments.existing_data.utils import get_assigned_students
@@ -23,6 +24,7 @@ from formulation.common.problems import (
 from formulation.common.utils import get_travel_time
 from formulation.normalized_result import (
     NormalizedBusItinerary,
+    NormalizedRoute,
     NormalizedRoutingResult,
     RoutingSolutionJson,
     RoutingSolutionRow,
@@ -111,7 +113,7 @@ def stats_time_on_bus_for_students_find_route(
     total_time: list[float] = []
     for student in students:
         route = get_route_for_student(student, routes)
-        if route:
+        if route is not None:
             if isinstance(route, RouteResult):
                 time_on_bus = get_student_time_on_bus(
                     student, route.all_places, problem_data
@@ -180,11 +182,13 @@ def stats_time_on_bus_for_students_find_route(
                     student, tuple(total_route), problem_data
                 )
                 total_time.append(time_on_bus)
-            else:
+            elif isinstance(route, NormalizedBusItinerary):
                 assert isinstance(routes, NormalizedRoutingResult)
                 total_route: list[Place] = []
-                for i, route_order in enumerate(route.route_orders):
-                    bird_route = routes.routes[route_order]
+                bird_routes: list[NormalizedRoute] = list(
+                    filter(lambda r: r.bus_id == route.bus_id, routes.routes)
+                )
+                for i, bird_route in enumerate(bird_routes):
                     depot = problem_data.depots[0]
                     stops: list[Stop] = []
                     for stop_id in bird_route.stop_ids:
@@ -239,8 +243,7 @@ def get_route_for_student(
 
     if isinstance(routes, list):
         for route in routes:
-            assert isinstance(route, RouteResult)
-            if student.stop in route.stops and student.school == route.school:
+            if student in route.students_served:
                 return route
 
     if isinstance(routes, NormalizedRoutingResult):
@@ -306,6 +309,20 @@ RELEVANT_STATS: list[tuple[str, Callable[[Student], bool]]] = [
 ]
 
 
+def students_over_1_5_miles_away(student: Student, problem_data: ProblemData) -> bool:
+    if student.stop is None or student.school is None:
+        return False
+
+    edge_data = problem_data.service_graph.get_edge_data(
+        student.stop.node_id, student.school.node_id, 0
+    )
+    if edge_data is None:
+        return False
+
+    distance = edge_data["length"]
+    return distance > (1.5 * KM_PER_MILE)
+
+
 def main() -> None:
     framingham_problem_data = setup_framingham(precompute_cache=True)
 
@@ -319,14 +336,20 @@ def main() -> None:
         _students=assigned_students,
     )
 
+    students_over_1_5_miles_away_filter = filter(
+        lambda s: students_over_1_5_miles_away(s, framingham_problem_data),
+        framingham_problem_data.students,
+    )
+    print(
+        f"Number of students over 1.5 miles away: {len(tuple(students_over_1_5_miles_away_filter))}"
+    )
+
     current_routes = get_existing_routes(filtered_problem_data)
 
     print("STATS FOR CURRENT STUDENTS")
     get_relevant_stats(current_routes, filtered_problem_data, RELEVANT_STATS)
 
-    filtered_bird_results = get_bird_routes(
-        "existing_student_routes", filtered_problem_data, BIRD_CONFIG
-    )
+    filtered_bird_results = get_bird_routes_json("existing_student_routes")
 
     print("STATS FOR BIRD ROUTES (EXISTING STUDENTS)")
     get_relevant_stats(filtered_bird_results, filtered_problem_data, RELEVANT_STATS)

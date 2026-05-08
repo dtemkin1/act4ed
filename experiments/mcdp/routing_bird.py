@@ -10,7 +10,7 @@ from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from itertools import product
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from loguru import logger
 import yaml
@@ -31,7 +31,6 @@ from formulation.common.problems import FilteredProblemData, ProblemData
 
 from tqdm import tqdm
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ROUTING_LIB = PROJECT_ROOT / "routing.mcdplib"
 BUS_CSV = PROJECT_ROOT / "experiments" / "data" / "buses.csv"
@@ -46,35 +45,35 @@ BUS_TYPES = ("C", "B", "BWC", "WC")
 
 ROUTING_F = ["Nat", "Nat", "Nat"]
 ROUTING_R = [
-    "Nat",                   # students_unserved
-    "Nat",                   # sped_students_unserved
-    "Nat",                   # wheelchair_students_unserved
-    "Nat",                   # stops_used
-    "Nat",                   # monitor_buses (total buses requiring a monitor)
-    "Nat",                   # buses_used C
-    "Nat",                   # buses_used B
-    "Nat",                   # buses_used BWC
-    "Nat",                   # buses_used WC
-    "km",                    # distance_km C
-    "km",                    # distance_km B
-    "km",                    # distance_km BWC
-    "km",                    # distance_km WC
-    "s",                     # runtime_s C
-    "s",                     # runtime_s B
-    "s",                     # runtime_s BWC
-    "s",                     # runtime_s WC
-    "`bird_method",          # routing algorithm (scenario | lbh)
-    "`bird_lambda",          # distance/ride-time trade-off weight
-    "`bird_partial",         # whether partial assignment is allowed
-    "`bird_dwell",           # school dwell time setting
+    "Nat",  # students_unserved
+    "Nat",  # sped_students_unserved
+    "Nat",  # wheelchair_students_unserved
+    "Nat",  # stops_used
+    "Nat",  # monitor_buses (total buses requiring a monitor)
+    "Nat",  # buses_used C
+    "Nat",  # buses_used B
+    "Nat",  # buses_used BWC
+    "Nat",  # buses_used WC
+    "km",  # distance_km C
+    "km",  # distance_km B
+    "km",  # distance_km BWC
+    "km",  # distance_km WC
+    "s",  # runtime_s C
+    "s",  # runtime_s B
+    "s",  # runtime_s BWC
+    "s",  # runtime_s WC
+    "`bird_method",  # routing algorithm (scenario | lbh)
+    "`bird_lambda",  # distance/ride-time trade-off weight
+    "`bird_partial",  # whether partial assignment is allowed
+    "`bird_dwell",  # school dwell time setting
     "`bird_arrival_window",  # earliest/latest arrival buffer setting
 ]
 
 GRID_FLEET = {
-    "C":   (45,),
-    "B":   (17,),
+    "C": (45,),
+    "B": (17,),
     "BWC": (9,),
-    "WC":  (1, ),
+    "WC": (1,),
 }
 GRID_METHODS = ("lbh", "scenario")
 GRID_LAMBDAS = ((1.0e2, "lambda_1e3"), (1.0e4, "lambda_1e4"), (1.0e5, "lambda_1e5"))
@@ -120,7 +119,7 @@ def _problem_size_summary(problem_data: ProblemData) -> dict[str, int]:
 @dataclass(frozen=True)
 class GridPoint:
     counts: dict[str, int]
-    method: str
+    method: Literal["lbh", "scenario"]
     lambda_value: float
     lambda_label: str
     conventional_spillover: bool
@@ -135,7 +134,9 @@ class GridPoint:
 
     @property
     def label(self) -> str:
-        count_label = "_".join(f"{bus_type}{self.counts[bus_type]}" for bus_type in BUS_TYPES)
+        count_label = "_".join(
+            f"{bus_type}{self.counts[bus_type]}" for bus_type in BUS_TYPES
+        )
         return (
             f"bird_{count_label}_{self.method}_{self.lambda_label}_"
             f"{self.partial_label}_{self.spillover_label}_{self.dwell_label}_{self.arrival_label}"
@@ -307,13 +308,19 @@ def fleet_catalogue(
     for values in product(*ranges):
         counts = dict(zip(BUS_TYPES, values, strict=True))
         name = "fleet_" + "_".join(str(counts[bus_type]) for bus_type in BUS_TYPES)
-        cost = sum(float(capital[bus_type]) * counts[bus_type] for bus_type in BUS_TYPES)
+        cost = sum(
+            float(capital[bus_type]) * counts[bus_type] for bus_type in BUS_TYPES
+        )
         implementations[name] = {
             "f_max": [str(counts[bus_type]) for bus_type in BUS_TYPES],
             "r_min": [_with_unit(cost * annualization, "USD")],
         }
 
-    return {"F": ["Nat", "Nat", "Nat", "Nat"], "R": ["USD"], "implementations": implementations}
+    return {
+        "F": ["Nat", "Nat", "Nat", "Nat"],
+        "R": ["USD"],
+        "implementations": implementations,
+    }
 
 
 def config_posets() -> dict[str, tuple[str, ...]]:
@@ -322,7 +329,9 @@ def config_posets() -> dict[str, tuple[str, ...]]:
         "bird_lambda": tuple(label for _value, label in GRID_LAMBDAS),
         "bird_partial": tuple(label for _value, label in GRID_PARTIAL),
         "bird_dwell": tuple(label for _value, label in GRID_DWELL),
-        "bird_arrival_window": tuple(label for _earliest, _latest, label in GRID_ARRIVAL_WINDOWS),
+        "bird_arrival_window": tuple(
+            label for _earliest, _latest, label in GRID_ARRIVAL_WINDOWS
+        ),
     }
 
 
@@ -477,8 +486,15 @@ def write_policy_module(routing_lib: Path) -> None:
 def iter_grid() -> Iterable[GridPoint]:
     count_values = [GRID_FLEET[bus_type] for bus_type in BUS_TYPES]
     for counts_tuple in product(*count_values):
-        counts = dict(zip(BUS_TYPES, counts_tuple, strict=True))
-        for method, lambda_pair, partial_pair, spillover_pair, dwell_pair, window in product(
+        counts: dict[str, int] = dict(zip(BUS_TYPES, counts_tuple, strict=True))
+        for (
+            method,
+            lambda_pair,
+            partial_pair,
+            spillover_pair,
+            dwell_pair,
+            window,
+        ) in product(
             GRID_METHODS,
             GRID_LAMBDAS,
             GRID_PARTIAL,
@@ -509,9 +525,8 @@ def iter_grid() -> Iterable[GridPoint]:
 
 
 def _load_assigned_framingham_problem(
-        problem_name: str = DEFAULT_PROBLEM_NAME, 
-        place_name: str = DEFAULT_PLACE_NAME    
-    ) -> ProblemData:
+    problem_name: str = DEFAULT_PROBLEM_NAME, place_name: str = DEFAULT_PLACE_NAME
+) -> ProblemData:
     problem_data = setup(problem_name, place_name, None)
     assigned_students = get_assigned_students(problem_data.schools, problem_data.stops)
     return FilteredProblemData(
@@ -522,13 +537,14 @@ def _load_assigned_framingham_problem(
 
 
 def _load_full_framingham_problem(
-        problem_name: str = DEFAULT_PROBLEM_NAME, 
-        place_name: str = DEFAULT_PLACE_NAME
-    ) -> ProblemData:
+    problem_name: str = DEFAULT_PROBLEM_NAME, place_name: str = DEFAULT_PLACE_NAME
+) -> ProblemData:
     return setup(problem_name, place_name, None)
 
 
-def _problem_with_buses(problem_data: ProblemData, buses: tuple[Bus, ...]) -> ProblemData:
+def _problem_with_buses(
+    problem_data: ProblemData, buses: tuple[Bus, ...]
+) -> ProblemData:
     return FilteredProblemData(
         name=f"{problem_data.name}_fleet_{len(buses)}",
         base_problem_data=problem_data,
@@ -567,7 +583,7 @@ def solve_grid_point(
         school_dwell_time=grid_point.school_dwell_time,
         earliest_arrival_buffer=grid_point.earliest_arrival_buffer,
         latest_arrival_buffer=grid_point.latest_arrival_buffer,
-        method=grid_point.method
+        method=grid_point.method,
     )
 
     instance_path = output_dir / f"{grid_point.label}_instance.npz"
@@ -763,8 +779,7 @@ def main() -> None:
         raise ValueError("--workers must be at least 1")
 
     grid_points = [
-        grid_point for grid_point in iter_grid()
-        if sum(grid_point.counts.values()) != 0
+        grid_point for grid_point in iter_grid() if sum(grid_point.counts.values()) != 0
     ]
     worker_count = min(
         args.workers or _default_worker_count(args.cpus_per_solve),
@@ -791,10 +806,12 @@ def main() -> None:
             error_count += 1
             return
         if result.summary is None or result.status is None:
-            errors.append({
-                "label": grid_point.label,
-                "error": "grid point solve returned an incomplete result",
-            })
+            errors.append(
+                {
+                    "label": grid_point.label,
+                    "error": "grid point solve returned an incomplete result",
+                }
+            )
             error_count += 1
             return
 

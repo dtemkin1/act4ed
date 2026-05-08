@@ -1,21 +1,22 @@
 # plots bird routes similarly to other map
 
-from dataclasses import replace
+import itertools
 
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
+from matplotlib import colors
 import osmnx as ox
-import matplotlib as mpl
+import pandas as pd
+import networkx as nx
 
 from experiments.existing_data.bird_routes import (
     BIRD_CONFIG,
     get_bird_routes,
     get_bird_routes_json,
 )
-from experiments.existing_data.utils import get_assigned_students
 from experiments.helpers import OUTPUTS_FOLDER, setup_framingham
 from formulation.common.classes import Depot, NodeId, Place, School, Stop
-from formulation.common.problems import FilteredProblemData, ProblemData
+from formulation.common.problems import ProblemData
 from formulation.normalized_result import (
     NormalizedRoutingResult,
     RoutingSolutionJson,
@@ -54,19 +55,21 @@ def plot_bird_routes_json(
         for node in graph.nodes()
     }
 
-    fig, ax = ox.plot_graph(graph, node_size=8, show=False)
+    edges = pd.Series(nx.edges(graph))
+    edges_weight = edges.map(lambda edge: 0.5)  # default weight of 0.5 for all edges
+    edges_colors = edges.map(
+        lambda edge: colors.to_hex("darkgray")
+    )  # default color for all edges
 
-    schools_plotted = set()
-    depots_plotted = set()
-    stops_plotted = set()
+    node_colors: dict[NodeId, str] = {node: "darkgray" for node in nx.nodes(graph)}
 
-    colormap = mpl.colormaps["hsv"]
-
-    bus_names = set()
+    bus_names: set[str] = set()
     for route in routes_json.solution:
         bus_names.add(route.bus_name)
 
-    for i, bus_name in enumerate(bus_names):
+    total_routes: dict[str, list[Place]] = {bus_name: [] for bus_name in bus_names}
+
+    for bus_name in bus_names:
         total_route: list[Place] = []
         all_nodes: list[NodeId] = []
 
@@ -89,26 +92,45 @@ def plot_bird_routes_json(
             places = [depot] + stops + [school]
             total_route += places
 
+        total_routes[bus_name] = total_route
+
         _, all_nodes = problem_data.get_shortest_paths_base(
             tuple(map(lambda p: p.node_id, total_route))
         )
 
-        ox.plot_graph_route(
-            graph,
-            list(all_nodes),
-            route_color=colormap(i / len(bus_names)),  # type: ignore
-            orig_dest_size=0,
-            ax=ax,
-            route_alpha=0.2,
-            show=False,
-        )
+        for u, v in itertools.pairwise(all_nodes):
+            if (edges == (u, v)).any():
+                index = (edges == (u, v)).idxmax()
+                edges_weight[
+                    index
+                ] += 0.5  # increase weight by 1.0 for each route that uses this edge
+                edges_colors[index] = colors.to_hex(
+                    "w"
+                )  # change color to orange for edges
+            if u in node_colors:
+                node_colors[u] = "w"
+            if v in node_colors:
+                node_colors[v] = "w"
 
+    fig, ax = ox.plot_graph(
+        graph,
+        node_size=0,
+        node_color=[colors.to_hex(color) for color in node_colors.values()],
+        edge_color=edges_colors.tolist(),
+        edge_linewidth=edges_weight.tolist(),
+        show=False,
+    )
+
+    schools_plotted = set()
+    depots_plotted = set()
+
+    for total_route in total_routes.values():
         for place in total_route:
             if isinstance(place, Depot) and place not in depots_plotted:
                 ax.scatter(
                     pos[place.node_id][0],
                     pos[place.node_id][1],
-                    c="black",
+                    c="tab:blue",
                     marker="X",
                     label=place.name if place not in depots_plotted else "",
                     zorder=4,
@@ -120,7 +142,7 @@ def plot_bird_routes_json(
                 ax.scatter(
                     pos[place.node_id][0],
                     pos[place.node_id][1],
-                    c="red",
+                    c="tab:red",
                     marker="s",
                     label=place.name if place not in schools_plotted else "",
                     zorder=3,
@@ -128,17 +150,6 @@ def plot_bird_routes_json(
                 )
                 schools_plotted.add(place)
 
-            if isinstance(place, Stop) and place.node_id not in stops_plotted:
-                ax.scatter(
-                    pos[place.node_id][0],
-                    pos[place.node_id][1],
-                    c="tab:blue",
-                    marker="o",
-                    s=8,
-                )
-                stops_plotted.add(place.node_id)
-
-    ax.title.set_text("BiRD School Bus Routes")
     ax.legend(loc="upper right", fontsize="small")
 
     if save_fig:
@@ -167,24 +178,36 @@ def plot_bird_routes_normalized(
         for node in graph.nodes()
     }
 
-    fig, ax = ox.plot_graph(graph, node_size=8, show=False)
+    edges = pd.Series(nx.edges(graph))
+    edges_weight = edges.map(lambda edge: 0.5)  # default weight of 0.5 for all edges
+    edges_colors = edges.map(
+        lambda edge: colors.to_hex("darkgray")
+    )  # default color for all edges
 
-    schools_plotted = set()
-    depots_plotted = set()
-    stops_plotted = set()
+    node_colors: dict[NodeId, str] = {node: "darkgray" for node in nx.nodes(graph)}
 
-    colormap = mpl.colormaps["hsv"]
+    bus_names = set[str]()
+    for itinerary in routes.itineraries:
+        bus_names.add(itinerary.bus_id)
+    bus_names = list(sorted(bus_names))
 
-    total_route: list[Place] = []
-    all_nodes: list[NodeId] = []
-    for i, route in enumerate(routes.itineraries):
+    total_routes: dict[str, list[Place]] = {bus_name: [] for bus_name in bus_names}
+
+    for route in routes.itineraries:
+        total_route: list[Place] = []
+        bus_id = route.bus_id
         for j, route_order in enumerate(route.route_orders):
-            bird_route = routes.routes[route_order]
+            bird_route = list(
+                filter(
+                    lambda r: r.bus_id == bus_id and r.order == route_order,
+                    routes.routes,
+                )
+            )[0]
             depot = problem_data.depots[0]
             stops: list[Stop] = []
             for stop_id in bird_route.stop_ids:
                 stop_filter = filter(lambda s: s.name == stop_id, problem_data.stops)
-                stops.append(list(stop_filter)[0])
+                stops.extend(list(stop_filter))
             school = list(
                 filter(
                     lambda s: s.id == bird_route.school_id,
@@ -193,58 +216,72 @@ def plot_bird_routes_normalized(
             )[0]
 
             places = ([depot] if j == 0 else []) + stops + [school]
+
+            while (
+                total_route and places and total_route[-1].node_id == places[0].node_id
+            ):
+                places = places[1:]
+
             total_route += places
+
+        total_routes[bus_id] = total_route
 
         _, all_nodes = problem_data.get_shortest_paths_base(
             tuple(map(lambda p: p.node_id, total_route))
         )
 
-        ox.plot_graph_route(
-            graph,
-            list(all_nodes),
-            route_color=colormap(i / len(routes.itineraries)),  # type: ignore
-            orig_dest_size=0,
-            ax=ax,
-            route_alpha=0.2,
-            show=False,
-        )
+        for u, v in itertools.pairwise(all_nodes):
+            if (edges == (u, v)).any():
+                index = (edges == (u, v)).idxmax()
+                edges_weight[
+                    index
+                ] += 0.5  # increase weight by 1.0 for each route that uses this edge
+                edges_colors[index] = colors.to_hex(
+                    "w"
+                )  # change color to orange for edges
+            if u in node_colors:
+                node_colors[u] = "w"
+            if v in node_colors:
+                node_colors[v] = "w"
 
-    for place in total_route:
-        if isinstance(place, Depot) and place not in depots_plotted:
-            ax.scatter(
-                pos[place.node_id][0],
-                pos[place.node_id][1],
-                c="black",
-                marker="X",
-                label=place.name if place not in depots_plotted else "",
-                zorder=4,
-                s=16,
-            )
-            depots_plotted.add(place)
+    fig, ax = ox.plot_graph(
+        graph,
+        node_size=0,
+        node_color=[colors.to_hex(color) for color in node_colors.values()],
+        edge_color=edges_colors.tolist(),
+        edge_linewidth=edges_weight.tolist(),
+        show=False,
+    )
 
-        if isinstance(place, School) and place not in schools_plotted:
-            ax.scatter(
-                pos[place.node_id][0],
-                pos[place.node_id][1],
-                c="red",
-                marker="s",
-                label=place.name if place not in schools_plotted else "",
-                zorder=3,
-                s=16,
-            )
-            schools_plotted.add(place)
+    schools_plotted = set()
+    depots_plotted = set()
 
-        if isinstance(place, Stop) and place.node_id not in stops_plotted:
-            ax.scatter(
-                pos[place.node_id][0],
-                pos[place.node_id][1],
-                c="tab:blue",
-                marker="o",
-                s=8,
-            )
-            stops_plotted.add(place.node_id)
+    for total_route in total_routes.values():
+        for place in total_route:
+            if isinstance(place, Depot) and place not in depots_plotted:
+                ax.scatter(
+                    pos[place.node_id][0],
+                    pos[place.node_id][1],
+                    c="tab:blue",
+                    marker="X",
+                    label=place.name if place not in depots_plotted else "",
+                    zorder=4,
+                    s=16,
+                )
+                depots_plotted.add(place)
 
-    ax.title.set_text("BiRD School Bus Routes")
+            if isinstance(place, School) and place not in schools_plotted:
+                ax.scatter(
+                    pos[place.node_id][0],
+                    pos[place.node_id][1],
+                    c="tab:red",
+                    marker="s",
+                    label=place.name if place not in schools_plotted else "",
+                    zorder=3,
+                    s=16,
+                )
+                schools_plotted.add(place)
+
     ax.legend(loc="upper right", fontsize="small")
 
     if save_fig:
@@ -256,38 +293,48 @@ def plot_bird_routes_normalized(
 def main() -> None:
     # load existing routes
     framingham_problem_data = setup_framingham(precompute_cache=True)
-    assigned_students = get_assigned_students(
-        framingham_problem_data.schools, framingham_problem_data.stops
-    )
-
-    filtered_problem_data = FilteredProblemData(
-        "framingham_filtered",
-        base_problem_data=framingham_problem_data,
-        _students=assigned_students,
-    )
 
     filtered_bird_results = get_bird_routes_json(
         "existing_student_routes",
     )
 
-    plot_bird_routes(
+    # plot_bird_routes(
+    #     "existing_student_routes",
+    #     filtered_bird_results,
+    #     problem_data=framingham_problem_data,
+    #     save_fig=True,
+    # )
+
+    plot_bird_routes_json(
         "existing_student_routes",
         filtered_bird_results,
-        problem_data=filtered_problem_data,
+        problem_data=framingham_problem_data,
         save_fig=True,
     )
 
-    full_bird_results = get_bird_routes(
-        "new_routes",
+    all_students_distance = get_bird_routes(
+        "all_students_over_distance",
         framingham_problem_data,
-        config=replace(BIRD_CONFIG, allow_partial=True),
-        save_results=True,
+        config=BIRD_CONFIG,
     )
 
     plot_bird_routes(
-        "new_routes",
-        full_bird_results,
-        problem_data=filtered_problem_data,
+        "all_students_over_distance",
+        all_students_distance,
+        problem_data=framingham_problem_data,
+        save_fig=True,
+    )
+
+    all_students = get_bird_routes(
+        "all_students",
+        framingham_problem_data,
+        config=BIRD_CONFIG,
+    )
+
+    plot_bird_routes(
+        "all_students",
+        all_students,
+        problem_data=framingham_problem_data,
         save_fig=True,
     )
 
