@@ -309,6 +309,20 @@ RELEVANT_STATS: list[tuple[str, Callable[[Student], bool]]] = [
 ]
 
 
+def students_over_1_5_miles_away(student: Student, problem_data: ProblemData) -> bool:
+    if student.stop is None or student.school is None:
+        return False
+
+    edge_data = problem_data.service_graph.get_edge_data(
+        student.stop.node_id, student.school.node_id, 0
+    )
+    if edge_data is None:
+        return False
+
+    distance = edge_data["length"]
+    return distance > (1.5 * KM_PER_MILE)
+
+
 def main() -> None:
     framingham_problem_data = setup_framingham(precompute_cache=True)
 
@@ -320,6 +334,14 @@ def main() -> None:
         "framingham_filtered_assigned",
         base_problem_data=framingham_problem_data,
         _students=assigned_students,
+    )
+
+    students_over_1_5_miles_away_filter = filter(
+        lambda s: students_over_1_5_miles_away(s, framingham_problem_data),
+        framingham_problem_data.students,
+    )
+    print(
+        f"Number of students over 1.5 miles away: {len(tuple(students_over_1_5_miles_away_filter))}"
     )
 
     current_routes = get_existing_routes(filtered_problem_data)

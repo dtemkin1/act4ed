@@ -1,12 +1,15 @@
 from dataclasses import dataclass
+import itertools
 import json
 from datetime import time
 from typing import TypedDict
 
+from matplotlib import colors
 import osmnx as ox
-import matplotlib as mpl
+import networkx as nx
 from matplotlib.figure import Figure
 from matplotlib.axes import Axes
+import pandas as pd
 
 from experiments.helpers import (
     OUTPUTS_FOLDER,
@@ -240,36 +243,54 @@ def plot_existing_routes(
         for node in graph.nodes()
     }
 
-    fig, ax = ox.plot_graph(graph, node_size=8, show=False)
+    # in correct order for osmnx...
+    edges = pd.Series(nx.edges(graph))
+    edges_weight = edges.map(lambda edge: 0.5)  # default weight of 0.5 for all edges
+    edges_colors = edges.map(
+        lambda edge: colors.to_hex("darkgray")
+    )  # default color for all edges
+
+    node_colors: dict[NodeId, str] = {node: "darkgray" for node in nx.nodes(graph)}
+
+    for route in routes:
+        all_nodes = route.path
+
+        # plot the route by increasing edge weight for each edge in the route, so that overlapping routes are visible
+        for u, v in itertools.pairwise(all_nodes):
+            if (edges == (u, v)).any():
+                index = (edges == (u, v)).idxmax()
+                edges_weight[
+                    index
+                ] += 0.5  # increase weight by 1.0 for each route that uses this edge
+                edges_colors[index] = colors.to_hex(
+                    "w"
+                )  # change color to orange for edges
+            if u in node_colors:
+                node_colors[u] = "w"
+            if v in node_colors:
+                node_colors[v] = "w"
+
+    fig, ax = ox.plot_graph(
+        graph,
+        node_size=0,
+        node_color=[colors.to_hex(color) for color in node_colors.values()],
+        edge_color=edges_colors.tolist(),
+        edge_linewidth=edges_weight.tolist(),
+        show=False,
+    )
 
     schools_plotted = set()
     depots_plotted = set()
-    stops_plotted = set()
 
-    colormap = mpl.colormaps["hsv"]
-
-    for i, route in enumerate(routes):
+    for route in routes:
         depot = route.depot
         school = route.school
-        stops = route.stops
-
-        all_nodes = route.path
-
-        ox.plot_graph_route(
-            graph,
-            list(all_nodes),
-            route_color=colormap(i / len(routes)),  # type: ignore
-            orig_dest_size=0,
-            ax=ax,
-            route_alpha=0.2,
-            show=False,
-        )
 
         if depot not in depots_plotted:
             ax.scatter(
                 pos[depot.node_id][0],
                 pos[depot.node_id][1],
-                c="black",
+                c="tab:blue",
                 marker="X",
                 label=depot.name if depot not in depots_plotted else "",
                 zorder=4,
@@ -281,7 +302,7 @@ def plot_existing_routes(
             ax.scatter(
                 pos[school.node_id][0],
                 pos[school.node_id][1],
-                c="red",
+                c="tab:red",
                 marker="s",
                 label=school.name if school not in schools_plotted else "",
                 zorder=3,
@@ -289,31 +310,9 @@ def plot_existing_routes(
             )
             schools_plotted.add(school)
 
-        for stop in stops:
-            if stop.node_id not in stops_plotted:
-                ax.scatter(
-                    pos[stop.node_id][0],
-                    pos[stop.node_id][1],
-                    c="tab:blue",
-                    marker="o",
-                    s=8,
-                )
-                stops_plotted.add(stop.node_id)
-
-    ax.title.set_text("Existing School Bus Routes")
     ax.legend(loc="upper right", fontsize="small")
 
     if save_fig:
-        # tex_path = OUTPUTS_FOLDER / "existing_routes.tex"
-        # # matplot2tikz.clean_figure(fig=fig)
-        # tex_code = matplot2tikz.get_tikz_code(
-        #     figure=fig,
-        #     filepath=OUTPUTS_FOLDER / "existing_routes.tikz",
-        # )
-
-        # with tex_path.open("w", encoding="utf-8") as f:
-        #     f.write(tex_code)
-
         fig.savefig(OUTPUTS_FOLDER / "existing_routes.png", bbox_inches="tight")
 
     return fig, ax
