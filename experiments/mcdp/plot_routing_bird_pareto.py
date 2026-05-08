@@ -7,6 +7,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+import matplotlib.axes as axes
 import matplotlib.pyplot as plt
 import yaml
 
@@ -34,7 +35,9 @@ def parse_poset_value(value: Any) -> str:
     return text
 
 
-def pareto_min(points: list[dict[str, Any]], x_key: str, y_key: str) -> list[dict[str, Any]]:
+def pareto_min(
+    points: list[dict[str, Any]], x_key: str, y_key: str
+) -> list[dict[str, Any]]:
     front: list[dict[str, Any]] = []
     best_y = math.inf
     for point in sorted(points, key=lambda p: (p[x_key], p[y_key])):
@@ -61,7 +64,10 @@ def route_records(library: Path, costs_path: Path) -> list[dict[str, Any]]:
         f = [parse_number(v) for v in impl["f_max"]]
         r = impl["r_min"]
 
-        used = {bus_type: int(parse_number(r[5 + i])) for i, bus_type in enumerate(BUS_TYPES)}
+        used = {
+            bus_type: int(parse_number(r[5 + i]))
+            for i, bus_type in enumerate(BUS_TYPES)
+        }
         distance = {
             bus_type: parse_number(r[9 + i]) for i, bus_type in enumerate(BUS_TYPES)
         }
@@ -70,7 +76,9 @@ def route_records(library: Path, costs_path: Path) -> list[dict[str, Any]]:
         }
 
         total_distance = sum(distance.values())
-        capital_cost = sum(float(capital[bus_type]) * used[bus_type] for bus_type in BUS_TYPES)
+        capital_cost = sum(
+            float(capital[bus_type]) * used[bus_type] for bus_type in BUS_TYPES
+        )
         driver_cost = sum(used.values()) * float(costs["driver_yearly_pay"])
         monitor_cost = parse_number(r[4]) * float(costs["monitor_yearly_pay"])
         fuel_cost = total_distance * school_days * float(costs["fuel_cost_per_km"])
@@ -79,7 +87,9 @@ def route_records(library: Path, costs_path: Path) -> list[dict[str, Any]]:
             + runtime[bus_type] * float(runtime_factor[bus_type])
             for bus_type in BUS_TYPES
         )
-        total_cost = capital_cost + driver_cost + monitor_cost + fuel_cost + maintenance_cost
+        total_cost = (
+            capital_cost + driver_cost + monitor_cost + fuel_cost + maintenance_cost
+        )
         emissions = total_distance * school_days * float(costs["emissions_kg_per_km"])
 
         records.append(
@@ -134,8 +144,7 @@ def routing_simple_feasible(records: list[dict[str, Any]]) -> list[dict[str, Any
     return [
         row
         for row in routing_simple_caps(records)
-        if row["total_cost"] <= 4_500_000
-        and row["emissions_kg"] <= 1_000_000
+        if row["total_cost"] <= 4_500_000 and row["emissions_kg"] <= 1_000_000
     ]
 
 
@@ -150,46 +159,67 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
 
 
 def plot_panel(
-    ax: plt.Axes,
+    ax: axes.Axes,
     rows: list[dict[str, Any]],
     x_key: str,
     y_key: str,
     x_label: str,
     y_label: str,
+    title: str = "",
 ) -> None:
-    methods = {"lbh": "#3b82f6", "scenario": "#ef4444"}
-    for method, color in methods.items():
+    methods = {"lbh": "LBH", "scenario": "Scenario"}
+    colors = {"lbh": "#3b82f6", "scenario": "#ef4444"}
+
+    for method, method_name in methods.items():
         subset = [row for row in rows if row["bird_method"] == method]
         if subset:
             ax.scatter(
                 [row[x_key] for row in subset],
                 [row[y_key] for row in subset],
-                s=42,
-                alpha=0.7,
-                color=color,
-                label=method,
+                s=60,
+                alpha=0.75,
+                color=colors[method],
+                edgecolors="white",
+                linewidth=0.5,
+                label=method_name,
+                zorder=2,
             )
 
     front = pareto_min(rows, x_key, y_key)
     if front:
+        front_sorted = sorted(front, key=lambda p: p[x_key])
         ax.plot(
-            [row[x_key] for row in front],
-            [row[y_key] for row in front],
+            [row[x_key] for row in front_sorted],
+            [row[y_key] for row in front_sorted],
             color="#111827",
             linewidth=2,
             marker="o",
-            markersize=4,
+            markersize=6,
+            markeredgecolor="white",
             label="Pareto front",
+            zorder=3,
         )
 
-    ax.set_xlabel(x_label)
-    ax.set_ylabel(y_label)
-    ax.grid(True, alpha=0.3)
+    ax.set_xlabel(x_label, fontsize=11, fontweight="medium")
+    ax.set_ylabel(y_label, fontsize=11, fontweight="medium")
+    if title:
+        ax.set_title(title, fontsize=12, fontweight="semibold")
+    ax.grid(True, alpha=0.4, linestyle="--")
+
+    # Optional nice formatting for axes
+    if "cost" in y_key or "USD" in y_label:
+        import matplotlib.ticker as ticker
+
+        ax.yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: f"${x:,.0f}"))
+    elif "emission" in y_key or "kg" in y_label:
+        import matplotlib.ticker as ticker
+
+        ax.yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: f"{x:,.0f}"))
 
 
-def make_plot(rows: list[dict[str, Any]], output: Path, title: str) -> None:
+def make_plot(rows: list[dict[str, Any]], output: Path, main_title: str) -> None:
     plt.style.use("seaborn-v0_8-whitegrid")
-    fig, axes = plt.subplots(1, 3, figsize=(16, 5))
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5))
 
     plot_panel(
         axes[0],
@@ -198,6 +228,7 @@ def make_plot(rows: list[dict[str, Any]], output: Path, title: str) -> None:
         "total_cost",
         "Students unserved",
         "Total annual cost (USD)",
+        title="Cost vs. Unserved Students",
     )
     plot_panel(
         axes[1],
@@ -206,6 +237,7 @@ def make_plot(rows: list[dict[str, Any]], output: Path, title: str) -> None:
         "emissions_kg",
         "Students unserved",
         "Annual emissions (kg)",
+        title="Emissions vs. Unserved Students",
     )
     plot_panel(
         axes[2],
@@ -214,13 +246,22 @@ def make_plot(rows: list[dict[str, Any]], output: Path, title: str) -> None:
         "total_cost",
         "Stops used",
         "Total annual cost (USD)",
+        title="Cost vs. Stops Used",
     )
 
     handles, labels = axes[0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc="upper center", ncols=3, frameon=False)
-    fig.suptitle(title, y=1.02)
+    fig.legend(
+        handles,
+        labels,
+        loc="upper center",
+        bbox_to_anchor=(0.5, 1.05),
+        ncols=3,
+        frameon=True,
+        fontsize=11,
+    )
+    fig.suptitle(main_title, y=1.12, fontsize=15, fontweight="bold")
     fig.tight_layout()
-    fig.savefig(output, dpi=180, bbox_inches="tight")
+    fig.savefig(output, dpi=200, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -238,15 +279,21 @@ def main() -> None:
 
     all_csv = args.output_dir / "routing_bird_mcdp_points.csv"
     capped_csv = args.output_dir / "routing_bird_mcdp_routing_simple_caps.csv"
-    feasible_csv = args.output_dir / "routing_bird_mcdp_routing_simple_budget_feasible.csv"
+    feasible_csv = (
+        args.output_dir / "routing_bird_mcdp_routing_simple_budget_feasible.csv"
+    )
     all_plot_png = args.output_dir / "routing_bird_mcdp_pareto_all.png"
-    capped_plot_png = args.output_dir / "routing_bird_mcdp_pareto_routing_simple_caps.png"
-    feasible_plot_png = args.output_dir / "routing_bird_mcdp_pareto_routing_simple_budget_feasible.png"
+    capped_plot_png = (
+        args.output_dir / "routing_bird_mcdp_pareto_routing_simple_caps.png"
+    )
+    feasible_plot_png = (
+        args.output_dir / "routing_bird_mcdp_pareto_routing_simple_budget_feasible.png"
+    )
 
     write_csv(all_csv, records)
     write_csv(capped_csv, capped)
     write_csv(feasible_csv, feasible)
-    make_plot(records, all_plot_png, "Routing BiRD MCDP Catalogue Pareto Fronts")
+    make_plot(records, all_plot_png, "Routing BiRD MCDP Catalog Pareto Fronts")
     if capped:
         make_plot(
             capped,
@@ -260,12 +307,14 @@ def main() -> None:
             "Routing BiRD MCDP Pareto Fronts: routing_simple Budget Feasible",
         )
 
-    print(f"Loaded {len(records)} route catalogue points")
+    print(f"Loaded {len(records)} route catalog points")
     print(f"Routing-simple BiRD-cap points: {len(capped)}")
     print(f"Routing-simple budget-feasible points: {len(feasible)}")
-    print(f"Minimum catalogue cost: {min(row['total_cost'] for row in records):.2f} USD")
+    print(f"Minimum catalog cost: {min(row['total_cost'] for row in records):.2f} USD")
     if capped:
-        print(f"Minimum routing-simple cap cost: {min(row['total_cost'] for row in capped):.2f} USD")
+        print(
+            f"Minimum routing-simple cap cost: {min(row['total_cost'] for row in capped):.2f} USD"
+        )
     print(f"Wrote {all_csv}")
     print(f"Wrote {capped_csv}")
     print(f"Wrote {feasible_csv}")
