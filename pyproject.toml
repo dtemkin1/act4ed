@@ -41,6 +41,7 @@ dependencies = [
     "dotenv>=0.9.9",
     "tqdm>=4.67.3",
     "matplot2tikz>=0.5.4",
+    "seaborn>=0.13.2",
 ]
 
 [tool.uv]
