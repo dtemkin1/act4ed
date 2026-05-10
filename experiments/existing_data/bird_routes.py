@@ -35,7 +35,7 @@ def get_bird_routes_json(
     bird_name: str,
 ) -> RoutingSolutionJson:
 
-    out_dir = OUTPUTS_FOLDER / f"bird_{bird_name}"
+    out_dir = OUTPUTS_FOLDER / f"bird_run_{bird_name}"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     solution = RoutingSolutionJson.load(out_dir / "bird_solution.json")
@@ -44,12 +44,12 @@ def get_bird_routes_json(
 
 def get_bird_routes(
     bird_name: str,
-    bird_problem: ProblemData,
-    config: BirdAdapterConfig,
+    bird_problem: ProblemData | None = None,
+    config: BirdAdapterConfig | None = None,
     save_results: bool = False,
 ) -> NormalizedRoutingResult:
 
-    out_dir = OUTPUTS_FOLDER / f"bird_{bird_name}"
+    out_dir = OUTPUTS_FOLDER / f"bird_run_{bird_name}"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     try:
@@ -67,6 +67,9 @@ def get_bird_routes(
         return normalized
     except Exception:
         pass
+
+    assert bird_problem is not None, "Must provide bird_problem if not already solved"
+    assert config is not None, "Must provide config if not already solved"
 
     instance_path = export_bird_instance(
         bird_problem,
@@ -104,17 +107,15 @@ def main() -> None:
         framingham_problem_data.schools, framingham_problem_data.stops
     )
 
-    filtered_problem_data = FilteredProblemData(
-        "framingham_filtered",
-        base_problem_data=framingham_problem_data,
-        _students=assigned_students,
-    )
+    # filtered_problem_data = FilteredProblemData(
+    #     "framingham_filtered",
+    #     base_problem_data=framingham_problem_data,
+    #     _students=assigned_students,
+    # )
 
-    config = BIRD_CONFIG
+    # config = BIRD_CONFIG
 
-    normalized_result = get_bird_routes(
-        "existing_student_routes", filtered_problem_data, config, save_results=True
-    )
+    normalized_result = get_bird_routes_json("assigned_student_routes")
     print(normalized_result)
 
 

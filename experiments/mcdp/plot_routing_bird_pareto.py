@@ -219,25 +219,38 @@ def plot_panel(
 
 def make_plot(rows: list[dict[str, Any]], output: Path, main_title: str) -> None:
     plt.style.use("seaborn-v0_8-whitegrid")
-    fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+
+    # Configure for LaTeX paper formatting
+    plt.rcParams["font.family"] = "serif"
+    plt.rcParams["font.size"] = 12
+    plt.rcParams["axes.titlesize"] = 14
+    plt.rcParams["axes.labelsize"] = 12
+    plt.rcParams["xtick.labelsize"] = 10
+    plt.rcParams["ytick.labelsize"] = 10
+    plt.rcParams["legend.fontsize"] = 11
+    plt.rcParams["pdf.fonttype"] = 42
+    plt.rcParams["ps.fonttype"] = 42
+
+    # Smaller width so it scales better in the paper
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4.5))
 
     plot_panel(
         axes[0],
         rows,
         "students_unserved",
         "total_cost",
-        "Students unserved",
+        "Students unassigned",
         "Total annual cost (USD)",
-        title="Cost vs. Unserved Students",
+        title="Cost vs. Unassigned Students",
     )
     plot_panel(
         axes[1],
         rows,
         "students_unserved",
         "emissions_kg",
-        "Students unserved",
+        "Students unassigned",
         "Annual emissions (kg)",
-        title="Emissions vs. Unserved Students",
+        title="Emissions vs. Unassigned Students",
     )
     plot_panel(
         axes[2],
@@ -282,28 +295,28 @@ def main() -> None:
     feasible_csv = (
         args.output_dir / "routing_bird_mcdp_routing_simple_budget_feasible.csv"
     )
-    all_plot_png = args.output_dir / "routing_bird_mcdp_pareto_all.png"
-    capped_plot_png = (
-        args.output_dir / "routing_bird_mcdp_pareto_routing_simple_caps.png"
+    all_plot_pdf = args.output_dir / "routing_bird_mcdp_pareto_all.pdf"
+    capped_plot_pdf = (
+        args.output_dir / "routing_bird_mcdp_pareto_routing_simple_caps.pdf"
     )
-    feasible_plot_png = (
-        args.output_dir / "routing_bird_mcdp_pareto_routing_simple_budget_feasible.png"
+    feasible_plot_pdf = (
+        args.output_dir / "routing_bird_mcdp_pareto_routing_simple_budget_feasible.pdf"
     )
 
     write_csv(all_csv, records)
     write_csv(capped_csv, capped)
     write_csv(feasible_csv, feasible)
-    make_plot(records, all_plot_png, "Routing BiRD MCDP Catalog Pareto Fronts")
+    make_plot(records, all_plot_pdf, "Routing BiRD MCDP Catalog Pareto Fronts")
     if capped:
         make_plot(
             capped,
-            capped_plot_png,
+            capped_plot_pdf,
             "Routing BiRD MCDP Pareto Fronts: routing_simple BiRD Caps",
         )
     if feasible:
         make_plot(
             feasible,
-            feasible_plot_png,
+            feasible_plot_pdf,
             "Routing BiRD MCDP Pareto Fronts: routing_simple Budget Feasible",
         )
 
@@ -318,11 +331,11 @@ def main() -> None:
     print(f"Wrote {all_csv}")
     print(f"Wrote {capped_csv}")
     print(f"Wrote {feasible_csv}")
-    print(f"Wrote {all_plot_png}")
+    print(f"Wrote {all_plot_pdf}")
     if capped:
-        print(f"Wrote {capped_plot_png}")
+        print(f"Wrote {capped_plot_pdf}")
     if feasible:
-        print(f"Wrote {feasible_plot_png}")
+        print(f"Wrote {feasible_plot_pdf}")
 
 
 if __name__ == "__main__":

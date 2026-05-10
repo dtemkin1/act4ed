@@ -295,27 +295,18 @@ def main() -> None:
     framingham_problem_data = setup_framingham(precompute_cache=True)
 
     filtered_bird_results = get_bird_routes_json(
-        "existing_student_routes",
+        "assigned_students_routes",
     )
 
-    # plot_bird_routes(
-    #     "existing_student_routes",
-    #     filtered_bird_results,
-    #     problem_data=framingham_problem_data,
-    #     save_fig=True,
-    # )
-
-    plot_bird_routes_json(
-        "existing_student_routes",
+    plot_bird_routes(
+        "assigned_students_routes",
         filtered_bird_results,
         problem_data=framingham_problem_data,
         save_fig=True,
     )
 
-    all_students_distance = get_bird_routes(
-        "all_students_over_distance",
-        framingham_problem_data,
-        config=BIRD_CONFIG,
+    all_students_distance = get_bird_routes_json(
+        "1_5_mile_students_routes",
     )
 
     plot_bird_routes(
@@ -325,10 +316,8 @@ def main() -> None:
         save_fig=True,
     )
 
-    all_students = get_bird_routes(
-        "all_students",
-        framingham_problem_data,
-        config=BIRD_CONFIG,
+    all_students = get_bird_routes_json(
+        "all_students_routes",
     )
 
     plot_bird_routes(
