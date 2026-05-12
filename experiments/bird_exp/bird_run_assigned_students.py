@@ -16,7 +16,7 @@ from formulation.common import FilteredProblemData
 
 from .config import config
 
-RUN_NAME = "run_assigned_students"
+RUN_NAME = "run_assigned_students" + f"_{'PARTIAL' if config.allow_partial else 'COMPLETE'}"
 
 problem_data = setup(
     problem_name="framingham_full_students",

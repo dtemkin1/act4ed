@@ -14,7 +14,7 @@ from formulation.bird_adapter import (BirdBackendSolution, BirdExportInstance,
 
 from .config import config
 
-RUN_NAME = "run_all_students"
+RUN_NAME = "run_all_students" + f"_{'PARTIAL' if config.allow_partial else 'COMPLETE'}"
 
 problem_data = setup(
     problem_name="framingham_full_students",

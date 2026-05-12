@@ -15,7 +15,7 @@ from formulation.common import KM_PER_MILE, FilteredProblemData
 
 from .config import config
 
-RUN_NAME = "run_1_5_mile_students"
+RUN_NAME = "run_1_5_mile_students" + f"_{'PARTIAL' if config.allow_partial else 'COMPLETE'}"
 
 problem_data = setup(
     problem_name="framingham_full_students",

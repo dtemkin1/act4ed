@@ -36,7 +36,7 @@ config = BirdAdapterConfig(
     stop_time_per_wheelchair_student=1.0,   # additional dwell per wheelchair student in minutes (default: 0)
 
     # ── Routing parameters ───────────────────────────────────────────────────
-    bus_mph=20,                     # assumed bus travel speed (default: _DEFAULT_BUS_MPH)
+    bus_mph=30,                     # assumed bus travel speed (default: _DEFAULT_BUS_MPH)
     # lambda_value=1.0e4,           # trade-off weight between distance and ride time (default: _DEFAULT_BIRD_LAMBDA_VALUE)
 
     # ── Partial assignment ───────────────────────────────────────────────────
