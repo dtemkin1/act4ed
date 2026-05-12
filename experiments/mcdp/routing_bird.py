@@ -63,6 +63,7 @@ ROUTING_R = [
     "`bird_partial",  # whether partial assignment is allowed
     "`bird_dwell",  # school dwell time setting
     "`bird_arrival_window",  # earliest/latest arrival buffer setting
+    "`bird_avg_speed",  # average bus speed setting
 ]
 
 GRID_FLEET = {
@@ -71,9 +72,14 @@ GRID_FLEET = {
     "BWC": (11,),
     "WC": (2,),
 }
-GRID_METHODS = ("scenario")
-GRID_LAMBDAS = ((1.0e2, "lambda_1e3"), (1.0e4, "lambda_1e4"), (1.0e5, "lambda_1e5"))
-GRID_PARTIAL = ((False, "partial_false"), (True, "partial_true"))
+GRID_METHODS = ("scenario",)
+GRID_LAMBDAS = (
+    (1.0e2, "lambda_1e3"),
+    (1.0e4, "lambda_1e4"),
+    (1.0e5, "lambda_1e5"),
+    (1.0e6, "lambda_1e6"),
+)
+GRID_PARTIAL = ((True, "partial_true"),)
 GRID_SPILLOVER = ((False, "spillover_false"), (True, "spillover_true"))
 GRID_DWELL = ((10.0, "dwell_0"), (15.0, "dwell_10"))
 GRID_ARRIVAL_WINDOWS = (
@@ -81,6 +87,7 @@ GRID_ARRIVAL_WINDOWS = (
     (30.0, 10.0, "arrival_early30_late10"),  # Minutes before school bell time
     (40.0, 10.0, "arrival_early40_late10"),  # Minutes before school bell time
 )
+GRID_AVG_SPEEDS = (10, 20, 30)
 
 DEFAULT_COSTS: dict[str, Any] = {
     "school_days": 180,
@@ -120,6 +127,8 @@ class GridPoint:
     method: Literal["lbh", "scenario"]
     lambda_value: float
     lambda_label: str
+    average_speed_mph: float
+    average_speed_label: str
     conventional_spillover: bool
     spillover_label: str
     allow_partial: bool
@@ -137,7 +146,8 @@ class GridPoint:
         )
         return (
             f"bird_{count_label}_{self.method}_{self.lambda_label}_"
-            f"{self.partial_label}_{self.spillover_label}_{self.dwell_label}_{self.arrival_label}"
+            f"{self.average_speed_label}_{self.partial_label}_{self.spillover_label}_"
+            f"{self.dwell_label}_{self.arrival_label}"
         )
 
     @property
@@ -148,6 +158,7 @@ class GridPoint:
             "bird_partial": self.partial_label,
             "bird_dwell": self.dwell_label,
             "bird_arrival_window": self.arrival_label,
+            "bird_avg_speed": self.average_speed_label,
         }
 
 
@@ -233,6 +244,17 @@ def _with_unit(value: float | int, unit: str) -> str:
     return f"{_format_number(value)} {unit}"
 
 
+def _speed_label(speed_mph: float | int) -> str:
+    return f"speed_{_format_number(speed_mph).replace('.', 'p')}mph"
+
+
+def _grid_speed_pair(value: float | int | tuple[float | int, str]) -> tuple[float, str]:
+    if isinstance(value, tuple):
+        speed_mph, label = value
+        return float(speed_mph), label
+    return float(value), _speed_label(value)
+
+
 def _fuel_cost_per_km(costs: Mapping[str, Any]) -> float:
     configured = costs.get("fuel_cost_per_km")
     if configured is not None:
@@ -295,6 +317,7 @@ def routing_service_entry(
             _poset_value("bird_partial", config_labels["bird_partial"]),
             _poset_value("bird_dwell", config_labels["bird_dwell"]),
             _poset_value("bird_arrival_window", config_labels["bird_arrival_window"]),
+            _poset_value("bird_avg_speed", config_labels["bird_avg_speed"]),
         ],
     }
 
@@ -340,6 +363,9 @@ def config_posets() -> dict[str, tuple[str, ...]]:
         "bird_dwell": tuple(label for _value, label in GRID_DWELL),
         "bird_arrival_window": tuple(
             label for _earliest, _latest, label in GRID_ARRIVAL_WINDOWS
+        ),
+        "bird_avg_speed": tuple(
+            label for _speed_mph, label in map(_grid_speed_pair, GRID_AVG_SPEEDS)
         ),
     }
 
@@ -503,6 +529,7 @@ def iter_grid() -> Iterable[GridPoint]:
             spillover_pair,
             dwell_pair,
             window,
+            speed_pair,
         ) in product(
             GRID_METHODS,
             GRID_LAMBDAS,
@@ -510,17 +537,21 @@ def iter_grid() -> Iterable[GridPoint]:
             GRID_SPILLOVER,
             GRID_DWELL,
             GRID_ARRIVAL_WINDOWS,
+            tuple(map(_grid_speed_pair, GRID_AVG_SPEEDS)),
         ):
             lambda_value, lambda_label = lambda_pair
             allow_partial, partial_label = partial_pair
             conventional_spillover, spillover_label = spillover_pair
             dwell_value, dwell_label = dwell_pair
             earliest, latest, arrival_label = window
+            average_speed_mph, average_speed_label = speed_pair
             yield GridPoint(
                 counts=counts,
                 method=method,
                 lambda_value=lambda_value,
                 lambda_label=lambda_label,
+                average_speed_mph=average_speed_mph,
+                average_speed_label=average_speed_label,
                 allow_partial=allow_partial,
                 partial_label=partial_label,
                 conventional_spillover=conventional_spillover,
@@ -531,6 +562,21 @@ def iter_grid() -> Iterable[GridPoint]:
                 latest_arrival_buffer=latest,
                 arrival_label=arrival_label,
             )
+
+
+def bird_config_for_grid_point(grid_point: GridPoint) -> BirdAdapterConfig:
+    return BirdAdapterConfig(
+        cohort="all",
+        fleet_aware=True,
+        conventional_spillover=grid_point.conventional_spillover,
+        allow_partial=grid_point.allow_partial,
+        lambda_value=grid_point.lambda_value,
+        school_dwell_time=grid_point.school_dwell_time,
+        earliest_arrival_buffer=grid_point.earliest_arrival_buffer,
+        latest_arrival_buffer=grid_point.latest_arrival_buffer,
+        bus_mph=grid_point.average_speed_mph,
+        method=grid_point.method,
+    )
 
 
 def _load_assigned_framingham_problem(
@@ -583,17 +629,7 @@ def solve_grid_point(
     if not selected_buses:
         raise ValueError("BiRD fleet-aware export requires at least one selected bus")
 
-    config = BirdAdapterConfig(
-        cohort="all",
-        fleet_aware=True,
-        conventional_spillover=grid_point.conventional_spillover,
-        allow_partial=grid_point.allow_partial,
-        lambda_value=grid_point.lambda_value,
-        school_dwell_time=grid_point.school_dwell_time,
-        earliest_arrival_buffer=grid_point.earliest_arrival_buffer,
-        latest_arrival_buffer=grid_point.latest_arrival_buffer,
-        method=grid_point.method,
-    )
+    config = bird_config_for_grid_point(grid_point)
 
     instance_path = output_dir / f"{grid_point.label}_instance.npz"
     if template is None:
@@ -837,6 +873,7 @@ def main() -> None:
             "school_dwell_time": grid_point.school_dwell_time,
             "earliest_arrival_buffer": grid_point.earliest_arrival_buffer,
             "latest_arrival_buffer": grid_point.latest_arrival_buffer,
+            "average_speed_mph": grid_point.average_speed_mph,
             "status": result.status,
             "summary": result.summary,
         }

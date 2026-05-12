@@ -1,0 +1,3 @@
+poset {
+    speed_10mph speed_20mph speed_30mph
+}

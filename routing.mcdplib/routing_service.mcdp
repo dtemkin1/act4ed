@@ -36,6 +36,7 @@ dp {
   requires bird_partial [`bird_partial]
   requires bird_dwell [`bird_dwell]
   requires bird_arrival_window [`bird_arrival_window]
+  requires bird_avg_speed [`bird_avg_speed]
 
   implemented-by yaml resource("routing_service.dpc.yaml")
 }

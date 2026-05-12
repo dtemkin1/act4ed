@@ -15,8 +15,9 @@ query:
     wheelchair_students_unserved: "100000"
     stops_used: "100000"
     bird_method: "`bird_method: scenario"
-    bird_lambda: "`bird_lambda: lambda_1e4"
+    bird_lambda: "`bird_lambda: lambda_1e3"
     bird_partial: "`bird_partial: partial_true"
     bird_dwell: "`bird_dwell: dwell_10"
     bird_arrival_window: "`bird_arrival_window: arrival_default"
+    bird_avg_speed: "`bird_avg_speed: speed_30mph"
   optimize_for: [total_cost]

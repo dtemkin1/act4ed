@@ -74,6 +74,7 @@ def route_records(library: Path, costs_path: Path) -> list[dict[str, Any]]:
         runtime = {
             bus_type: parse_number(r[13 + i]) for i, bus_type in enumerate(BUS_TYPES)
         }
+        config_offset = 5 + 3 * len(BUS_TYPES)
 
         total_distance = sum(distance.values())
         capital_cost = sum(
@@ -116,11 +117,12 @@ def route_records(library: Path, costs_path: Path) -> list[dict[str, Any]]:
                 "maintenance_cost": maintenance_cost,
                 "total_cost": total_cost,
                 "emissions_kg": emissions,
-                "bird_method": parse_poset_value(r[17]),
-                "bird_lambda": parse_poset_value(r[18]),
-                "bird_partial": parse_poset_value(r[19]),
-                "bird_dwell": parse_poset_value(r[20]),
-                "bird_arrival_window": parse_poset_value(r[21]),
+                "bird_method": parse_poset_value(r[config_offset]),
+                "bird_lambda": parse_poset_value(r[config_offset + 1]),
+                "bird_partial": parse_poset_value(r[config_offset + 2]),
+                "bird_dwell": parse_poset_value(r[config_offset + 3]),
+                "bird_arrival_window": parse_poset_value(r[config_offset + 4]),
+                "bird_avg_speed": parse_poset_value(r[config_offset + 5]),
             }
         )
     return records
@@ -128,6 +130,7 @@ def route_records(library: Path, costs_path: Path) -> list[dict[str, Any]]:
 
 def routing_simple_caps(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
     lambda_allowed = {"lambda_1e3", "lambda_1e4"}
+    speed_allowed = {"speed_10mph", "speed_20mph", "speed_30mph"}
     return [
         row
         for row in records
@@ -137,6 +140,7 @@ def routing_simple_caps(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
         and row["bird_partial"] in {"partial_false", "partial_true"}
         and row["bird_dwell"] in {"dwell_0", "dwell_10"}
         and row["bird_arrival_window"] == "arrival_default"
+        and row["bird_avg_speed"] in speed_allowed
     ]
 
 

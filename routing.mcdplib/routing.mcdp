@@ -16,6 +16,7 @@ mcdp {
     requires bird_partial [`bird_partial]
     requires bird_dwell [`bird_dwell]
     requires bird_arrival_window [`bird_arrival_window]
+    requires bird_avg_speed [`bird_avg_speed]
 
     sub rs = instance `routing_service
     sub bc = instance `fleet_bus_count
@@ -39,6 +40,7 @@ mcdp {
     required bird_partial >= bird_partial required by rs
     required bird_dwell >= bird_dwell required by rs
     required bird_arrival_window >= bird_arrival_window required by rs
+    required bird_avg_speed >= bird_avg_speed required by rs
 
     required total_cost >= (
         fuel_cost required by fu +
