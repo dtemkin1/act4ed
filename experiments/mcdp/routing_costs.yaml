@@ -2,15 +2,19 @@ school_days: 180
 capital_annualization_factor: 1.0
 
 capital:
-  C: 50000
-  B: 70000
-  BWC: 80000
-  WC: 90000
+  C: 128780
+  B: 110060
+  BWC: 126660
+  WC: 136780
 
-driver_yearly_pay: 50000
-monitor_yearly_pay: 20000
+driver_yearly_pay: 46571
+monitor_yearly_pay: 26609
 
-fuel_cost_per_km: 0.60
+diesel_cost_per_gallon: 3.09
+diesel_co2_kg_per_gallon: 10.21
+# If omitted, routing_bird.py derives fuel_cost_per_km from
+# diesel_cost_per_gallon * emissions_kg_per_km / diesel_co2_kg_per_gallon.
+fuel_cost_per_km:
 emissions_kg_per_km: 1.20
 
 maintenance_distance_factor:

@@ -6,7 +6,7 @@ mcdp {
 
   requires driver_cost [USD]
 
-  constant yearly_pay_per_bus = 50000 USD
+  constant yearly_pay_per_bus = 46571 USD
 
   required driver_cost >= (
     provided used_C +

@@ -17,17 +17,17 @@ FLEET_INPUT = CURRENT_FILE_DIR / ".." / "data" / "buses.csv"
 FLEET_OUTPUT = CURRENT_FILE_DIR / ".." / "outputs" / "fleet_bus_count.dpc.yaml"
 
 BUS_COSTS = {
-    BusType.C: 50000,
-    BusType.B: 70000,
-    BusType.BWC: 80000,
-    BusType.WC: 90000,
+    BusType.C: 128780,
+    BusType.B: 110060,
+    BusType.BWC: 126660,
+    BusType.WC: 136780,
 }
 
 BUS_CAPACITIES = {
-    BusType.C: 71,
+    BusType.C: 77,
     BusType.B: 48,
     BusType.BWC: 31,
-    BusType.WC: 4,
+    BusType.WC: 40,
 }
 
 # TODO: change formulation to use wheelchair capacity

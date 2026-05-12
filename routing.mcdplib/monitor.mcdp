@@ -4,7 +4,7 @@ mcdp {
 
   requires monitor_cost [USD]
 
-  constant yearly_pay_per_monitor_bus = 20000 USD
+  constant yearly_pay_per_monitor_bus = 26609 USD
 
   required monitor_cost >= provided monitor_buses * yearly_pay_per_monitor_bus
 }

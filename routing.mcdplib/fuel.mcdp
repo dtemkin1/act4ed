@@ -8,7 +8,7 @@ mcdp {
     requires emissions [kg]
 
     constant school_days = 180
-    constant fuel_cost_per_km = 0.6 USD / km
+    constant fuel_cost_per_km = 0.363173359452 USD / km
     constant emissions_per_km = 1.2 kg / km
 
     required fuel_cost >= (

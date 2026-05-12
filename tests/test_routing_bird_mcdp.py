@@ -22,7 +22,7 @@ class RoutingBirdMcdpTests(unittest.TestCase):
     def test_bus_inventory_counts_match_current_csv(self) -> None:
         self.assertEqual(
             read_bus_inventory_counts(),
-            {"C": 45, "B": 17, "BWC": 9, "WC": 1},
+            {"C": 52, "B": 21, "BWC": 11, "WC": 2},
         )
 
     def test_routing_service_entry_uses_expected_yaml_shape(self) -> None:
@@ -75,7 +75,7 @@ class RoutingBirdMcdpTests(unittest.TestCase):
     def test_config_values_are_finite_unordered_posets(self) -> None:
         posets = config_posets()
 
-        self.assertEqual(posets["bird_method"], ("scenario", "lbh"))
+        self.assertEqual(posets["bird_method"], ("lbh", "scenario"))
         self.assertEqual(posets["bird_lambda"], ("lambda_1e3", "lambda_1e4", "lambda_1e5"))
         self.assertEqual(posets["bird_partial"], ("partial_false", "partial_true"))
 

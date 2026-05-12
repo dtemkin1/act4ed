@@ -70,12 +70,12 @@ ROUTING_R = [
 ]
 
 GRID_FLEET = {
-    "C": (45,),
-    "B": (17,),
-    "BWC": (9,),
-    "WC": (1,),
+    "C": (52,),
+    "B": (21,),
+    "BWC": (11,),
+    "WC": (2,),
 }
-GRID_METHODS = ("lbh", "scenario")
+GRID_METHODS = ("scenario")
 GRID_LAMBDAS = ((1.0e2, "lambda_1e3"), (1.0e4, "lambda_1e4"), (1.0e5, "lambda_1e5"))
 GRID_PARTIAL = ((False, "partial_false"), (True, "partial_true"))
 GRID_SPILLOVER = ((False, "spillover_false"), (True, "spillover_true"))
@@ -89,10 +89,12 @@ GRID_ARRIVAL_WINDOWS = (
 DEFAULT_COSTS: dict[str, Any] = {
     "school_days": 180,
     "capital_annualization_factor": 1.0,
-    "capital": {"C": 50000, "B": 70000, "BWC": 80000, "WC": 90000},
-    "driver_yearly_pay": 50000,
-    "monitor_yearly_pay": 20000,
-    "fuel_cost_per_km": 0.60,
+    "capital": {"C": 128780, "B": 110060, "BWC": 126660, "WC": 136780},
+    "driver_yearly_pay": 46571,
+    "monitor_yearly_pay": 26609,
+    "diesel_cost_per_gallon": 3.09,
+    "diesel_co2_kg_per_gallon": 10.21,
+    "fuel_cost_per_km": None,
     "emissions_kg_per_km": 1.20,
     "maintenance_distance_factor": {"C": 0.15, "B": 0.15, "BWC": 0.15, "WC": 0.15},
     "maintenance_runtime_factor": {"C": 0.0, "B": 0.0, "BWC": 0.0, "WC": 0.0},
@@ -235,6 +237,17 @@ def _with_unit(value: float | int, unit: str) -> str:
     return f"{_format_number(value)} {unit}"
 
 
+def _fuel_cost_per_km(costs: Mapping[str, Any]) -> float:
+    configured = costs.get("fuel_cost_per_km")
+    if configured is not None:
+        return float(configured)
+    return (
+        float(costs["diesel_cost_per_gallon"])
+        * float(costs["emissions_kg_per_km"])
+        / float(costs["diesel_co2_kg_per_gallon"])
+    )
+
+
 def _poset_value(poset_name: str, value: str) -> str:
     return f"`{poset_name}: {value}"
 
@@ -348,7 +361,7 @@ def write_cost_modules(routing_lib: Path, costs: Mapping[str, Any]) -> None:
     school_days = _format_number(costs["school_days"])
     driver_pay = _format_number(costs["driver_yearly_pay"])
     monitor_pay = _format_number(costs["monitor_yearly_pay"])
-    fuel_cost_per_km = _format_number(costs["fuel_cost_per_km"])
+    fuel_cost_per_km = _format_number(_fuel_cost_per_km(costs))
     emissions_kg_per_km = _format_number(costs["emissions_kg_per_km"])
     distance_factor = costs["maintenance_distance_factor"]
     runtime_factor = costs["maintenance_runtime_factor"]
