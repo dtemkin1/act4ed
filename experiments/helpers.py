@@ -2,12 +2,13 @@ import os
 from pathlib import Path
 from typing import Literal, overload
 
-from networkx import MultiDiGraph
 import pandas as pd
+from networkx import MultiDiGraph
 from shapely import Point
 
 from formulation.common.classes import NodeId, Student
-from formulation.common.problems import ProblemDataReal, ProblemDataRealSurrogate
+from formulation.common.problems import (ProblemDataReal,
+                                         ProblemDataRealSurrogate)
 
 CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 

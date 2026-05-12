@@ -1,15 +1,15 @@
-from dataclasses import dataclass
-from enum import IntEnum, auto
-from functools import cache, cached_property
 import json
 import os
 import random
+import re
+from dataclasses import dataclass
+from enum import IntEnum, auto
+from functools import cache, cached_property
 from typing import NamedTuple, TypedDict, cast
 
-from dotenv import load_dotenv
-import re
 import censusgeocode as cg
 from census import Census
+from dotenv import load_dotenv
 
 from formulation.common.constants import CACHE_DIR
 

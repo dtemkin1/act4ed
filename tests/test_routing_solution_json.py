@@ -9,30 +9,16 @@ import networkx as nx
 import numpy as np
 from shapely import Point
 
-from formulation.bird_adapter import (
-    BirdAdapterConfig,
-    BirdBackendSolution,
-    build_bird_export_instance,
-    routing_solution_json_from_bird_solution,
-)
-from formulation.common import (
-    Bus,
-    BusType,
-    Attributes,
-    Depot,
-    MPH_TO_KM_PER_MIN,
-    ProblemData,
-    School,
-    SchoolType,
-    Stop,
-    Student,
-)
+from formulation.bird_adapter import (BirdAdapterConfig, BirdBackendSolution,
+                                      build_bird_export_instance,
+                                      routing_solution_json_from_bird_solution)
+from formulation.common import (MPH_TO_KM_PER_MIN, Attributes, Bus, BusType,
+                                Depot, ProblemData, School, SchoolType, Stop,
+                                Student)
 from formulation.formulation_3.definition import Formulation3
 from formulation.formulation_3.solution import Formulation3Solution
 from formulation.normalized_result import (
-    RoutingSolutionJson,
-    routing_solution_json_from_formulation3_solution,
-)
+    RoutingSolutionJson, routing_solution_json_from_formulation3_solution)
 
 
 @dataclass(frozen=True)

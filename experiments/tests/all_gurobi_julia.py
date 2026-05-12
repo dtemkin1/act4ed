@@ -1,39 +1,29 @@
 import argparse
-from collections import Counter
-from dataclasses import dataclass
 import os
-from pathlib import Path
 import re
 import subprocess
+from collections import Counter
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
-from formulation.bird_adapter import (
-    BirdAdapterConfig,
-    BirdBackendSolution,
-    BirdCohort,
-    BirdExportInstance,
-    OptimizationMethod,
-    export_bird_instance,
-    normalized_result_from_bird_solution,
-    routing_solution_json_from_bird_solution,
-)
+from experiments.helpers import ProblemDataReal, setup
+from formulation.bird_adapter import (BirdAdapterConfig, BirdBackendSolution,
+                                      BirdCohort, BirdExportInstance,
+                                      OptimizationMethod, export_bird_instance,
+                                      normalized_result_from_bird_solution,
+                                      routing_solution_json_from_bird_solution)
 from formulation.common.classes import SchoolType
 from formulation.common.problems import FilteredProblemData
-
-from formulation.formulation_3.julia_export import export_formulation3_instance
 from formulation.formulation_3.definition import Formulation3
-from formulation.formulation_3.gurobipy import (
-    Formulation3Solution,
-    build_model_from_definition,
-    solve_problem,
-)
+from formulation.formulation_3.gurobipy import (Formulation3Solution,
+                                                build_model_from_definition,
+                                                solve_problem)
+from formulation.formulation_3.julia_export import export_formulation3_instance
 from formulation.normalized_result import (
-    NormalizedRoutingResult,
+    NormalizedRoutingResult, RoutingSolutionJson,
     normalized_result_from_formulation3_solution,
-    RoutingSolutionJson,
-    routing_solution_json_from_formulation3_solution,
-)
-from experiments.helpers import setup, ProblemDataReal
+    routing_solution_json_from_formulation3_solution)
 
 CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 PROJECT_ROOT = CURRENT_FILE_DIR.parent

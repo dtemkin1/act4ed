@@ -1,23 +1,22 @@
-from dataclasses import dataclass
 import itertools
 import json
+from dataclasses import dataclass
 from datetime import time
 from typing import TypedDict
 
-from matplotlib import colors
-import osmnx as ox
 import networkx as nx
-from matplotlib.figure import Figure
-from matplotlib.axes import Axes
+import osmnx as ox
 import pandas as pd
+from matplotlib import colors
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 
-from experiments.helpers import (
-    OUTPUTS_FOLDER,
-    setup_framingham,
-)
-from experiments.existing_data.utils import RawBusRoutes, get_raw_assigned_buses
+from experiments.existing_data.utils import (RawBusRoutes,
+                                             get_raw_assigned_buses)
+from experiments.helpers import OUTPUTS_FOLDER, setup_framingham
+from formulation.common.classes import (Bus, Depot, NodeId, Place, School,
+                                        Stop, Student)
 from formulation.common.problems import ProblemData
-from formulation.common.classes import Bus, Depot, NodeId, Place, School, Stop, Student
 
 OUTPUT_ROUTES = OUTPUTS_FOLDER / "existing_routes.json"
 

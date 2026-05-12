@@ -9,24 +9,13 @@ import networkx as nx
 import numpy as np
 from shapely import Point
 
-from formulation.common import (
-    Bus,
-    BusType,
-    Attributes,
-    Depot,
-    ProblemData,
-    School,
-    SchoolType,
-    Stop,
-    Student,
-)
+from formulation.common import (Attributes, Bus, BusType, Depot, ProblemData,
+                                School, SchoolType, Stop, Student)
 from formulation.common.constants import MPH_TO_KM_PER_MIN
+from formulation.formulation_3.definition import Formulation3
 from formulation.formulation_3.gurobipy import build_model_from_definition
 from formulation.formulation_3.julia_export import (
-    build_formulation3_numeric_instance,
-    export_formulation3_instance,
-)
-from formulation.formulation_3.definition import Formulation3
+    build_formulation3_numeric_instance, export_formulation3_instance)
 
 MILES_TO_KILOMETERS = 1.60934
 MPH_TO_KILOMETERS_PER_MINUTE = 1.0 / MPH_TO_KM_PER_MIN

@@ -4,8 +4,8 @@ from dataclasses import dataclass
 
 import networkx as nx
 
-from formulation.common.constants import METERS_PER_KM
 from formulation.common.classes import School
+from formulation.common.constants import METERS_PER_KM
 from formulation.common.problems import ProblemData
 
 

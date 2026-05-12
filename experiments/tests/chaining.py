@@ -4,27 +4,15 @@ from pathlib import Path
 from gurobipy import GRB
 
 from experiments.helpers import make_point_from_node_id
-from formulation.common.classes import (
-    Attributes,
-    Depot,
-    Bus,
-    School,
-    SchoolType,
-    Stop,
-    Student,
-)
+from formulation.common.classes import (Attributes, Bus, Depot, School,
+                                        SchoolType, Stop, Student)
 from formulation.common.problems import ProblemDataToy
 from formulation.common.toy import make_graph
 from formulation.formulation_3.definition import Formulation3
-from formulation.formulation_3.gurobipy import (
-    Formulation3Solution,
-    build_model_from_definition,
-    solve_problem,
-)
-from formulation.formulation_3.outputs import (
-    make_report,
-    plot_bus_routes,
-)
+from formulation.formulation_3.gurobipy import (Formulation3Solution,
+                                                build_model_from_definition,
+                                                solve_problem)
+from formulation.formulation_3.outputs import make_report, plot_bus_routes
 
 CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 

@@ -1,15 +1,12 @@
 import os
 from pathlib import Path
 
-from formulation.formulation_3.definition import ExperimentConfig, Formulation3
-from formulation.formulation_3.cvxpy import (
-    build_model_from_definition,
-    make_report,
-    plot_bus_routes,
-    solve_problem,
-)
-from formulation.common.constants import CACHE_DIR
 from experiments.helpers import setup_framingham
+from formulation.common.constants import CACHE_DIR
+from formulation.formulation_3.cvxpy import (build_model_from_definition,
+                                             make_report, plot_bus_routes,
+                                             solve_problem)
+from formulation.formulation_3.definition import ExperimentConfig, Formulation3
 
 CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 

@@ -2,7 +2,6 @@ from datetime import time
 from functools import cache
 from typing import NamedTuple
 
-
 import pandas as pd
 
 from experiments.helpers import DATA_FOLDER

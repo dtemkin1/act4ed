@@ -1,20 +1,15 @@
 import os
-from pathlib import Path
 import subprocess
+from pathlib import Path
 
 from experiments.existing_data.utils import get_assigned_students
 from experiments.helpers import OUTPUTS_FOLDER, setup_framingham
-
+from formulation.bird_adapter import (BirdAdapterConfig, BirdBackendSolution,
+                                      BirdExportInstance, export_bird_instance,
+                                      normalized_result_from_bird_solution)
 from formulation.common.problems import FilteredProblemData, ProblemData
-
-from formulation.bird_adapter import (
-    BirdAdapterConfig,
-    BirdBackendSolution,
-    BirdExportInstance,
-    export_bird_instance,
-    normalized_result_from_bird_solution,
-)
-from formulation.normalized_result import NormalizedRoutingResult, RoutingSolutionJson
+from formulation.normalized_result import (NormalizedRoutingResult,
+                                           RoutingSolutionJson)
 
 CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 

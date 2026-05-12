@@ -1,10 +1,10 @@
+import time
 from pathlib import Path
 
 import pandas as pd
-from geopy.geocoders import Nominatim
 from geopy.extra.rate_limiter import RateLimiter
+from geopy.geocoders import Nominatim
 from geopy.location import Location
-import time
 
 # Read the CSV file
 script_path = Path(__file__).parent

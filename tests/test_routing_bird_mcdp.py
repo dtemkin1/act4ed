@@ -6,16 +6,12 @@ from pathlib import Path
 
 import yaml
 
-from experiments.mcdp.routing_bird import (
-    BUS_TYPES,
-    config_posets,
-    fleet_catalogue,
-    read_bus_inventory_counts,
-    routing_service_catalogue,
-    routing_service_entry,
-    write_policy_module,
-    write_poset,
-)
+from experiments.mcdp.routing_bird import (BUS_TYPES, config_posets,
+                                           fleet_catalogue,
+                                           read_bus_inventory_counts,
+                                           routing_service_catalogue,
+                                           routing_service_entry,
+                                           write_policy_module, write_poset)
 
 
 class RoutingBirdMcdpTests(unittest.TestCase):

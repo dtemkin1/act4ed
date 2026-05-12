@@ -12,32 +12,20 @@ import networkx as nx
 import numpy as np
 from shapely import Point
 
-from formulation.bird_adapter import (
-    BirdAdapterConfig,
-    BirdBackendSolution,
-    BirdExportInstance,
-    assign_students_to_existing_stops,
-    bird_export_instance_from_template,
-    bird_stop_assignments,
-    bird_student_assignments,
-    bird_student_ride_times,
-    build_bird_export_instance,
-    normalized_result_from_bird_solution,
-    summarize_bird_solution_for_mcdp,
-    _bird_stop_dwell_time_min,
-)
-from formulation.common import (
-    Bus,
-    BusType,
-    Attributes,
-    Depot,
-    MPH_TO_KM_PER_MIN,
-    ProblemData,
-    School,
-    SchoolType,
-    Stop,
-    Student,
-)
+from formulation.bird_adapter import (BirdAdapterConfig, BirdBackendSolution,
+                                      BirdExportInstance,
+                                      _bird_stop_dwell_time_min,
+                                      assign_students_to_existing_stops,
+                                      bird_export_instance_from_template,
+                                      bird_stop_assignments,
+                                      bird_student_assignments,
+                                      bird_student_ride_times,
+                                      build_bird_export_instance,
+                                      normalized_result_from_bird_solution,
+                                      summarize_bird_solution_for_mcdp)
+from formulation.common import (MPH_TO_KM_PER_MIN, Attributes, Bus, BusType,
+                                Depot, ProblemData, School, SchoolType, Stop,
+                                Student)
 
 
 @dataclass(frozen=True)

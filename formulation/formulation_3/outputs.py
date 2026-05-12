@@ -1,22 +1,15 @@
-from typing import Any
 from pathlib import Path
+from typing import Any
 
 import gurobipy as gp
-from gurobipy import GRB, tupledict, Var
-from matplotlib import pyplot as plt
 import osmnx as ox
+from gurobipy import GRB, Var, tupledict
+from matplotlib import pyplot as plt
 
-from formulation.common.utils import (
-    C_b,
-    R_b,
-    Wh_b,
-    s_m,
-)
+from formulation.common.utils import C_b, R_b, Wh_b, s_m
 from formulation.formulation_3.definition import Formulation3
-from formulation.formulation_3.solution import (
-    Formulation3Solution,
-    coerce_reporting_inputs,
-)
+from formulation.formulation_3.solution import (Formulation3Solution,
+                                                coerce_reporting_inputs)
 
 
 def make_report(

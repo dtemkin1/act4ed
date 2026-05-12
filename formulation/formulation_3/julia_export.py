@@ -6,24 +6,11 @@ from typing import Any
 
 import numpy as np
 
-from formulation.common.utils import (
-    C_b,
-    R_b,
-    Wh_b,
-    depot_b,
-    f_m,
-    l_s,
-    make_depot_end_copy,
-    make_depot_start_copy,
-    p_m,
-    s_m,
-    tau_m,
-)
 from formulation.common.classes import BusType
-
-from formulation.formulation_3.definition import (
-    Formulation3,
-)
+from formulation.common.utils import (C_b, R_b, Wh_b, depot_b, f_m, l_s,
+                                      make_depot_end_copy,
+                                      make_depot_start_copy, p_m, s_m, tau_m)
+from formulation.formulation_3.definition import Formulation3
 
 
 @dataclass(frozen=True, slots=True)

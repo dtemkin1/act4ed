@@ -1,15 +1,11 @@
 import os
 from pathlib import Path
-from shapely import Point
-import yaml
 
 import pandas as pd
+import yaml
+from shapely import Point
 
-from formulation.common.classes import (
-    Bus,
-    BusType,
-    Depot,
-)
+from formulation.common.classes import Bus, BusType, Depot
 
 CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 

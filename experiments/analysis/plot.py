@@ -2,26 +2,22 @@
 
 import itertools
 
-from matplotlib.axes import Axes
-from matplotlib.figure import Figure
-from matplotlib import colors
+import networkx as nx
 import osmnx as ox
 import pandas as pd
-import networkx as nx
+from matplotlib import colors
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 
-from experiments.existing_data.bird_routes import (
-    BIRD_CONFIG,
-    get_bird_routes,
-    get_bird_routes_json,
-)
+from experiments.existing_data.bird_routes import (BIRD_CONFIG,
+                                                   get_bird_routes,
+                                                   get_bird_routes_json)
 from experiments.helpers import OUTPUTS_FOLDER, setup_framingham
 from formulation.common.classes import Depot, NodeId, Place, School, Stop
 from formulation.common.problems import ProblemData
-from formulation.normalized_result import (
-    NormalizedRoutingResult,
-    RoutingSolutionJson,
-    RoutingSolutionRow,
-)
+from formulation.normalized_result import (NormalizedRoutingResult,
+                                           RoutingSolutionJson,
+                                           RoutingSolutionRow)
 
 
 def plot_bird_routes(

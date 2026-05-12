@@ -12,24 +12,20 @@ from itertools import product
 from pathlib import Path
 from typing import Any, Literal
 
-from loguru import logger
 import yaml
+from loguru import logger
+from tqdm import tqdm
 
 from experiments.existing_data.utils import get_assigned_students
 from experiments.helpers import setup
-from formulation.bird_adapter import (
-    BirdAdapterConfig,
-    BirdBackendSolution,
-    BirdExportInstance,
-    bird_export_instance_from_template,
-    build_bird_export_instance,
-    export_bird_instance,
-    summarize_bird_solution_for_mcdp,
-)
+from formulation.bird_adapter import (BirdAdapterConfig, BirdBackendSolution,
+                                      BirdExportInstance,
+                                      bird_export_instance_from_template,
+                                      build_bird_export_instance,
+                                      export_bird_instance,
+                                      summarize_bird_solution_for_mcdp)
 from formulation.common import Bus
 from formulation.common.problems import FilteredProblemData, ProblemData
-
-from tqdm import tqdm
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ROUTING_LIB = PROJECT_ROOT / "routing.mcdplib"

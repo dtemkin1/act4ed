@@ -6,28 +6,22 @@
 import statistics
 from typing import Callable, overload
 
-from experiments.existing_data.bird_routes import (
-    BIRD_CONFIG,
-    get_bird_routes,
-    get_bird_routes_json,
-)
-from experiments.existing_data.current_routes import RouteResult, get_existing_routes
+from experiments.existing_data.bird_routes import (BIRD_CONFIG,
+                                                   get_bird_routes,
+                                                   get_bird_routes_json)
+from experiments.existing_data.current_routes import (RouteResult,
+                                                      get_existing_routes)
 from experiments.existing_data.utils import get_assigned_students
 from experiments.helpers import setup_framingham
 from formulation.common.classes import Place, Stop, Student
 from formulation.common.constants import KM_PER_MILE
-from formulation.common.problems import (
-    FilteredProblemData,
-    ProblemData,
-)
+from formulation.common.problems import FilteredProblemData, ProblemData
 from formulation.common.utils import get_travel_time
-from formulation.normalized_result import (
-    NormalizedBusItinerary,
-    NormalizedRoute,
-    NormalizedRoutingResult,
-    RoutingSolutionJson,
-    RoutingSolutionRow,
-)
+from formulation.normalized_result import (NormalizedBusItinerary,
+                                           NormalizedRoute,
+                                           NormalizedRoutingResult,
+                                           RoutingSolutionJson,
+                                           RoutingSolutionRow)
 
 
 def get_dwell_time(students_at_stop: tuple[Student, ...], place: Place) -> float:

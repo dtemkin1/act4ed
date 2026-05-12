@@ -1,23 +1,14 @@
+from collections.abc import Hashable
 from dataclasses import replace
 from functools import cache
-from collections.abc import Hashable
 
 import networkx as nx
 
-from formulation.common.classes import (
-    NodeId,
-    Place,
-    School,
-    Bus,
-    Student,
-    Depot,
-)
-from formulation.common.constants import (
-    BUS_SPEED_NOT_HIGHWAY,
-    BUS_SPEED_SCHOOL_ZONE,
-    METERS_PER_KM,
-    MPH_TO_KM_PER_MIN,
-)
+from formulation.common.classes import (Bus, Depot, NodeId, Place, School,
+                                        Student)
+from formulation.common.constants import (BUS_SPEED_NOT_HIGHWAY,
+                                          BUS_SPEED_SCHOOL_ZONE, METERS_PER_KM,
+                                          MPH_TO_KM_PER_MIN)
 
 
 @cache

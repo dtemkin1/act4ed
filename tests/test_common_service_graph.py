@@ -6,16 +6,9 @@ import networkx as nx
 import pandas as pd
 from shapely import Point
 
-from formulation.common import (
-    Attributes,
-    Depot,
-    FilteredProblemData,
-    ProblemDataReal,
-    School,
-    SchoolType,
-    Stop,
-    Student,
-)
+from formulation.common import (Attributes, Depot, FilteredProblemData,
+                                ProblemDataReal, School, SchoolType, Stop,
+                                Student)
 
 
 def _make_stop(name: str, node_id: int) -> Stop:

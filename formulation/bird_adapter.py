@@ -1,33 +1,23 @@
 from __future__ import annotations
 
+import math
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass, field, replace
-import math
 from pathlib import Path
 from typing import Literal
 
 import numpy as np
 
-from formulation.common import (
-    Bus,
-    BusType,
-    Depot,
-    ProblemData,
-    School,
-    Stop,
-    Student,
-    l_s,
-)
+from formulation.common import (Bus, BusType, Depot, ProblemData, School, Stop,
+                                Student, l_s)
 from formulation.common.constants import MPH_TO_KM_PER_MIN
-from formulation.normalized_result import (
-    NormalizedBusItinerary,
-    NormalizedRoute,
-    NormalizedRoutingResult,
-    RoutingSolutionJson,
-    RoutingSolutionMetadata,
-    RoutingSolutionRow,
-)
+from formulation.normalized_result import (NormalizedBusItinerary,
+                                           NormalizedRoute,
+                                           NormalizedRoutingResult,
+                                           RoutingSolutionJson,
+                                           RoutingSolutionMetadata,
+                                           RoutingSolutionRow)
 
 _BIRD_INSTANCE_SCHEMA_VERSION = 14
 _BIRD_SOLUTION_SCHEMA_VERSION = 1

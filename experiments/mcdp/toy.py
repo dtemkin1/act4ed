@@ -1,25 +1,17 @@
-from dataclasses import replace
 import os
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
-from gurobipy import GRB, Var, tupledict
-import yaml
 
+import yaml
+from gurobipy import GRB, Var, tupledict
 
 from formulation.common import ProblemDataToy
-from formulation.formulation_3.gurobipy import (
-    build_model_from_definition,
-    solve_problem,
-)
+from formulation.common.toy import (make_buses, make_depots, make_graph,
+                                    make_schools, make_stops, make_students)
 from formulation.formulation_3.definition import Formulation3
-from formulation.common.toy import (
-    make_buses,
-    make_graph,
-    make_depots,
-    make_schools,
-    make_stops,
-    make_students,
-)
+from formulation.formulation_3.gurobipy import (build_model_from_definition,
+                                                solve_problem)
 
 CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 

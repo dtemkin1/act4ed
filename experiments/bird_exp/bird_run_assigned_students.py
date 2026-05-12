@@ -1,23 +1,19 @@
+import subprocess
 from pathlib import Path
+
+import numpy as np
 import pandas as pd
+
+from experiments.existing_data.utils import get_assigned_students
+from experiments.helpers import setup
+from experiments.tests.all_gurobi_julia import DEFAULT_PLACE_NAME
+from formulation.bird_adapter import (BirdBackendSolution, BirdExportInstance,
+                                      _bird_bus_display_name,
+                                      export_bird_instance,
+                                      normalized_result_from_bird_solution,
+                                      routing_solution_json_from_bird_solution)
 from formulation.common import FilteredProblemData
 
-from formulation.bird_adapter import (
-    BirdBackendSolution,
-    BirdExportInstance,
-    export_bird_instance,
-    normalized_result_from_bird_solution,
-    routing_solution_json_from_bird_solution,
-    _bird_bus_display_name
-)
-from experiments.existing_data.utils import get_assigned_students
-import subprocess
-import numpy as np
-
-from experiments.helpers import setup
-from experiments.tests.all_gurobi_julia import (
-    DEFAULT_PLACE_NAME
-)
 from .config import config
 
 RUN_NAME = "run_assigned_students"

@@ -1,37 +1,24 @@
-from dataclasses import dataclass
-from abc import ABC, abstractmethod
-from functools import cached_property
-from pathlib import Path
-import warnings
-from typing import Any, Callable, Optional, cast
-
 import datetime as dt
 import pickle
+import warnings
+from abc import ABC, abstractmethod
 from collections.abc import Hashable, Iterable, Sequence
+from dataclasses import dataclass
+from functools import cached_property
+from pathlib import Path
+from typing import Any, Callable, Optional, cast
 
 import geopandas as gpd
 import networkx as nx
 import osmnx as ox
 import pandas as pd
 
+from formulation.common.classes import (Attributes, Bus, BusType, Depot,
+                                        NodeId, Place, School, SchoolType,
+                                        Stop, Student)
 from formulation.common.constants import CACHE_DIR, NETWORK_TYPE
-from formulation.common.classes import (
-    Attributes,
-    NodeId,
-    SchoolType,
-    BusType,
-    Bus,
-    Stop,
-    School,
-    Depot,
-    Student,
-    Place,
-)
-from formulation.common.utils import (
-    get_shortest_path,
-    ensure_service_graph_kilometers,
-    meters_to_kilometers,
-)
+from formulation.common.utils import (ensure_service_graph_kilometers,
+                                      get_shortest_path, meters_to_kilometers)
 
 try:
     import r5py

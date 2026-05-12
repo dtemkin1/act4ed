@@ -1,33 +1,18 @@
-import math
 import datetime as dt
+import math
 
 import gurobipy as gp
 from gurobipy import GRB, GurobiError
-
 from loguru import logger
 
-from formulation.common.utils import (
-    C_b,
-    R_b,
-    Wh_b,
-    depot_b,
-    f_m,
-    l_s,
-    make_depot_end_copy,
-    make_depot_start_copy,
-    p_m,
-    s_m,
-    tau_m,
-)
-from formulation.formulation_3.definition import Formulation3
-
 from formulation.common.constants import METERS_PER_MILE
-
-from formulation.formulation_3.solution import (
-    Formulation3ModelBundle,
-    Formulation3Solution,
-    _gurobi_status_name,
-)
+from formulation.common.utils import (C_b, R_b, Wh_b, depot_b, f_m, l_s,
+                                      make_depot_end_copy,
+                                      make_depot_start_copy, p_m, s_m, tau_m)
+from formulation.formulation_3.definition import Formulation3
+from formulation.formulation_3.solution import (Formulation3ModelBundle,
+                                                Formulation3Solution,
+                                                _gurobi_status_name)
 
 
 def build_model_from_definition(

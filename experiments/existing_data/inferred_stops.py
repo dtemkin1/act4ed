@@ -1,21 +1,15 @@
 from dataclasses import replace
 from random import random
 
-from matplotlib.colors import Normalize
 import matplotlib.pyplot as plt
+from matplotlib.colors import Normalize
 
-from experiments.helpers import (
-    DATA_FOLDER,
-    OUTPUTS_FOLDER,
-    make_students_csv,
-    setup_framingham,
-)
-from experiments.existing_data.utils import (
-    get_assigned_students,
-    get_raw_assigned_students,
-)
-from formulation.common.problems import ProblemDataReal
+from experiments.existing_data.utils import (get_assigned_students,
+                                             get_raw_assigned_students)
+from experiments.helpers import (DATA_FOLDER, OUTPUTS_FOLDER,
+                                 make_students_csv, setup_framingham)
 from formulation.common.classes import Attributes, Student
+from formulation.common.problems import ProblemDataReal
 
 ASSIGNED_STUDENTS = DATA_FOLDER / "assigned_students.csv"
 BUSES = DATA_FOLDER / "buses.csv"

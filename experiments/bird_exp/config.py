@@ -1,6 +1,5 @@
 from formulation.bird_adapter import BirdAdapterConfig
 
-
 config = BirdAdapterConfig(
     # ── Cohort / assignment mode ──────────────────────────────────────────────
     # Which student population to route.

@@ -4,10 +4,8 @@ from pathlib import Path
 
 from formulation.common.toy import make_toy_problem_data
 from formulation.formulation_3.definition import Formulation3
-from formulation.formulation_3.gurobipy import (
-    build_model_from_definition,
-    solve_problem,
-)
+from formulation.formulation_3.gurobipy import (build_model_from_definition,
+                                                solve_problem)
 from formulation.formulation_3.outputs import plot_bus_routes
 
 CURRENT_FILE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))

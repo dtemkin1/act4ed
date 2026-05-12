@@ -1,18 +1,10 @@
-from typing import cast
 import random
+from typing import cast
 
 import networkx as nx
 
-from formulation.common.classes import (
-    Attributes,
-    Bus,
-    Depot,
-    NodeId,
-    School,
-    SchoolType,
-    Stop,
-    Student,
-)
+from formulation.common.classes import (Attributes, Bus, Depot, NodeId, School,
+                                        SchoolType, Stop, Student)
 from formulation.common.problems import ProblemDataToy
 
 try:

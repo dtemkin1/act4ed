@@ -3,8 +3,8 @@ from collections.abc import Callable
 from experiments.existing_data.utils import get_assigned_students
 from experiments.helpers import setup_framingham
 from formulation.common.classes import IncomeLevel, Student
-from formulation.common.problems import ProblemData
 from formulation.common.constants import KM_PER_MILE
+from formulation.common.problems import ProblemData
 
 
 def distance_to_school(student: Student, problem_data: ProblemData) -> float:

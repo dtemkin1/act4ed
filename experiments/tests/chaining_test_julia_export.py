@@ -3,19 +3,12 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from formulation.common.classes import (
-    Attributes,
-    Bus,
-    Depot,
-    School,
-    SchoolType,
-    Stop,
-    Student,
-)
+from formulation.common.classes import (Attributes, Bus, Depot, School,
+                                        SchoolType, Stop, Student)
 from formulation.common.problems import ProblemDataToy
-from formulation.formulation_3.julia_export import export_formulation3_instance
-from formulation.formulation_3.definition import Formulation3
 from formulation.common.toy import make_graph
+from formulation.formulation_3.definition import Formulation3
+from formulation.formulation_3.julia_export import export_formulation3_instance
 
 
 def build_problem(rounds: int = 1) -> Formulation3:

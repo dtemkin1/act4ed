@@ -1,10 +1,10 @@
+import json
 import os
 from pathlib import Path
 from typing import NamedTuple
-import json
 
-from experiments.helpers import OUTPUTS_FOLDER, setup_framingham
 from experiments.existing_data.utils import get_assigned_students
+from experiments.helpers import OUTPUTS_FOLDER, setup_framingham
 from formulation.common.classes import Stop, Student
 from formulation.common.problems import ProblemDataReal
 

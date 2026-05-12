@@ -1,29 +1,17 @@
 from dataclasses import dataclass, field, replace
 from functools import cached_property
 from pathlib import Path
+
 import networkx as nx
 from dataclasses_json import dataclass_json
 
-from formulation.common.classes import (
-    Bus,
-    Depot,
-    NodeId,
-    School,
-    SchoolType,
-    Student,
-    Stop,
-    Place,
-)
+from formulation.common.classes import (Bus, Depot, NodeId, Place, School,
+                                        SchoolType, Stop, Student)
 from formulation.common.problems import ProblemData, ProblemDataReal
-from formulation.common.utils import (
-    C_b,
-    get_paths_between_nodes,
-    get_travel_time,
-    l_s,
-    make_depot_end_copy,
-    make_depot_start_copy,
-    make_school_copy,
-)
+from formulation.common.utils import (C_b, get_paths_between_nodes,
+                                      get_travel_time, l_s,
+                                      make_depot_end_copy,
+                                      make_depot_start_copy, make_school_copy)
 
 
 @dataclass_json
