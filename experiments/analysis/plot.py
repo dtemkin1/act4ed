@@ -9,9 +9,7 @@ from matplotlib import colors
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
-from experiments.existing_data.bird_routes import (BIRD_CONFIG,
-                                                   get_bird_routes,
-                                                   get_bird_routes_json)
+from experiments.existing_data.bird_routes import get_bird_routes_json
 from experiments.helpers import OUTPUTS_FOLDER, setup_framingham
 from formulation.common.classes import Depot, NodeId, Place, School, Stop
 from formulation.common.problems import ProblemData
@@ -149,7 +147,7 @@ def plot_bird_routes_json(
     ax.legend(loc="upper right", fontsize="small")
 
     if save_fig:
-        fig.savefig(OUTPUTS_FOLDER / f"bird_{name}.png", bbox_inches="tight")
+        fig.savefig(OUTPUTS_FOLDER / f"bird_{name}.pdf", bbox_inches="tight")
 
     return fig, ax
 
@@ -281,7 +279,7 @@ def plot_bird_routes_normalized(
     ax.legend(loc="upper right", fontsize="small")
 
     if save_fig:
-        fig.savefig(OUTPUTS_FOLDER / f"bird_{name}.png", bbox_inches="tight")
+        fig.savefig(OUTPUTS_FOLDER / f"bird_{name}.pdf", bbox_inches="tight")
 
     return fig, ax
 
@@ -302,11 +300,11 @@ def main() -> None:
     )
 
     all_students_distance = get_bird_routes_json(
-        "1_5_mile_students_routes",
+        "1_5_mile_students",
     )
 
     plot_bird_routes(
-        "all_students_over_distance",
+        "all_students_over_1_5_miles",
         all_students_distance,
         problem_data=framingham_problem_data,
         save_fig=True,

@@ -312,7 +312,7 @@ def plot_existing_routes(
     ax.legend(loc="upper right", fontsize="small")
 
     if save_fig:
-        fig.savefig(OUTPUTS_FOLDER / "existing_routes.png", bbox_inches="tight")
+        fig.savefig(OUTPUTS_FOLDER / "existing_routes.pdf", bbox_inches="tight")
 
     return fig, ax
 

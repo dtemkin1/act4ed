@@ -72,7 +72,7 @@ GRID_FLEET = {
     "BWC": (11,),
     "WC": (2,),
 }
-GRID_METHODS = ("scenario",)
+GRID_METHODS = ("lbh", "scenario")
 GRID_LAMBDAS = (
     (1.0e2, "lambda_1e3"),
     (1.0e4, "lambda_1e4"),

@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
 
@@ -7,7 +7,8 @@ from dataclasses_json import dataclass_json
 
 from formulation.common.classes import (Bus, Depot, NodeId, Place, School,
                                         SchoolType, Stop, Student)
-from formulation.common.problems import ProblemData, ProblemDataReal
+from formulation.common.problems import (FilteredProblemData, ProblemData,
+                                         ProblemDataReal)
 from formulation.common.utils import (C_b, get_paths_between_nodes,
                                       get_travel_time, l_s,
                                       make_depot_end_copy,
@@ -91,13 +92,13 @@ class ExperimentConfig:
             ]
 
         # create new problem data with filters applied
-        new_problem_data = replace(
-            problem_data,
-            students=filtered_students,
-            schools=filtered_schools,
-            buses=filtered_buses,
+        new_problem_data = FilteredProblemData(
+            name=f"filtered_{problem_data.name}",
+            base_problem_data=problem_data,
+            _students=tuple(filtered_students),
+            _schools=tuple(filtered_schools),
+            _buses=tuple(filtered_buses),
         )
-        del new_problem_data.service_graph
         return new_problem_data
 
     def make_formulation(self):
@@ -154,27 +155,27 @@ class Formulation3:
     # sets
     G: "nx.MultiDiGraph[NodeId]" = field(init=False)
     """road network graph"""
-    P: tuple[Stop, ...] = field(init=False, default_factory=list)
+    P: tuple[Stop, ...] = field(init=False, default_factory=tuple)
     """pickup stop nodes"""
-    S: tuple[School, ...] = field(init=False, default_factory=list)
+    S: tuple[School, ...] = field(init=False, default_factory=tuple)
     """school nodes"""
-    S_PLUS: tuple[School, ...] = field(init=False, default_factory=list)
+    S_PLUS: tuple[School, ...] = field(init=False, default_factory=tuple)
     """school start-copy nodes"""
-    D: tuple[Depot, ...] = field(init=False, default_factory=list)
+    D: tuple[Depot, ...] = field(init=False, default_factory=tuple)
     """depot nodes"""
-    D_PLUS: tuple[Depot, ...] = field(init=False, default_factory=list)
+    D_PLUS: tuple[Depot, ...] = field(init=False, default_factory=tuple)
     """depot start-copy nodes"""
-    D_MINUS: tuple[Depot, ...] = field(init=False, default_factory=list)
+    D_MINUS: tuple[Depot, ...] = field(init=False, default_factory=tuple)
     """depot end-copy nodes"""
-    N: tuple[Place, ...] = field(init=False, default_factory=list)
+    N: tuple[Place, ...] = field(init=False, default_factory=tuple)
     """all nodes"""
-    B: tuple[Bus, ...] = field(init=False, default_factory=list)
+    B: tuple[Bus, ...] = field(init=False, default_factory=tuple)
     """buses"""
-    M: tuple[Student, ...] = field(init=False, default_factory=list)
+    M: tuple[Student, ...] = field(init=False, default_factory=tuple)
     """students"""
-    F: tuple[Student, ...] = field(init=False, default_factory=list)
+    F: tuple[Student, ...] = field(init=False, default_factory=tuple)
     """students needing monitor, eg special education or wheelchair"""
-    W: tuple[Student, ...] = field(init=False, default_factory=list)
+    W: tuple[Student, ...] = field(init=False, default_factory=tuple)
     """students needing wheelchair access"""
     TAU: tuple[SchoolType, ...] = field(init=False, default_factory=tuple)
     """school types"""

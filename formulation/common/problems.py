@@ -119,6 +119,38 @@ class ProblemData(ABC):
         """get shortest path and length in meters between two nodes in the base graph"""
         return get_shortest_path(self.base_graph, start, end, weight)
 
+    def _stop_school_types(self) -> dict[Stop, set[SchoolType]]:
+        stop_school_types: dict[Stop, set[SchoolType]] = {}
+        for student in self.students:
+            stop_school_types.setdefault(student.stop, set()).add(student.school.type)
+        return stop_school_types
+
+    def _service_graph_pairs(self) -> tuple[tuple[Place, Place], ...]:
+        pairs: list[tuple[Place, Place]] = []
+
+        for depot in self.depots:
+            for stop in self.stops:
+                pairs.append((depot, stop))
+
+        for stop1 in self.stops:
+            for stop2 in self.stops:
+                if stop1 != stop2:
+                    pairs.append((stop1, stop2))
+
+            for school in self.schools:
+                pairs.append((stop1, school))
+
+        for school in self.schools:
+            for stop in self.stops:
+                pairs.append((school, stop))
+            for other_school in self.schools:
+                if school != other_school:
+                    pairs.append((school, other_school))
+            for depot in self.depots:
+                pairs.append((school, depot))
+
+        return tuple(pairs)
+
     def get_shortest_paths_base(
         self, nodes: Sequence[NodeId], weight: str = "length"
     ) -> tuple[float, list[NodeId]]:
@@ -727,38 +759,6 @@ class ProblemDataReal(ProblemData):
         # return super().get_shortest_path_base(start, end, weight)
         return get_shortest_path(self.base_graph, start, end, weight)
 
-    def _stop_school_types(self) -> dict[Stop, set[SchoolType]]:
-        stop_school_types: dict[Stop, set[SchoolType]] = {}
-        for student in self.students:
-            stop_school_types.setdefault(student.stop, set()).add(student.school.type)
-        return stop_school_types
-
-    def _service_graph_pairs(self) -> tuple[tuple[Place, Place], ...]:
-        pairs: list[tuple[Place, Place]] = []
-
-        for depot in self.depots:
-            for stop in self.stops:
-                pairs.append((depot, stop))
-
-        for stop1 in self.stops:
-            for stop2 in self.stops:
-                if stop1 != stop2:
-                    pairs.append((stop1, stop2))
-
-            for school in self.schools:
-                pairs.append((stop1, school))
-
-        for school in self.schools:
-            for stop in self.stops:
-                pairs.append((school, stop))
-            for other_school in self.schools:
-                if school != other_school:
-                    pairs.append((school, other_school))
-            for depot in self.depots:
-                pairs.append((school, depot))
-
-        return tuple(pairs)
-
     def _service_edge_allowed(
         self,
         start: Place,
@@ -1083,9 +1083,7 @@ class ProblemDataReal(ProblemData):
         for _, row in buses_df.iterrows():
             depot = next(d for d in self.depots if d.name == row["depot_name"])
             bus_type = (
-                BusType[row["type"]]
-                if row.get("type") in BusType.__members__
-                else None
+                BusType[row["type"]] if row.get("type") in BusType.__members__ else None
             )
             if "wheelchair_capacity" in buses_df.columns and not pd.isna(
                 row["wheelchair_capacity"]

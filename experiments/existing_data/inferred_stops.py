@@ -83,7 +83,7 @@ def plot_special_education_students(problem_data: ProblemDataReal) -> None:
         for student in special_education_students
         if student.school is not None
     ]
-    color_gradient = plt.cm.get_cmap("RdYlGn_r")
+    color_gradient = plt.get_cmap("RdYlGn_r")
     norm = Normalize(vmin=min(all_distances), vmax=max(all_distances))
     sm = plt.cm.ScalarMappable(cmap=color_gradient, norm=norm)
     sm.set_array([])
@@ -107,8 +107,7 @@ def plot_special_education_students(problem_data: ProblemDataReal) -> None:
     # remove axis borders and ticks
     ax.set_axis_off()
     fig.savefig(
-        OUTPUTS_FOLDER / "special_education_students.png",
-        dpi=300,
+        OUTPUTS_FOLDER / "special_education_students.pdf",
         bbox_inches="tight",
     )
 

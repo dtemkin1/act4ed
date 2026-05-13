@@ -82,7 +82,16 @@ def route_records(library: Path, costs_path: Path) -> list[dict[str, Any]]:
         )
         driver_cost = sum(used.values()) * float(costs["driver_yearly_pay"])
         monitor_cost = parse_number(r[4]) * float(costs["monitor_yearly_pay"])
-        fuel_cost = total_distance * school_days * float(costs["fuel_cost_per_km"])
+        fuel_cost_per_km = (
+            float(costs["fuel_cost_per_km"])
+            if costs.get("fuel_cost_per_km") is not None
+            else (
+                float(costs["diesel_cost_per_gallon"])
+                * float(costs["emissions_kg_per_km"])
+                / float(costs["diesel_co2_kg_per_gallon"])
+            )
+        )
+        fuel_cost = total_distance * school_days * fuel_cost_per_km
         maintenance_cost = school_days * sum(
             distance[bus_type] * float(distance_factor[bus_type])
             + runtime[bus_type] * float(runtime_factor[bus_type])
@@ -172,7 +181,7 @@ def plot_panel(
     title: str = "",
 ) -> None:
     methods = {"lbh": "LBH", "scenario": "Scenario"}
-    colors = {"lbh": "#3b82f6", "scenario": "#ef4444"}
+    colors = {"lbh": "C0", "scenario": "C1"}
 
     for method, method_name in methods.items():
         subset = [row for row in rows if row["bird_method"] == method]
@@ -183,7 +192,7 @@ def plot_panel(
                 s=60,
                 alpha=0.75,
                 color=colors[method],
-                edgecolors="white",
+                edgecolors="none",
                 linewidth=0.5,
                 label=method_name,
                 zorder=2,
@@ -199,7 +208,7 @@ def plot_panel(
             linewidth=2,
             marker="o",
             markersize=6,
-            markeredgecolor="white",
+            markeredgecolor="none",
             label="Pareto front",
             zorder=3,
         )
@@ -223,17 +232,6 @@ def plot_panel(
 
 def make_plot(rows: list[dict[str, Any]], output: Path, main_title: str) -> None:
     plt.style.use("seaborn-v0_8-whitegrid")
-
-    # Configure for LaTeX paper formatting
-    plt.rcParams["font.family"] = "serif"
-    plt.rcParams["font.size"] = 12
-    plt.rcParams["axes.titlesize"] = 14
-    plt.rcParams["axes.labelsize"] = 12
-    plt.rcParams["xtick.labelsize"] = 10
-    plt.rcParams["ytick.labelsize"] = 10
-    plt.rcParams["legend.fontsize"] = 11
-    plt.rcParams["pdf.fonttype"] = 42
-    plt.rcParams["ps.fonttype"] = 42
 
     # Smaller width so it scales better in the paper
     fig, axes = plt.subplots(1, 3, figsize=(15, 4.5))
@@ -289,22 +287,22 @@ def main() -> None:
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     args = parser.parse_args()
 
-    args.output_dir.mkdir(parents=True, exist_ok=True)
-    records = route_records(args.library, args.costs)
+    library: Path = args.library
+    costs: Path = args.costs
+    output_dir: Path = args.output_dir
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    records = route_records(library, costs)
     capped = routing_simple_caps(records)
     feasible = routing_simple_feasible(records)
 
-    all_csv = args.output_dir / "routing_bird_mcdp_points.csv"
-    capped_csv = args.output_dir / "routing_bird_mcdp_routing_simple_caps.csv"
-    feasible_csv = (
-        args.output_dir / "routing_bird_mcdp_routing_simple_budget_feasible.csv"
-    )
-    all_plot_pdf = args.output_dir / "routing_bird_mcdp_pareto_all.pdf"
-    capped_plot_pdf = (
-        args.output_dir / "routing_bird_mcdp_pareto_routing_simple_caps.pdf"
-    )
+    all_csv = output_dir / "routing_bird_mcdp_points.csv"
+    capped_csv = output_dir / "routing_bird_mcdp_routing_simple_caps.csv"
+    feasible_csv = output_dir / "routing_bird_mcdp_routing_simple_budget_feasible.csv"
+    all_plot_pdf = output_dir / "routing_bird_mcdp_pareto_all.pdf"
+    capped_plot_pdf = output_dir / "routing_bird_mcdp_pareto_routing_simple_caps.pdf"
     feasible_plot_pdf = (
-        args.output_dir / "routing_bird_mcdp_pareto_routing_simple_budget_feasible.pdf"
+        output_dir / "routing_bird_mcdp_pareto_routing_simple_budget_feasible.pdf"
     )
 
     write_csv(all_csv, records)
