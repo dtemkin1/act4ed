@@ -100,7 +100,21 @@ GRID_STUDENT_POLICIES = (
     "all_students",
 )
 DEFAULT_GUIDELINE_BUDGET_USD = 4_500_000
-DEFAULT_ALLOWABLE_UNSERVED = 10_000
+DEFAULT_ALLOWABLE_UNSERVED = 2_000
+
+# GUIDELINE_BUDGETS = (
+#     10_000_000,
+#     5_000_000,
+#     2_500_000,
+#     1_000_000,
+# )
+
+# ALLOWABLE_UNSERVED = (
+#     2_000,
+#     1_000,
+#     100,
+#     0
+# )
 
 DEFAULT_COSTS: dict[str, Any] = {
     "school_days": 180,
