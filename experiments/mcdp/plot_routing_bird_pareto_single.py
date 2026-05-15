@@ -234,51 +234,53 @@ def plot_panel(
 def make_plot(rows: list[dict[str, Any]], output: Path, main_title: str) -> None:
     plt.style.use("petroff10")
 
-    # Smaller width so it scales better in the paper
-    fig, axes = plt.subplots(1, 3, figsize=(15, 4.5))
+    def save_single_plot(
+        x_key: str, y_key: str, x_label: str, y_label: str, title: str, suffix: str
+    ):
+        fig, ax = plt.subplots(figsize=(5.5, 5))
+        plot_panel(ax, rows, x_key, y_key, x_label, y_label, title=title)
 
-    plot_panel(
-        axes[0],
-        rows,
+        handles, labels = ax.get_legend_handles_labels()
+        if handles:
+            fig.legend(
+                handles,
+                labels,
+                loc="upper center",
+                bbox_to_anchor=(0.5, 1.15),
+                ncols=3,
+                frameon=True,
+                fontsize=11,
+            )
+        # fig.suptitle(f"{main_title}", y=1.25, fontsize=13, fontweight="bold")
+        fig.tight_layout()
+        out_path = output.with_name(f"{output.stem}_{suffix}{output.suffix}")
+        fig.savefig(out_path, bbox_inches="tight")
+        plt.close(fig)
+
+    save_single_plot(
         "students_unserved",
         "total_cost",
         "Students unassigned",
         "Total annual cost (USD)",
-        title="Cost vs. Unassigned Students",
+        "Cost vs. Unassigned Students",
+        "cost_unassigned",
     )
-    plot_panel(
-        axes[1],
-        rows,
+    save_single_plot(
         "students_unserved",
         "emissions_kg",
         "Students unassigned",
         "Annual emissions (kg)",
-        title="Emissions vs. Unassigned Students",
+        "Emissions vs. Unassigned Students",
+        "emissions_unassigned",
     )
-    plot_panel(
-        axes[2],
-        rows,
+    save_single_plot(
         "stops_used",
         "students_unserved",
         "Stops used",
         "Students unassigned",
-        title="Students Unassigned vs. Stops Used",
+        "Students Unassigned vs. Stops Used",
+        "students_stops",
     )
-
-    handles, labels = axes[0].get_legend_handles_labels()
-    fig.legend(
-        handles,
-        labels,
-        loc="upper center",
-        bbox_to_anchor=(0.5, 1.05),
-        ncols=3,
-        frameon=True,
-        fontsize=11,
-    )
-    fig.suptitle(main_title, y=1.12, fontsize=15, fontweight="bold")
-    fig.tight_layout()
-    fig.savefig(output, dpi=200, bbox_inches="tight")
-    plt.close(fig)
 
 
 def main() -> None:

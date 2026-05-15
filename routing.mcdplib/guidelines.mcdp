@@ -4,7 +4,7 @@ dp {
 
   # Minimum service level required by policy/planning
   requires students_served [Nat]
-  requires sped_students_served [Nat]
+  requires monitor_students_served [Nat]
   requires wheelchair_students_served [Nat]
 
   implemented-by yaml resource("guidelines.dpc.yaml")

@@ -5,13 +5,13 @@ query:
   query_type: FixFunMinRes
   min_f:
     students_served: "10"
-    sped_students_served: "0"
+    monitor_students_served: "0"
     wheelchair_students_served: "0"
   max_r:
     total_cost: "4500000 USD"
     emissions: "1000000 kg"
     students_unserved: "100000"
-    sped_students_unserved: "100000"
+    monitor_students_unserved: "100000"
     wheelchair_students_unserved: "100000"
     stops_used: "100000"
     bird_method: "`bird_method: scenario"

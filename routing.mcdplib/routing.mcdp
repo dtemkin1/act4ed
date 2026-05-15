@@ -1,12 +1,12 @@
 mcdp {
     provides students_served [Nat]
-    provides sped_students_served [Nat]
+    provides monitor_students_served [Nat]
     provides wheelchair_students_served [Nat]
 
     requires total_cost [USD]
     requires emissions [kg]
     requires students_unserved [Nat]
-    requires sped_students_unserved [Nat]
+    requires monitor_students_unserved [Nat]
     requires wheelchair_students_unserved [Nat]
     requires stops_used [Nat]
 
@@ -27,12 +27,12 @@ mcdp {
 
     # expose the route catalogue functionality to the top-level query
     provided students_served <= students_served provided by rs
-    provided sped_students_served <= sped_students_served provided by rs
+    provided monitor_students_served <= monitor_students_served provided by rs
     provided wheelchair_students_served <= wheelchair_students_served provided by rs
 
     # expose route catalogue requirements to the top-level query
     required students_unserved >= students_unserved required by rs
-    required sped_students_unserved >= sped_students_unserved required by rs
+    required monitor_students_unserved >= monitor_students_unserved required by rs
     required wheelchair_students_unserved >= wheelchair_students_unserved required by rs
     required stops_used >= stops_used required by rs
     required bird_method >= bird_method required by rs
