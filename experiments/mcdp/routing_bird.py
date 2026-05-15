@@ -933,6 +933,46 @@ def solve_grid_point_result(
     )
 
 
+def _config_labels_from_stored_data(data: Mapping[str, Any]) -> dict[str, str | None] | None:
+    """Reconstruct config_labels from an old partial-result entry that predates the
+    config_labels field.  Returns None when any lookup fails."""
+    method = data.get("method")
+    lambda_value = data.get("lambda_value")
+    lambda_label = next((lbl for v, lbl in GRID_LAMBDAS if v == lambda_value), None)
+    allow_partial = data.get("allow_partial")
+    partial_label = next((lbl for v, lbl in GRID_PARTIAL if v == allow_partial), None)
+    dwell = data.get("school_dwell_time")
+    dwell_label = next((lbl for v, lbl in GRID_DWELL if v == dwell), None)
+    earliest = data.get("earliest_arrival_buffer")
+    latest = data.get("latest_arrival_buffer")
+    arrival_label = next(
+        (lbl for e, l, lbl in GRID_ARRIVAL_WINDOWS if e == earliest and l == latest),
+        None,
+    )
+    speed = data.get("average_speed_mph")
+    speed_label = next(
+        (lbl for v, lbl in map(_grid_speed_pair, GRID_AVG_SPEEDS) if v == speed), None
+    )
+    student_policy = data.get("student_policy")
+    if any(
+        v is None
+        for v in [
+            method, lambda_label, partial_label, dwell_label,
+            arrival_label, speed_label, student_policy,
+        ]
+    ):
+        return None
+    return {
+        "bird_method": method,
+        "bird_lambda": lambda_label,
+        "bird_partial": partial_label,
+        "bird_dwell": dwell_label,
+        "bird_arrival_window": arrival_label,
+        "bird_avg_speed": speed_label,
+        "student_policy": student_policy,
+    }
+
+
 def write_static_catalogues(
     *,
     routing_lib: Path = ROUTING_LIB,
@@ -1090,6 +1130,37 @@ def main() -> None:
     success_count = 0
     error_count = 0
 
+    partial_result_path = output_dir / "routing_bird_catalogue_partial_result.json"
+    errors_path = output_dir / "routing_bird_errors.json"
+    if partial_result_path.exists():
+        logger.info("Resuming from previous partial results in {}", partial_result_path)
+        loaded_partial: dict[str, Any] = json.loads(
+            partial_result_path.read_text(encoding="utf-8")
+        )
+        for label, data in loaded_partial.items():
+            config_labels = data.get("config_labels") or _config_labels_from_stored_data(data)
+            if config_labels is not None and "summary" in data:
+                partial_result[label] = data
+                implementations[label] = routing_service_entry(
+                    data["summary"], config_labels
+                )
+                success_count += 1
+            else:
+                logger.warning(
+                    "Skipping unresumable checkpoint entry {} (config_labels missing or unresolvable)",
+                    label,
+                )
+        grid_points = [gp for gp in grid_points if gp.label not in partial_result]
+        worker_count = min(
+            args.workers or _default_worker_count(args.cpus_per_solve),
+            len(grid_points) or 1,
+        )
+        logger.info(
+            "Loaded {} previous results; {} grid points remaining",
+            len(partial_result),
+            len(grid_points),
+        )
+
     logger.info(
         "Grid prepared: grid_points={}, worker_count={}, cpus_per_solve={}, "
         "julia_timing_log={}, gurobi_verbose={}, policies={}",
@@ -1133,6 +1204,7 @@ def main() -> None:
             "earliest_arrival_buffer": grid_point.earliest_arrival_buffer,
             "latest_arrival_buffer": grid_point.latest_arrival_buffer,
             "average_speed_mph": grid_point.average_speed_mph,
+            "config_labels": grid_point.config_labels,
             "status": result.status,
             "summary": result.summary,
         }
@@ -1221,8 +1293,6 @@ def main() -> None:
         routing_implementations=implementations or None,
         guideline_implementations=guideline_implementations,
     )
-    partial_result_path = output_dir / "routing_bird_catalogue_partial_result.json"
-    errors_path = output_dir / "routing_bird_errors.json"
     partial_result_path.write_text(
         json.dumps(partial_result, indent=2, sort_keys=True),
         encoding="utf-8",
