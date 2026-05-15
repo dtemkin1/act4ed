@@ -1,12 +1,12 @@
 dp {
   # demand satisfied by a BiRD run
   provides students_served [Nat]
-  provides sped_students_served [Nat]
+  provides monitor_students_served [Nat]
   provides wheelchair_students_served [Nat]
 
   # demand left unserved by the same BiRD run
   requires students_unserved [Nat]
-  requires sped_students_unserved [Nat]
+  requires monitor_students_unserved [Nat]
   requires wheelchair_students_unserved [Nat]
 
   # route complexity and staffing selected by BiRD

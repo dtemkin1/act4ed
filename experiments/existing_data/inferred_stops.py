@@ -9,6 +9,7 @@ from experiments.existing_data.utils import (get_assigned_students,
 from experiments.helpers import (DATA_FOLDER, OUTPUTS_FOLDER,
                                  make_students_csv, setup_framingham)
 from formulation.common.classes import Attributes, Student
+from formulation.common.constants import METERS_PER_MILE
 from formulation.common.problems import ProblemDataReal
 
 ASSIGNED_STUDENTS = DATA_FOLDER / "assigned_students.csv"
@@ -75,25 +76,20 @@ def plot_special_education_students(problem_data: ProblemDataReal) -> None:
     gdf.plot(ax=ax, color="white", edgecolor="black")
 
     # plot students, color based on how far they are from their school
-    all_distances = [
-        problem_data.get_shortest_path_base(
+    all_distances = {
+        student: problem_data.get_shortest_path_base(
             student.stop.node_id, student.school.node_id
         )[0]
-        / 1000.0
+        / METERS_PER_MILE  # convert to miles
         for student in special_education_students
         if student.school is not None
-    ]
-    color_gradient = plt.cm.get_cmap("RdYlGn_r")
-    norm = Normalize(vmin=min(all_distances), vmax=max(all_distances))
+    }
+    color_gradient = plt.get_cmap("RdYlGn_r")
+    norm = Normalize(vmin=min(all_distances.values()), vmax=max(all_distances.values()))
     sm = plt.cm.ScalarMappable(cmap=color_gradient, norm=norm)
     sm.set_array([])
 
-    for student in special_education_students:
-        distance_m, _ = problem_data.get_shortest_path_base(
-            student.stop.node_id, student.school.node_id
-        )
-        distance = distance_m / 1000.0  # convert to km
-
+    for student, distance in all_distances.items():
         ax.scatter(
             student.geographic_location.x,
             student.geographic_location.y,
@@ -102,13 +98,12 @@ def plot_special_education_students(problem_data: ProblemDataReal) -> None:
 
     # add gradient legend
     cbar = plt.colorbar(sm, ax=ax)
-    cbar.set_label("Distance to School (km)")
+    cbar.set_label("Distance to School (miles)")
 
     # remove axis borders and ticks
     ax.set_axis_off()
     fig.savefig(
-        OUTPUTS_FOLDER / "special_education_students.png",
-        dpi=300,
+        OUTPUTS_FOLDER / "special_education_students.pdf",
         bbox_inches="tight",
     )
 

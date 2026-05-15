@@ -85,7 +85,7 @@ def main() -> None:
     plot_bus_routes(
         no_chaining_solution,
         no_chaining,
-        save_path=CURRENT_FILE_DIR / ".." / "outputs" / "no_chaining_routes.png",
+        save_path=CURRENT_FILE_DIR / ".." / "outputs" / "no_chaining_routes.pdf",
     )
     print("No-chaining routes plotted")
     no_chaining_bundle.model.close()
@@ -154,7 +154,7 @@ def main() -> None:
     plot_bus_routes(
         chaining_solution,
         chaining,
-        save_path=CURRENT_FILE_DIR / ".." / "outputs" / "chaining_routes.png",
+        save_path=CURRENT_FILE_DIR / ".." / "outputs" / "chaining_routes.pdf",
     )
 
     chaining_bundle.model.close()

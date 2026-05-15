@@ -141,11 +141,11 @@ def make_buses(
     depots: tuple[Depot, ...] | None = None,
 ) -> tuple[Bus, ...]:
     if capacities is None:
-        capacities = [40] * num_buses
+        capacities = [len(graph.nodes)]
     if depots is None:
         depots = make_depots(graph)
     if ranges is None:
-        ranges = [float(len(graph.nodes))] * num_buses
+        ranges = [float(len(graph.nodes))]
     buses: list[Bus] = []
     for i in range(num_buses):
         bus = Bus(

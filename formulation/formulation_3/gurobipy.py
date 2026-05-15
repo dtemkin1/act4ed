@@ -1,5 +1,6 @@
 import datetime as dt
 import math
+from typing import overload
 
 import gurobipy as gp
 from gurobipy import GRB, GurobiError
@@ -556,6 +557,14 @@ def build_model_from_definition(
         },
         meta=meta,
     )
+
+
+@overload
+def solve_problem(model: Formulation3ModelBundle) -> Formulation3Solution: ...
+
+
+@overload
+def solve_problem(model: gp.Model) -> None: ...
 
 
 def solve_problem(

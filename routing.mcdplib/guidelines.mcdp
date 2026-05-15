@@ -7,7 +7,7 @@ dp {
 
   # Minimum service level and student body selected by policy/planning.
   requires students_served [Nat]
-  requires sped_students_served [Nat]
+  requires monitor_students_served [Nat]
   requires wheelchair_students_served [Nat]
   requires student_policy [`student_policy]
 
