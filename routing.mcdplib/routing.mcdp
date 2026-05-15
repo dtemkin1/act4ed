@@ -17,8 +17,10 @@ mcdp {
     requires bird_dwell [`bird_dwell]
     requires bird_arrival_window [`bird_arrival_window]
     requires bird_avg_speed [`bird_avg_speed]
+    requires student_policy [`student_policy]
 
     sub rs = instance `routing_service
+    sub g = instance `guidelines
     sub bc = instance `fleet_bus_count
     sub dr = instance `driver
     sub mo = instance `monitor
@@ -41,6 +43,17 @@ mcdp {
     required bird_dwell >= bird_dwell required by rs
     required bird_arrival_window >= bird_arrival_window required by rs
     required bird_avg_speed >= bird_avg_speed required by rs
+    required student_policy >= student_policy required by rs
+    required student_policy >= student_policy required by g
+
+    # policy/guideline constraints
+    students_served required by g <= students_served provided by rs
+    sped_students_served required by g <= sped_students_served provided by rs
+    wheelchair_students_served required by g <= wheelchair_students_served provided by rs
+
+    students_unserved required by rs <= students_unserved provided by g
+    sped_students_unserved required by rs <= sped_students_unserved provided by g
+    wheelchair_students_unserved required by rs <= wheelchair_students_unserved provided by g
 
     required total_cost >= (
         fuel_cost required by fu +
@@ -49,6 +62,13 @@ mcdp {
         monitor_cost required by mo +
         capital_cost required by bc
     )
+    (
+        fuel_cost required by fu +
+        maintenance_cost required by mt +
+        driver_cost required by dr +
+        monitor_cost required by mo +
+        capital_cost required by bc
+    ) <= roi_budget provided by g
 
     # emissions
     required emissions >= emissions required by fu

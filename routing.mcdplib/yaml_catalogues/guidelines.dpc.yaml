@@ -1,15 +1,77 @@
 F:
-  - "USD"
+- USD
+- Nat
+- Nat
+- Nat
 R:
-  - "Nat"
-  - "Nat"
-  - "Nat"
-
+- Nat
+- Nat
+- Nat
+- '`student_policy'
 implementations:
-  guideline_200:
+  guideline_current_assignment:
     f_max:
-      - "4500000 USD"
+    - 4500000 USD
+    - '100000'
+    - '100000'
+    - '100000'
     r_min:
-      - "0"
-      - "0"
-      - "0"
+    - '0'
+    - '0'
+    - '0'
+    - '`student_policy: current_assignment'
+  guideline_distance_gt_2mi:
+    f_max:
+    - 4500000 USD
+    - '100000'
+    - '100000'
+    - '100000'
+    r_min:
+    - '0'
+    - '0'
+    - '0'
+    - '`student_policy: distance_gt_2mi'
+  guideline_distance_gt_1p5mi:
+    f_max:
+    - 4500000 USD
+    - '100000'
+    - '100000'
+    - '100000'
+    r_min:
+    - '0'
+    - '0'
+    - '0'
+    - '`student_policy: distance_gt_1p5mi'
+  guideline_distance_gt_1mi:
+    f_max:
+    - 4500000 USD
+    - '100000'
+    - '100000'
+    - '100000'
+    r_min:
+    - '0'
+    - '0'
+    - '0'
+    - '`student_policy: distance_gt_1mi'
+  guideline_distance_gt_0p5mi:
+    f_max:
+    - 4500000 USD
+    - '100000'
+    - '100000'
+    - '100000'
+    r_min:
+    - '0'
+    - '0'
+    - '0'
+    - '`student_policy: distance_gt_0p5mi'
+  guideline_all_students:
+    f_max:
+    - 4500000 USD
+    - '100000'
+    - '100000'
+    - '100000'
+    r_min:
+    - '0'
+    - '0'
+    - '0'
+    - '`student_policy: all_students'

@@ -1,11 +1,15 @@
 dp {
-  # Budget cap available from policy/planning
+  # Policy/planning budget cap and allowable unserved counts.
   provides roi_budget [USD]
+  provides students_unserved [Nat]
+  provides sped_students_unserved [Nat]
+  provides wheelchair_students_unserved [Nat]
 
-  # Minimum service level required by policy/planning
+  # Minimum service level and student body selected by policy/planning.
   requires students_served [Nat]
   requires sped_students_served [Nat]
   requires wheelchair_students_served [Nat]
+  requires student_policy [`student_policy]
 
   implemented-by yaml resource("guidelines.dpc.yaml")
 }

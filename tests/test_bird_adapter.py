@@ -777,8 +777,16 @@ class BirdAdapterTests(unittest.TestCase):
         self.assertEqual(summary["students_unserved"], 0)
         self.assertEqual(summary["sped_students_unserved"], 0)
         self.assertEqual(summary["wheelchair_students_unserved"], 0)
-        self.assertEqual(summary["stops_used"], 3)
+        self.assertEqual(summary["stops_used"], 1)
+        self.assertEqual(summary["unique_stops_used"], 1)
+        self.assertEqual(summary["total_stops_used"], 2)
         self.assertEqual(summary["monitor_buses"], 2)
+
+        by_bus = summary["by_bus"]
+        self.assertEqual(by_bus["C01"]["unique_stops_used"], 1)
+        self.assertEqual(by_bus["C01"]["total_stops_used"], 1)
+        self.assertEqual(by_bus["M01"]["unique_stops_used"], 1)
+        self.assertEqual(by_bus["M01"]["total_stops_used"], 1)
 
         by_type = summary["by_type"]
         self.assertEqual(by_type["C"]["buses_used"], 1)

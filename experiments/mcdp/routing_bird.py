@@ -24,7 +24,7 @@ from formulation.bird_adapter import (BirdAdapterConfig, BirdBackendSolution,
                                       build_bird_export_instance,
                                       export_bird_instance,
                                       summarize_bird_solution_for_mcdp)
-from formulation.common import Bus
+from formulation.common import Bus, KM_PER_MILE, Student
 from formulation.common.problems import FilteredProblemData, ProblemData
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -64,6 +64,7 @@ ROUTING_R = [
     "`bird_dwell",  # school dwell time setting
     "`bird_arrival_window",  # earliest/latest arrival buffer setting
     "`bird_avg_speed",  # average bus speed setting
+    "`student_policy",  # student body/policy cohort selected for routing
 ]
 
 GRID_FLEET = {
@@ -72,7 +73,7 @@ GRID_FLEET = {
     "BWC": (11,),
     "WC": (2,),
 }
-GRID_METHODS = ("scenario",)
+GRID_METHODS = ("lbh", "scenario")
 GRID_LAMBDAS = (
     (1.0e2, "lambda_1e3"),
     (1.0e4, "lambda_1e4"),
@@ -88,19 +89,44 @@ GRID_ARRIVAL_WINDOWS = (
     (40.0, 10.0, "arrival_early40_late10"),  # Minutes before school bell time
 )
 GRID_AVG_SPEEDS = (10, 20, 30)
+GRID_STUDENT_POLICIES = (
+    "current_assignment",
+    "distance_gt_2mi",
+    "distance_gt_1p5mi",
+    "distance_gt_1mi",
+    "distance_gt_0p5mi",
+    "all_students",
+)
+DEFAULT_GUIDELINE_BUDGET_USD = 4_500_000
+DEFAULT_ALLOWABLE_UNSERVED = 100_000
 
 DEFAULT_COSTS: dict[str, Any] = {
     "school_days": 180,
     "capital_annualization_factor": 1.0,
-    "capital": {"C": 128780, "B": 110060, "BWC": 126660, "WC": 136780},
+    "capital": {
+        "C": 128780,
+        "B": 110060,
+        "BWC": 126660,
+        "WC": 136780
+    },
     "driver_yearly_pay": 46571,
     "monitor_yearly_pay": 26609,
     "diesel_cost_per_gallon": 3.09,
     "diesel_co2_kg_per_gallon": 10.21,
     "fuel_cost_per_km": None,
     "emissions_kg_per_km": 1.20,
-    "maintenance_distance_factor": {"C": 0.15, "B": 0.15, "BWC": 0.15, "WC": 0.15},
-    "maintenance_runtime_factor": {"C": 0.0, "B": 0.0, "BWC": 0.0, "WC": 0.0},
+    "maintenance_distance_factor": {
+        "C": 0.15,
+        "B": 0.15,
+        "BWC": 0.15,
+        "WC": 0.15
+    },
+    "maintenance_runtime_factor": {
+        "C": 0.0,
+        "B": 0.0,
+        "BWC": 0.0,
+        "WC": 0.0
+    },
 }
 
 
@@ -122,8 +148,50 @@ def _problem_size_summary(problem_data: ProblemData) -> dict[str, int]:
 
 
 @dataclass(frozen=True)
+class StudentPolicySpec:
+    label: str
+    description: str
+    min_distance_miles: float | None = None
+    current_assignment: bool = False
+
+
+STUDENT_POLICY_SPECS = {
+    "current_assignment": StudentPolicySpec(
+        label="current_assignment",
+        description="current assignment",
+        current_assignment=True,
+    ),
+    "distance_gt_2mi": StudentPolicySpec(
+        label="distance_gt_2mi",
+        description="students living farther than 2 miles",
+        min_distance_miles=2.0,
+    ),
+    "distance_gt_1p5mi": StudentPolicySpec(
+        label="distance_gt_1p5mi",
+        description="students living farther than 1.5 miles",
+        min_distance_miles=1.5,
+    ),
+    "distance_gt_1mi": StudentPolicySpec(
+        label="distance_gt_1mi",
+        description="students living farther than 1 mile",
+        min_distance_miles=1.0,
+    ),
+    "distance_gt_0p5mi": StudentPolicySpec(
+        label="distance_gt_0p5mi",
+        description="students living farther than 0.5 miles",
+        min_distance_miles=0.5,
+    ),
+    "all_students": StudentPolicySpec(
+        label="all_students",
+        description="all students",
+    ),
+}
+
+
+@dataclass(frozen=True)
 class GridPoint:
     counts: dict[str, int]
+    student_policy: str
     method: Literal["lbh", "scenario"]
     lambda_value: float
     lambda_label: str
@@ -145,7 +213,7 @@ class GridPoint:
             f"{bus_type}{self.counts[bus_type]}" for bus_type in BUS_TYPES
         )
         return (
-            f"bird_{count_label}_{self.method}_{self.lambda_label}_"
+            f"bird_{self.student_policy}_{count_label}_{self.method}_{self.lambda_label}_"
             f"{self.average_speed_label}_{self.partial_label}_{self.spillover_label}_"
             f"{self.dwell_label}_{self.arrival_label}"
         )
@@ -159,6 +227,7 @@ class GridPoint:
             "bird_dwell": self.dwell_label,
             "bird_arrival_window": self.arrival_label,
             "bird_avg_speed": self.average_speed_label,
+            "student_policy": self.student_policy,
         }
 
 
@@ -318,6 +387,7 @@ def routing_service_entry(
             _poset_value("bird_dwell", config_labels["bird_dwell"]),
             _poset_value("bird_arrival_window", config_labels["bird_arrival_window"]),
             _poset_value("bird_avg_speed", config_labels["bird_avg_speed"]),
+            _poset_value("student_policy", config_labels["student_policy"]),
         ],
     }
 
@@ -355,6 +425,82 @@ def fleet_catalogue(
     }
 
 
+def fleet_bounds_for_routing_implementations(
+    implementations: Mapping[str, dict[str, list[str]]],
+) -> dict[str, int]:
+    bounds = {bus_type: 0 for bus_type in BUS_TYPES}
+    for implementation in implementations.values():
+        r_min = implementation["r_min"]
+        for index, bus_type in enumerate(BUS_TYPES):
+            bounds[bus_type] = max(bounds[bus_type], int(r_min[5 + index]))
+    return bounds
+
+
+def _student_counts(students: Iterable[Student]) -> dict[str, int]:
+    total = 0
+    sped = 0
+    wheelchair = 0
+    for student in students:
+        total += 1
+        sped += int(bool(student.attributes.special_ed))
+        wheelchair += int(bool(student.attributes.wheelchair_user))
+    return {
+        "students": total,
+        "sped_students": sped,
+        "wheelchair_students": wheelchair,
+    }
+
+
+def guideline_entry_for_policy(
+    policy_problem_data: ProblemData,
+    policy_label: str,
+    *,
+    roi_budget_usd: float = DEFAULT_GUIDELINE_BUDGET_USD,
+) -> dict[str, list[str]]:
+    counts = _student_counts(policy_problem_data.students)
+    return {
+        "f_max": [
+            _with_unit(roi_budget_usd, "USD"),
+            "0",
+            "0",
+            "0",
+        ],
+        "r_min": [
+            str(counts["students"]),
+            str(counts["sped_students"]),
+            str(counts["wheelchair_students"]),
+            _poset_value("student_policy", policy_label),
+        ],
+    }
+
+
+def default_guideline_entry(policy_label: str) -> dict[str, list[str]]:
+    return {
+        "f_max": [
+            _with_unit(DEFAULT_GUIDELINE_BUDGET_USD, "USD"),
+            str(DEFAULT_ALLOWABLE_UNSERVED),
+            str(DEFAULT_ALLOWABLE_UNSERVED),
+            str(DEFAULT_ALLOWABLE_UNSERVED),
+        ],
+        "r_min": [
+            "0",
+            "0",
+            "0",
+            _poset_value("student_policy", policy_label),
+        ],
+    }
+
+
+def guidelines_catalogue(
+    implementations: Mapping[str, dict[str, list[str]]],
+) -> dict[str, Any]:
+    return {
+        "F": ["USD", "Nat", "Nat", "Nat"],
+        "R": ["Nat", "Nat", "Nat", "`student_policy"],
+        "implementations": dict(implementations),
+    }
+
+
 def config_posets() -> dict[str, tuple[str, ...]]:
     return {
         "bird_method": GRID_METHODS,
@@ -367,6 +513,7 @@ def config_posets() -> dict[str, tuple[str, ...]]:
         "bird_avg_speed": tuple(
             label for _speed_mph, label in map(_grid_speed_pair, GRID_AVG_SPEEDS)
         ),
+        "student_policy": GRID_STUDENT_POLICIES,
     }
 
 
@@ -496,33 +643,39 @@ def write_cost_modules(routing_lib: Path, costs: Mapping[str, Any]) -> None:
     )
 
 
-def write_policy_module(routing_lib: Path) -> None:
-    (routing_lib / "routing_policy.mcdp").write_text(
-        """mcdp {
-    provides students_served [Nat]
-    provides sped_students_served [Nat]
-    provides wheelchair_students_served [Nat]
+def write_guidelines_module(routing_lib: Path) -> None:
+    (routing_lib / "guidelines.mcdp").write_text(
+        """dp {
+  # Policy/planning budget cap and allowable unserved counts.
+  provides roi_budget [USD]
+  provides students_unserved [Nat]
+  provides sped_students_unserved [Nat]
+  provides wheelchair_students_unserved [Nat]
 
-    requires policy_cost [USD]
+  # Minimum service level and student body selected by policy/planning.
+  requires students_served [Nat]
+  requires sped_students_served [Nat]
+  requires wheelchair_students_served [Nat]
+  requires student_policy [`student_policy]
 
-    sub g = instance `guidelines
-
-    provided students_served >= students_served required by g
-    provided sped_students_served >= sped_students_served required by g
-    provided wheelchair_students_served >= wheelchair_students_served required by g
-
-    required policy_cost <= roi_budget provided by g
+  implemented-by yaml resource("guidelines.dpc.yaml")
 }
 """,
         encoding="utf-8",
     )
 
 
-def iter_grid() -> Iterable[GridPoint]:
+def write_policy_module(routing_lib: Path) -> None:
+    write_guidelines_module(routing_lib)
+
+
+def iter_grid(policy_labels: Iterable[str] | None = None) -> Iterable[GridPoint]:
+    selected_policy_labels = tuple(policy_labels or GRID_STUDENT_POLICIES)
     count_values = [GRID_FLEET[bus_type] for bus_type in BUS_TYPES]
     for counts_tuple in product(*count_values):
         counts: dict[str, int] = dict(zip(BUS_TYPES, counts_tuple, strict=True))
         for (
+            student_policy,
             method,
             lambda_pair,
             partial_pair,
@@ -531,6 +684,7 @@ def iter_grid() -> Iterable[GridPoint]:
             window,
             speed_pair,
         ) in product(
+            selected_policy_labels,
             GRID_METHODS,
             GRID_LAMBDAS,
             GRID_PARTIAL,
@@ -547,6 +701,7 @@ def iter_grid() -> Iterable[GridPoint]:
             average_speed_mph, average_speed_label = speed_pair
             yield GridPoint(
                 counts=counts,
+                student_policy=student_policy,
                 method=method,
                 lambda_value=lambda_value,
                 lambda_label=lambda_label,
@@ -576,6 +731,58 @@ def bird_config_for_grid_point(grid_point: GridPoint) -> BirdAdapterConfig:
         latest_arrival_buffer=grid_point.latest_arrival_buffer,
         bus_mph=grid_point.average_speed_mph,
         method=grid_point.method,
+    )
+
+
+def _student_distance_to_school_km(
+    problem_data: ProblemData, student: Student
+) -> float:
+    if student.stop.node_id == student.school.node_id:
+        return 0.0
+    edge_data = problem_data.service_graph.get_edge_data(
+        student.stop.node_id,
+        student.school.node_id,
+        key=0,
+    )
+    if edge_data is not None:
+        return float(edge_data["length"])
+    length_m, _path = problem_data.get_shortest_path_base(
+        student.stop.node_id,
+        student.school.node_id,
+    )
+    return length_m / 1000.0
+
+
+def students_for_policy(
+    problem_data: ProblemData,
+    policy_label: str,
+) -> tuple[Student, ...]:
+    try:
+        policy = STUDENT_POLICY_SPECS[policy_label]
+    except KeyError as exc:
+        raise ValueError(f"unknown student policy {policy_label!r}") from exc
+
+    if policy.current_assignment:
+        return get_assigned_students(problem_data.schools, problem_data.stops)
+    if policy.min_distance_miles is None:
+        return tuple(problem_data.students)
+
+    threshold_km = policy.min_distance_miles * KM_PER_MILE
+    return tuple(
+        student
+        for student in problem_data.students
+        if _student_distance_to_school_km(problem_data, student) > threshold_km
+    )
+
+
+def problem_for_student_policy(
+    problem_data: ProblemData,
+    policy_label: str,
+) -> ProblemData:
+    return FilteredProblemData(
+        name=f"{problem_data.name}_{policy_label}",
+        base_problem_data=problem_data,
+        _students=students_for_policy(problem_data, policy_label),
     )
 
 
@@ -715,12 +922,29 @@ def write_static_catalogues(
     routing_lib: Path = ROUTING_LIB,
     costs: Mapping[str, Any] | None = None,
     routing_implementations: Mapping[str, dict[str, list[str]]] | None = None,
+    guideline_implementations: Mapping[str, dict[str, list[str]]] | None = None,
 ) -> None:
     selected_costs = dict(costs or load_routing_costs())
     yaml_dir = routing_lib / "yaml_catalogues"
+    fleet_bounds = (
+        fleet_bounds_for_routing_implementations(routing_implementations)
+        if routing_implementations is not None
+        else read_bus_inventory_counts()
+    )
     write_catalogue(
         yaml_dir / "fleet_bus_count.dpc.yaml",
-        fleet_catalogue(read_bus_inventory_counts(), selected_costs),
+        fleet_catalogue(fleet_bounds, selected_costs),
+    )
+    write_catalogue(
+        yaml_dir / "guidelines.dpc.yaml",
+        guidelines_catalogue(
+            guideline_implementations
+            if guideline_implementations is not None
+            else {
+                f"guideline_{policy_label}": default_guideline_entry(policy_label)
+                for policy_label in GRID_STUDENT_POLICIES
+            }
+        ),
     )
     if routing_implementations is not None:
         write_catalogue(
@@ -730,7 +954,7 @@ def write_static_catalogues(
     for name, elements in config_posets().items():
         write_poset(routing_lib / f"{name}.mcdp_poset", elements)
     write_cost_modules(routing_lib, selected_costs)
-    write_policy_module(routing_lib)
+    write_guidelines_module(routing_lib)
 
 
 def parse_args() -> argparse.Namespace:
@@ -787,25 +1011,40 @@ def main() -> None:
     costs = load_routing_costs(args.cost_config)
     logger.info("Routing costs loaded")
 
-    if args.current_routes:
-        logger.info("Loading assigned Framingham problem data")
-        problem_data = _load_assigned_framingham_problem()
-    else:
-        logger.info("Loading full Framingham problem data")
-        problem_data = _load_full_framingham_problem()
-    logger.info("Problem data loaded: {}", _problem_size_summary(problem_data))
+    policy_labels = (
+        ("current_assignment",) if args.current_routes else GRID_STUDENT_POLICIES
+    )
+    logger.info("Loading full Framingham problem data")
+    base_problem_data = _load_full_framingham_problem()
+    logger.info("Problem data loaded: {}", _problem_size_summary(base_problem_data))
 
-    logger.info("Building reusable Bird export template")
-    bird_template = build_bird_export_instance(
-        problem_data,
-        BirdAdapterConfig(cohort="all", fleet_aware=True),
-    )
-    logger.info(
-        "Bird export template built: demand_rows={}, schools={}, fleet_size={}",
-        len(bird_template.demand_rows),
-        len(bird_template.schools),
-        bird_template.fleet_size,
-    )
+    policy_problems: dict[str, ProblemData] = {}
+    bird_templates: dict[str, BirdExportInstance] = {}
+    guideline_implementations: dict[str, dict[str, list[str]]] = {}
+    for policy_label in policy_labels:
+        policy_problem = problem_for_student_policy(base_problem_data, policy_label)
+        policy_problems[policy_label] = policy_problem
+        guideline_implementations[f"guideline_{policy_label}"] = (
+            guideline_entry_for_policy(policy_problem, policy_label)
+        )
+        logger.info(
+            "Building Bird export template for policy {}: {}",
+            policy_label,
+            _problem_size_summary(policy_problem),
+        )
+        bird_template = build_bird_export_instance(
+            policy_problem,
+            BirdAdapterConfig(cohort="all", fleet_aware=True),
+        )
+        bird_templates[policy_label] = bird_template
+        logger.info(
+            "Bird export template built for {}: demand_rows={}, schools={}, "
+            "fleet_size={}",
+            policy_label,
+            len(bird_template.demand_rows),
+            len(bird_template.schools),
+            bird_template.fleet_size,
+        )
 
     logger.info("Reading bus inventory order from {}", BUS_CSV)
     bus_order = read_bus_inventory_order()
@@ -824,7 +1063,9 @@ def main() -> None:
         raise ValueError("--workers must be at least 1")
 
     grid_points = [
-        grid_point for grid_point in iter_grid() if sum(grid_point.counts.values()) != 0
+        grid_point
+        for grid_point in iter_grid(policy_labels)
+        if sum(grid_point.counts.values()) != 0
     ]
     worker_count = min(
         args.workers or _default_worker_count(args.cpus_per_solve),
@@ -835,12 +1076,13 @@ def main() -> None:
 
     logger.info(
         "Grid prepared: grid_points={}, worker_count={}, cpus_per_solve={}, "
-        "julia_timing_log={}, gurobi_verbose={}",
+        "julia_timing_log={}, gurobi_verbose={}, policies={}",
         len(grid_points),
         worker_count,
         args.cpus_per_solve,
         args.julia_timing_log,
         args.gurobi_verbose,
+        policy_labels,
     )
 
     def record_result(result: GridPointSolveResult) -> None:
@@ -868,6 +1110,7 @@ def main() -> None:
             "counts": grid_point.counts,
             "method": grid_point.method,
             "lambda_value": grid_point.lambda_value,
+            "student_policy": grid_point.student_policy,
             "conventional_spillover": grid_point.conventional_spillover,
             "allow_partial": grid_point.allow_partial,
             "school_dwell_time": grid_point.school_dwell_time,
@@ -891,11 +1134,11 @@ def main() -> None:
         for grid_point in progress:
             record_result(
                 solve_grid_point_result(
-                    problem_data,
+                    policy_problems[grid_point.student_policy],
                     grid_point,
                     output_dir=output_dir,
                     bus_order=bus_order,
-                    template=bird_template,
+                    template=bird_templates[grid_point.student_policy],
                     julia_timing_log=args.julia_timing_log,
                     gurobi_verbose=args.gurobi_verbose,
                     cpus_per_solve=args.cpus_per_solve,
@@ -908,11 +1151,11 @@ def main() -> None:
             pending = {
                 executor.submit(
                     solve_grid_point_result,
-                    problem_data,
+                    policy_problems[grid_point.student_policy],
                     grid_point,
                     output_dir=output_dir,
                     bus_order=bus_order,
-                    template=bird_template,
+                    template=bird_templates[grid_point.student_policy],
                     julia_timing_log=args.julia_timing_log,
                     gurobi_verbose=args.gurobi_verbose,
                     cpus_per_solve=args.cpus_per_solve,
@@ -960,6 +1203,7 @@ def main() -> None:
         routing_lib=args.routing_lib,
         costs=costs,
         routing_implementations=implementations or None,
+        guideline_implementations=guideline_implementations,
     )
     partial_result_path = output_dir / "routing_bird_catalogue_partial_result.json"
     errors_path = output_dir / "routing_bird_errors.json"

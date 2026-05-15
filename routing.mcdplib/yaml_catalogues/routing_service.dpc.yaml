@@ -26,6 +26,7 @@ R:
 - '`bird_dwell'
 - '`bird_arrival_window'
 - '`bird_avg_speed'
+- '`student_policy'
 implementations:
   bird_C45_B17_BWC9_WC1_scenario_lambda_1e3_speed_30mph_partial_true_spillover_false_dwell_0_arrival_default:
     f_max:
@@ -56,6 +57,7 @@ implementations:
     - '`bird_dwell: dwell_0'
     - '`bird_arrival_window: arrival_default'
     - '`bird_avg_speed: speed_30mph'
+    - '`student_policy: all_students'
   bird_C45_B17_BWC9_WC1_scenario_lambda_1e3_speed_30mph_partial_true_spillover_false_dwell_0_arrival_early30_late10:
     f_max:
     - '8147'
@@ -85,6 +87,7 @@ implementations:
     - '`bird_dwell: dwell_0'
     - '`bird_arrival_window: arrival_early30_late10'
     - '`bird_avg_speed: speed_30mph'
+    - '`student_policy: all_students'
   bird_C45_B17_BWC9_WC1_scenario_lambda_1e3_speed_30mph_partial_true_spillover_false_dwell_10_arrival_default:
     f_max:
     - '7519'
@@ -114,6 +117,7 @@ implementations:
     - '`bird_dwell: dwell_10'
     - '`bird_arrival_window: arrival_default'
     - '`bird_avg_speed: speed_30mph'
+    - '`student_policy: all_students'
   bird_C45_B17_BWC9_WC1_scenario_lambda_1e3_speed_30mph_partial_true_spillover_false_dwell_0_arrival_early40_late10:
     f_max:
     - '8147'
@@ -143,6 +147,7 @@ implementations:
     - '`bird_dwell: dwell_0'
     - '`bird_arrival_window: arrival_early40_late10'
     - '`bird_avg_speed: speed_30mph'
+    - '`student_policy: all_students'
   bird_C45_B17_BWC9_WC1_scenario_lambda_1e3_speed_30mph_partial_true_spillover_false_dwell_10_arrival_early30_late10:
     f_max:
     - '8136'
@@ -172,6 +177,7 @@ implementations:
     - '`bird_dwell: dwell_10'
     - '`bird_arrival_window: arrival_early30_late10'
     - '`bird_avg_speed: speed_30mph'
+    - '`student_policy: all_students'
   bird_C45_B17_BWC9_WC1_scenario_lambda_1e3_speed_30mph_partial_true_spillover_false_dwell_10_arrival_early40_late10:
     f_max:
     - '8147'
@@ -201,6 +207,7 @@ implementations:
     - '`bird_dwell: dwell_10'
     - '`bird_arrival_window: arrival_early40_late10'
     - '`bird_avg_speed: speed_30mph'
+    - '`student_policy: all_students'
   bird_C45_B17_BWC9_WC1_scenario_lambda_1e3_speed_30mph_partial_true_spillover_true_dwell_0_arrival_early30_late10:
     f_max:
     - '8210'
@@ -230,6 +237,7 @@ implementations:
     - '`bird_dwell: dwell_0'
     - '`bird_arrival_window: arrival_early30_late10'
     - '`bird_avg_speed: speed_30mph'
+    - '`student_policy: all_students'
   bird_C45_B17_BWC9_WC1_scenario_lambda_1e3_speed_30mph_partial_true_spillover_true_dwell_0_arrival_early40_late10:
     f_max:
     - '8210'
@@ -259,6 +267,7 @@ implementations:
     - '`bird_dwell: dwell_0'
     - '`bird_arrival_window: arrival_early40_late10'
     - '`bird_avg_speed: speed_30mph'
+    - '`student_policy: all_students'
   bird_C45_B17_BWC9_WC1_scenario_lambda_1e3_speed_30mph_partial_true_spillover_true_dwell_0_arrival_default:
     f_max:
     - '8161'
@@ -288,6 +297,7 @@ implementations:
     - '`bird_dwell: dwell_0'
     - '`bird_arrival_window: arrival_default'
     - '`bird_avg_speed: speed_30mph'
+    - '`student_policy: all_students'
   bird_C45_B17_BWC9_WC1_scenario_lambda_1e3_speed_30mph_partial_true_spillover_true_dwell_10_arrival_default:
     f_max:
     - '7843'
@@ -317,6 +327,7 @@ implementations:
     - '`bird_dwell: dwell_10'
     - '`bird_arrival_window: arrival_default'
     - '`bird_avg_speed: speed_30mph'
+    - '`student_policy: all_students'
   bird_C45_B17_BWC9_WC1_scenario_lambda_1e3_speed_30mph_partial_true_spillover_true_dwell_10_arrival_early30_late10:
     f_max:
     - '8210'
@@ -346,6 +357,7 @@ implementations:
     - '`bird_dwell: dwell_10'
     - '`bird_arrival_window: arrival_early30_late10'
     - '`bird_avg_speed: speed_30mph'
+    - '`student_policy: all_students'
   bird_C45_B17_BWC9_WC1_scenario_lambda_1e3_speed_30mph_partial_true_spillover_true_dwell_10_arrival_early40_late10:
     f_max:
     - '8210'
@@ -375,3 +387,4 @@ implementations:
     - '`bird_dwell: dwell_10'
     - '`bird_arrival_window: arrival_early40_late10'
     - '`bird_avg_speed: speed_30mph'
+    - '`student_policy: all_students'

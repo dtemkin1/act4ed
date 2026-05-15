@@ -20,4 +20,5 @@ query:
     bird_dwell: "`bird_dwell: dwell_10"
     bird_arrival_window: "`bird_arrival_window: arrival_default"
     bird_avg_speed: "`bird_avg_speed: speed_30mph"
+    student_policy: "`student_policy: all_students"
   optimize_for: [total_cost]

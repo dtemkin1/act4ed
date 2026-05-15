@@ -1763,8 +1763,12 @@ def summarize_bird_solution_for_mcdp(
         "sped_students_served": 0,
         "wheelchair_students_served": 0,
         "stops_used": 0,
+        "unique_stops_used": 0,
+        "total_stops_used": 0,
         "monitor_buses": 0,
     }
+    unique_stop_node_ids: set[int] = set()
+    total_stop_visits = 0
 
     for bus_id, bus_rows in sorted(rows_by_bus.items()):
         bus_index = bus_id - 1
@@ -1784,7 +1788,8 @@ def summarize_bird_solution_for_mcdp(
         bus_students = 0
         bus_sped = 0
         bus_wheelchair = 0
-        bus_stops = 0
+        bus_stop_node_ids: set[int] = set()
+        bus_total_stop_visits = 0
 
         for row_idx in sorted(
             bus_rows, key=lambda idx: int(solution.assignment_orders[idx])
@@ -1814,7 +1819,13 @@ def summarize_bird_solution_for_mcdp(
             bus_students += sum(row.students for _idx, row in route_rows)
             bus_sped += sum(row.special_ed_students for _idx, row in route_rows)
             bus_wheelchair += sum(row.wheelchair_students for _idx, row in route_rows)
-            bus_stops += len(route_rows)
+            route_stop_node_ids: set[int] = set()
+            for _idx, row in route_rows:
+                bus_stop_node_ids.add(row.stop_node_id)
+                unique_stop_node_ids.add(row.stop_node_id)
+                route_stop_node_ids.add(row.stop_node_id)
+            bus_total_stop_visits += len(route_stop_node_ids)
+            total_stop_visits += len(route_stop_node_ids)
             current_matrix_idx = demand_count + school_idx
 
         depot_matrix_idx = demand_count + school_count + depot_index
@@ -1833,6 +1844,7 @@ def summarize_bird_solution_for_mcdp(
             )
 
         needs_monitor = bus_sped > 0 or bus_wheelchair > 0
+        bus_stops = len(bus_stop_node_ids)
         bus_summary = {
             "bus_name": bus_name,
             "bus_type": bus_type,
@@ -1843,6 +1855,8 @@ def summarize_bird_solution_for_mcdp(
             "sped_students_served": bus_sped,
             "wheelchair_students_served": bus_wheelchair,
             "stops_used": bus_stops,
+            "unique_stops_used": bus_stops,
+            "total_stops_used": bus_total_stop_visits,
             "needs_monitor": needs_monitor,
         }
         by_bus[bus_name] = bus_summary
@@ -1870,8 +1884,11 @@ def summarize_bird_solution_for_mcdp(
         totals["students_served"] += bus_students
         totals["sped_students_served"] += bus_sped
         totals["wheelchair_students_served"] += bus_wheelchair
-        totals["stops_used"] += bus_stops
         totals["monitor_buses"] += int(needs_monitor)
+
+    totals["stops_used"] = len(unique_stop_node_ids)
+    totals["unique_stops_used"] = len(unique_stop_node_ids)
+    totals["total_stops_used"] = total_stop_visits
 
     unassigned_rows = _bird_unassigned_demand_rows(instance, solution)
     students_unserved = sum(row.students for row in unassigned_rows)

@@ -35,6 +35,17 @@ def parse_poset_value(value: Any) -> str:
     return text
 
 
+def fuel_cost_per_km(costs: dict[str, Any]) -> float:
+    configured = costs.get("fuel_cost_per_km")
+    if configured is not None:
+        return float(configured)
+    return (
+        float(costs["diesel_cost_per_gallon"])
+        * float(costs["emissions_kg_per_km"])
+        / float(costs["diesel_co2_kg_per_gallon"])
+    )
+
+
 def pareto_min(
     points: list[dict[str, Any]], x_key: str, y_key: str
 ) -> list[dict[str, Any]]:
@@ -58,6 +69,7 @@ def route_records(library: Path, costs_path: Path) -> list[dict[str, Any]]:
     capital = costs["capital"]
     distance_factor = costs["maintenance_distance_factor"]
     runtime_factor = costs["maintenance_runtime_factor"]
+    fuel_cost_factor = fuel_cost_per_km(costs)
 
     records: list[dict[str, Any]] = []
     for label, impl in route_yaml["implementations"].items():
@@ -82,7 +94,7 @@ def route_records(library: Path, costs_path: Path) -> list[dict[str, Any]]:
         )
         driver_cost = sum(used.values()) * float(costs["driver_yearly_pay"])
         monitor_cost = parse_number(r[4]) * float(costs["monitor_yearly_pay"])
-        fuel_cost = total_distance * school_days * float(costs["fuel_cost_per_km"])
+        fuel_cost = total_distance * school_days * fuel_cost_factor
         maintenance_cost = school_days * sum(
             distance[bus_type] * float(distance_factor[bus_type])
             + runtime[bus_type] * float(runtime_factor[bus_type])
@@ -123,6 +135,11 @@ def route_records(library: Path, costs_path: Path) -> list[dict[str, Any]]:
                 "bird_dwell": parse_poset_value(r[config_offset + 3]),
                 "bird_arrival_window": parse_poset_value(r[config_offset + 4]),
                 "bird_avg_speed": parse_poset_value(r[config_offset + 5]),
+                "student_policy": (
+                    parse_poset_value(r[config_offset + 6])
+                    if len(r) > config_offset + 6
+                    else "all_students"
+                ),
             }
         )
     return records
@@ -141,6 +158,7 @@ def routing_simple_caps(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
         and row["bird_dwell"] in {"dwell_0", "dwell_10"}
         and row["bird_arrival_window"] == "arrival_default"
         and row["bird_avg_speed"] in speed_allowed
+        and row["student_policy"] == "all_students"
     ]
 
 
@@ -192,9 +210,10 @@ def plot_panel(
     front = pareto_min(rows, x_key, y_key)
     if front:
         front_sorted = sorted(front, key=lambda p: p[x_key])
-        ax.plot(
+        ax.step(
             [row[x_key] for row in front_sorted],
             [row[y_key] for row in front_sorted],
+            where="post",
             color="#111827",
             linewidth=2,
             marker="o",

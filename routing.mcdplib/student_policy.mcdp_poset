@@ -1,0 +1,3 @@
+poset {
+    current_assignment distance_gt_2mi distance_gt_1p5mi distance_gt_1mi distance_gt_0p5mi all_students
+}
