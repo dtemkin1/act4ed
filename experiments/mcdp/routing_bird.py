@@ -83,10 +83,12 @@ GRID_LAMBDAS = (
 GRID_PARTIAL = ((True, "partial_true"),)
 GRID_SPILLOVER = ((False, "spillover_false"), (True, "spillover_true"))
 GRID_DWELL = ((10.0, "dwell_0"), (15.0, "dwell_10"))
+# Minutes before school bell time
 GRID_ARRIVAL_WINDOWS = (
     (None, None, "arrival_default"),
-    (30.0, 10.0, "arrival_early30_late10"),  # Minutes before school bell time
-    (40.0, 10.0, "arrival_early40_late10"),  # Minutes before school bell time
+    (20.0, 10.0, "arrival_early20_late10"),
+    (30.0, 10.0, "arrival_early30_late10"),
+    (40.0, 10.0, "arrival_early40_late10"),
 )
 GRID_AVG_SPEEDS = (10, 20, 30)
 GRID_STUDENT_POLICIES = (
@@ -98,7 +100,7 @@ GRID_STUDENT_POLICIES = (
     "all_students",
 )
 DEFAULT_GUIDELINE_BUDGET_USD = 4_500_000
-DEFAULT_ALLOWABLE_UNSERVED = 100_000
+DEFAULT_ALLOWABLE_UNSERVED = 10_000
 
 DEFAULT_COSTS: dict[str, Any] = {
     "school_days": 180,
