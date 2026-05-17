@@ -2,7 +2,7 @@ dp {
   # Policy/planning budget cap and allowable unserved counts.
   provides roi_budget [USD]
   provides students_unserved [Nat]
-  provides sped_students_unserved [Nat]
+  provides monitor_students_unserved [Nat]
   provides wheelchair_students_unserved [Nat]
 
   # Minimum service level and student body selected by policy/planning.

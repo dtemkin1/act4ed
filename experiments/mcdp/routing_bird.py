@@ -24,7 +24,7 @@ from formulation.bird_adapter import (BirdAdapterConfig, BirdBackendSolution,
                                       build_bird_export_instance,
                                       export_bird_instance,
                                       summarize_bird_solution_for_mcdp)
-from formulation.common import Bus, KM_PER_MILE, Student
+from formulation.common import KM_PER_MILE, Bus, Student
 from formulation.common.problems import FilteredProblemData, ProblemData
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -42,7 +42,7 @@ BUS_TYPES = ("C", "B", "BWC", "WC")
 ROUTING_F = ["Nat", "Nat", "Nat"]
 ROUTING_R = [
     "Nat",  # students_unserved
-    "Nat",  # sped_students_unserved
+    "Nat",  # monitor_students_unserved
     "Nat",  # wheelchair_students_unserved
     "Nat",  # stops_used
     "Nat",  # monitor_buses (total buses requiring a monitor)
@@ -119,30 +119,15 @@ DEFAULT_ALLOWABLE_UNSERVED = 2_000
 DEFAULT_COSTS: dict[str, Any] = {
     "school_days": 180,
     "capital_annualization_factor": 1.0,
-    "capital": {
-        "C": 128780,
-        "B": 110060,
-        "BWC": 126660,
-        "WC": 136780
-    },
+    "capital": {"C": 128780, "B": 110060, "BWC": 126660, "WC": 136780},
     "driver_yearly_pay": 46571,
     "monitor_yearly_pay": 26609,
     "diesel_cost_per_gallon": 3.09,
     "diesel_co2_kg_per_gallon": 10.21,
     "fuel_cost_per_km": None,
     "emissions_kg_per_km": 1.20,
-    "maintenance_distance_factor": {
-        "C": 0.15,
-        "B": 0.15,
-        "BWC": 0.15,
-        "WC": 0.15
-    },
-    "maintenance_runtime_factor": {
-        "C": 0.0,
-        "B": 0.0,
-        "BWC": 0.0,
-        "WC": 0.0
-    },
+    "maintenance_distance_factor": {"C": 0.15, "B": 0.15, "BWC": 0.15, "WC": 0.15},
+    "maintenance_runtime_factor": {"C": 0.0, "B": 0.0, "BWC": 0.0, "WC": 0.0},
 }
 
 
@@ -370,12 +355,12 @@ def routing_service_entry(
     return {
         "f_max": [
             str(int(summary["students_served"])),
-            str(int(summary["sped_students_served"])),
+            str(int(summary["monitor_students_served"])),
             str(int(summary["wheelchair_students_served"])),
         ],
         "r_min": [
             str(int(summary["students_unserved"])),
-            str(int(summary["sped_students_unserved"])),
+            str(int(summary["monitor_students_unserved"])),
             str(int(summary["wheelchair_students_unserved"])),
             str(int(summary["stops_used"])),
             str(int(summary["monitor_buses"])),
@@ -454,15 +439,15 @@ def fleet_bounds_for_routing_implementations(
 
 def _student_counts(students: Iterable[Student]) -> dict[str, int]:
     total = 0
-    sped = 0
+    monitor = 0
     wheelchair = 0
     for student in students:
         total += 1
-        sped += int(bool(student.attributes.special_ed))
+        monitor += int(bool(student.attributes.special_ed))
         wheelchair += int(bool(student.attributes.wheelchair_user))
     return {
         "students": total,
-        "sped_students": sped,
+        "monitor_students": monitor,
         "wheelchair_students": wheelchair,
     }
 
@@ -483,7 +468,7 @@ def guideline_entry_for_policy(
         ],
         "r_min": [
             str(counts["students"]),
-            str(counts["sped_students"]),
+            str(counts["monitor_students"]),
             str(counts["wheelchair_students"]),
             _poset_value("student_policy", policy_label),
         ],
@@ -665,12 +650,12 @@ def write_guidelines_module(routing_lib: Path) -> None:
   # Policy/planning budget cap and allowable unserved counts.
   provides roi_budget [USD]
   provides students_unserved [Nat]
-  provides sped_students_unserved [Nat]
+  provides monitor_students_unserved [Nat]
   provides wheelchair_students_unserved [Nat]
 
   # Minimum service level and student body selected by policy/planning.
   requires students_served [Nat]
-  requires sped_students_served [Nat]
+  requires monitor_students_served [Nat]
   requires wheelchair_students_served [Nat]
   requires student_policy [`student_policy]
 
@@ -933,7 +918,9 @@ def solve_grid_point_result(
     )
 
 
-def _config_labels_from_stored_data(data: Mapping[str, Any]) -> dict[str, str | None] | None:
+def _config_labels_from_stored_data(
+    data: Mapping[str, Any],
+) -> dict[str, str] | None:
     """Reconstruct config_labels from an old partial-result entry that predates the
     config_labels field.  Returns None when any lookup fails."""
     method = data.get("method")
@@ -946,7 +933,11 @@ def _config_labels_from_stored_data(data: Mapping[str, Any]) -> dict[str, str | 
     earliest = data.get("earliest_arrival_buffer")
     latest = data.get("latest_arrival_buffer")
     arrival_label = next(
-        (lbl for e, l, lbl in GRID_ARRIVAL_WINDOWS if e == earliest and l == latest),
+        (
+            lbl
+            for early, late, lbl in GRID_ARRIVAL_WINDOWS
+            if early == earliest and late == latest
+        ),
         None,
     )
     speed = data.get("average_speed_mph")
@@ -957,11 +948,25 @@ def _config_labels_from_stored_data(data: Mapping[str, Any]) -> dict[str, str | 
     if any(
         v is None
         for v in [
-            method, lambda_label, partial_label, dwell_label,
-            arrival_label, speed_label, student_policy,
+            method,
+            lambda_label,
+            partial_label,
+            dwell_label,
+            arrival_label,
+            speed_label,
+            student_policy,
         ]
     ):
         return None
+
+    assert method is not None
+    assert lambda_label is not None
+    assert partial_label is not None
+    assert dwell_label is not None
+    assert arrival_label is not None
+    assert speed_label is not None
+    assert student_policy is not None
+
     return {
         "bird_method": method,
         "bird_lambda": lambda_label,
@@ -1138,7 +1143,9 @@ def main() -> None:
             partial_result_path.read_text(encoding="utf-8")
         )
         for label, data in loaded_partial.items():
-            config_labels = data.get("config_labels") or _config_labels_from_stored_data(data)
+            config_labels = data.get(
+                "config_labels"
+            ) or _config_labels_from_stored_data(data)
             if config_labels is not None and "summary" in data:
                 partial_result[label] = data
                 implementations[label] = routing_service_entry(
