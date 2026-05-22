@@ -5,6 +5,7 @@ import csv
 import json
 import os
 import subprocess
+import time
 from collections.abc import Iterable, Mapping
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import dataclass
@@ -32,7 +33,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ROUTING_LIB = PROJECT_ROOT / "routing.mcdplib"
 BUS_CSV = PROJECT_ROOT / "experiments" / "data" / "buses.csv"
 COST_CONFIG = PROJECT_ROOT / "experiments" / "mcdp" / "routing_costs.yaml"
-DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "experiments" / "outputs" / "routing_bird_grid"
+DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "experiments" / "outputs" / "full_routing_bird_grid"
 DEFAULT_PLACE_NAME = "Framingham, Massachusetts, USA"
 DEFAULT_PROBLEM_NAME = "framingham"
 DEFAULT_CPUS_PER_SOLVE = 4
@@ -1259,6 +1260,7 @@ class GridPointSolveResult:
     summary: dict[str, Any] | None = None
     status: str | None = None
     error: str | None = None
+    problem_runtime_s: float | None = None
 
 
 def solve_grid_point_result(
@@ -1272,6 +1274,7 @@ def solve_grid_point_result(
     gurobi_verbose: bool,
     cpus_per_solve: int,
 ) -> GridPointSolveResult:
+    start = time.perf_counter()
     try:
         summary, _instance, solution = solve_grid_point(
             problem_data,
@@ -1284,11 +1287,16 @@ def solve_grid_point_result(
             cpus_per_solve=cpus_per_solve,
         )
     except Exception as exc:
-        return GridPointSolveResult(grid_point=grid_point, error=str(exc))
+        return GridPointSolveResult(
+            grid_point=grid_point,
+            error=str(exc),
+            problem_runtime_s=time.perf_counter() - start,
+        )
     return GridPointSolveResult(
         grid_point=grid_point,
         summary=summary,
         status=solution.status,
+        problem_runtime_s=time.perf_counter() - start,
     )
 
 
@@ -1606,7 +1614,13 @@ def main() -> None:
         nonlocal success_count, error_count
         grid_point = result.grid_point
         if result.error is not None:
-            errors.append({"label": grid_point.label, "error": result.error})
+            errors.append(
+                {
+                    "label": grid_point.label,
+                    "error": result.error,
+                    "problem_runtime_s": result.problem_runtime_s,
+                }
+            )
             error_count += 1
             return
         if result.summary is None or result.status is None:
@@ -1614,6 +1628,7 @@ def main() -> None:
                 {
                     "label": grid_point.label,
                     "error": "grid point solve returned an incomplete result",
+                    "problem_runtime_s": result.problem_runtime_s,
                 }
             )
             error_count += 1
@@ -1636,6 +1651,7 @@ def main() -> None:
             "average_speed_mph": grid_point.average_speed_mph,
             "config_labels": grid_point.config_labels,
             "status": result.status,
+            "problem_runtime_s": result.problem_runtime_s,
             "summary": result.summary,
         }
         success_count += 1

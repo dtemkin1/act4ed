@@ -3,6 +3,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import yaml
 
@@ -15,6 +16,7 @@ from experiments.mcdp.routing_bird import (BUS_TYPES, GRID_AVG_SPEEDS,
                                            read_bus_inventory_counts,
                                            routing_service_catalogue,
                                            routing_service_entry,
+                                           solve_grid_point_result,
                                            write_catalogue,
                                            write_guidelines_module,
                                            write_poset,
@@ -31,10 +33,10 @@ class RoutingBirdMcdpTests(unittest.TestCase):
     def test_routing_service_entry_uses_expected_yaml_shape(self) -> None:
         summary = {
             "students_served": 3,
-            "sped_students_served": 2,
+            "monitor_students_served": 2,
             "wheelchair_students_served": 1,
             "students_unserved": 4,
-            "sped_students_unserved": 1,
+            "monitor_students_unserved": 1,
             "wheelchair_students_unserved": 0,
             "stops_used": 5,
             "unique_stops_used": 4,
@@ -162,6 +164,54 @@ class RoutingBirdMcdpTests(unittest.TestCase):
                 grid_point.average_speed_mph,
             )
 
+    def test_grid_point_result_records_problem_runtime_on_success(self) -> None:
+        class Solution:
+            status = "OPTIMAL"
+
+        grid_point = next(iter_grid(("all_students",)))
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch(
+                "experiments.mcdp.routing_bird.solve_grid_point",
+                return_value=({"students_served": 0}, object(), Solution()),
+            ):
+                result = solve_grid_point_result(
+                    object(),  # type: ignore[arg-type]
+                    grid_point,
+                    output_dir=Path(tmpdir),
+                    bus_order={},
+                    template=None,
+                    julia_timing_log=False,
+                    gurobi_verbose=False,
+                    cpus_per_solve=1,
+                )
+
+        self.assertIsNone(result.error)
+        self.assertEqual(result.status, "OPTIMAL")
+        self.assertIsNotNone(result.problem_runtime_s)
+        self.assertGreaterEqual(result.problem_runtime_s or 0.0, 0.0)
+
+    def test_grid_point_result_records_problem_runtime_on_failure(self) -> None:
+        grid_point = next(iter_grid(("all_students",)))
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch(
+                "experiments.mcdp.routing_bird.solve_grid_point",
+                side_effect=RuntimeError("boom"),
+            ):
+                result = solve_grid_point_result(
+                    object(),  # type: ignore[arg-type]
+                    grid_point,
+                    output_dir=Path(tmpdir),
+                    bus_order={},
+                    template=None,
+                    julia_timing_log=False,
+                    gurobi_verbose=False,
+                    cpus_per_solve=1,
+                )
+
+        self.assertEqual(result.error, "boom")
+        self.assertIsNotNone(result.problem_runtime_s)
+        self.assertGreaterEqual(result.problem_runtime_s or 0.0, 0.0)
+
     def test_fleet_catalogue_uses_type_count_interface_and_costs(self) -> None:
         costs = {
             "capital": {"C": 10, "B": 20, "BWC": 30, "WC": 40},
@@ -194,10 +244,10 @@ class RoutingBirdMcdpTests(unittest.TestCase):
         route = routing_service_entry(
             {
                 "students_served": 3,
-                "sped_students_served": 0,
+                "monitor_students_served": 0,
                 "wheelchair_students_served": 0,
                 "students_unserved": 0,
-                "sped_students_unserved": 0,
+                "monitor_students_unserved": 0,
                 "wheelchair_students_unserved": 0,
                 "stops_used": 1,
                 "monitor_buses": 0,
@@ -255,10 +305,10 @@ class RoutingBirdMcdpTests(unittest.TestCase):
         route = routing_service_entry(
             {
                 "students_served": 3,
-                "sped_students_served": 0,
+                "monitor_students_served": 0,
                 "wheelchair_students_served": 0,
                 "students_unserved": 0,
-                "sped_students_unserved": 0,
+                "monitor_students_unserved": 0,
                 "wheelchair_students_unserved": 0,
                 "stops_used": 1,
                 "monitor_buses": 0,
