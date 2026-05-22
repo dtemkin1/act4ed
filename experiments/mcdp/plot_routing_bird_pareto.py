@@ -35,7 +35,7 @@ def parse_poset_value(value: Any) -> str:
     return text
 
 
-def fuel_cost_per_km(costs: dict[str, Any]) -> float:
+def _fuel_cost_per_km(costs: dict[str, Any]) -> float:
     configured = costs.get("fuel_cost_per_km")
     if configured is not None:
         return float(configured)
@@ -69,7 +69,7 @@ def route_records(library: Path, costs_path: Path) -> list[dict[str, Any]]:
     capital = costs["capital"]
     distance_factor = costs["maintenance_distance_factor"]
     runtime_factor = costs["maintenance_runtime_factor"]
-    fuel_cost_factor = fuel_cost_per_km(costs)
+    fuel_cost_factor = _fuel_cost_per_km(costs)
 
     records: list[dict[str, Any]] = []
     for label, impl in route_yaml["implementations"].items():
@@ -97,6 +97,9 @@ def route_records(library: Path, costs_path: Path) -> list[dict[str, Any]]:
         driver_cost = sum(used.values()) * float(costs["driver_yearly_pay"])
         monitor_cost = monitor_buses * float(costs["monitor_yearly_pay"])
         fuel_cost = total_distance * school_days * fuel_cost_factor
+        monitor_cost = parse_number(r[4]) * float(costs["monitor_yearly_pay"])
+        fuel_cost_per_km = fuel_cost_factor
+        fuel_cost = total_distance * school_days * fuel_cost_per_km
         maintenance_cost = school_days * sum(
             distance[bus_type] * float(distance_factor[bus_type])
             + runtime[bus_type] * float(runtime_factor[bus_type])
@@ -234,28 +237,29 @@ def plot_panel(
             zorder=3,
             drawstyle="steps-post",
         )
-        x_min, x_max = ax.get_xlim()
-        y_min, y_max = ax.get_ylim()
-        first = front_sorted[0]
-        last = front_sorted[-1]
-        ax.plot(
-            [first[x_key], first[x_key]],
-            [first[y_key], y_max],
+
+        leftmost = min(front, key=lambda p: p[x_key])
+        bottommost = min(front, key=lambda p: p[y_key])
+
+        plot_y_min, plot_y_max = ax.get_ylim()
+        plot_x_min, plot_x_max = ax.get_xlim()
+
+        ax.axvline(
+            leftmost[x_key],
+            ymin=(leftmost[y_key] - plot_y_min) / (plot_y_max - plot_y_min),
+            ymax=1,
             color="#111827",
-            linewidth=2,
-            solid_capstyle="butt",
             zorder=3,
+            linewidth=2,
         )
-        ax.plot(
-            [last[x_key], x_max],
-            [last[y_key], last[y_key]],
+        ax.axhline(
+            bottommost[y_key],
+            xmin=(bottommost[x_key] - plot_x_min) / (plot_x_max - plot_x_min),
+            xmax=1,
             color="#111827",
-            linewidth=2,
-            solid_capstyle="butt",
             zorder=3,
+            linewidth=2,
         )
-        ax.set_xlim(x_min, x_max)
-        ax.set_ylim(y_min, y_max)
 
     ax.set_xlabel(x_label, fontsize=11, fontweight="medium")
     ax.set_ylabel(y_label, fontsize=11, fontweight="medium")
