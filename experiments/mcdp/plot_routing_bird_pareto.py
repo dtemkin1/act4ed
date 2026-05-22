@@ -61,7 +61,7 @@ def pareto_min(
 
 def route_records(library: Path, costs_path: Path) -> list[dict[str, Any]]:
     route_yaml = yaml.safe_load(
-        (library / "yaml_catalogues" / "routing_service.dpc.yaml").read_text()
+        (library / "yaml_catalogs" / "routing_service.dpc.yaml").read_text()
     )
     costs = yaml.safe_load(costs_path.read_text())
 
@@ -76,34 +76,27 @@ def route_records(library: Path, costs_path: Path) -> list[dict[str, Any]]:
         f = [parse_number(v) for v in impl["f_max"]]
         r = impl["r_min"]
 
+        unique_stops_used = parse_number(r[4])
+        monitor_buses = parse_number(r[5])
         used = {
-            bus_type: int(parse_number(r[5 + i]))
+            bus_type: int(parse_number(r[6 + i]))
             for i, bus_type in enumerate(BUS_TYPES)
         }
         distance = {
-            bus_type: parse_number(r[9 + i]) for i, bus_type in enumerate(BUS_TYPES)
+            bus_type: parse_number(r[10 + i]) for i, bus_type in enumerate(BUS_TYPES)
         }
         runtime = {
-            bus_type: parse_number(r[13 + i]) for i, bus_type in enumerate(BUS_TYPES)
+            bus_type: parse_number(r[14 + i]) for i, bus_type in enumerate(BUS_TYPES)
         }
-        config_offset = 5 + 3 * len(BUS_TYPES)
+        config_offset = 6 + 3 * len(BUS_TYPES)
 
         total_distance = sum(distance.values())
         capital_cost = sum(
             float(capital[bus_type]) * used[bus_type] for bus_type in BUS_TYPES
         )
         driver_cost = sum(used.values()) * float(costs["driver_yearly_pay"])
-        monitor_cost = parse_number(r[4]) * float(costs["monitor_yearly_pay"])
-        fuel_cost_per_km = (
-            float(costs["fuel_cost_per_km"])
-            if costs.get("fuel_cost_per_km") is not None
-            else (
-                float(costs["diesel_cost_per_gallon"])
-                * float(costs["emissions_kg_per_km"])
-                / float(costs["diesel_co2_kg_per_gallon"])
-            )
-        )
-        fuel_cost = total_distance * school_days * fuel_cost_per_km
+        monitor_cost = monitor_buses * float(costs["monitor_yearly_pay"])
+        fuel_cost = total_distance * school_days * fuel_cost_factor
         maintenance_cost = school_days * sum(
             distance[bus_type] * float(distance_factor[bus_type])
             + runtime[bus_type] * float(runtime_factor[bus_type])
@@ -124,7 +117,8 @@ def route_records(library: Path, costs_path: Path) -> list[dict[str, Any]]:
                 "sped_students_unserved": parse_number(r[1]),
                 "wheelchair_students_unserved": parse_number(r[2]),
                 "stops_used": parse_number(r[3]),
-                "monitor_buses": parse_number(r[4]),
+                "unique_stops_used": unique_stops_used,
+                "monitor_buses": monitor_buses,
                 "used_C": used["C"],
                 "used_B": used["B"],
                 "used_BWC": used["BWC"],
@@ -201,22 +195,28 @@ def plot_panel(
     methods = {"lbh": "LBH", "scenario": "Scenario"}
     colors = {"lbh": "C0", "scenario": "C1"}
 
+    front = pareto_min(rows, x_key, y_key)
+    front_ids = {id(row) for row in front}
+
     for method, method_name in methods.items():
-        subset = [row for row in rows if row["bird_method"] == method]
+        subset = [
+            row
+            for row in rows
+            if row["bird_method"] == method and id(row) not in front_ids
+        ]
         if subset:
             ax.scatter(
                 [row[x_key] for row in subset],
                 [row[y_key] for row in subset],
                 s=60,
-                # alpha=0.75,
-                color=colors[method],
-                edgecolors="none",
-                linewidth=0.5,
+                facecolors=colors[method],
+                edgecolors="#111827",
+                linewidth=0.45,
+                alpha=0.5,
                 label=method_name,
                 zorder=2,
             )
 
-    front = pareto_min(rows, x_key, y_key)
     if front:
         front_sorted = sorted(front, key=lambda p: p[x_key])
         ax.step(
@@ -227,11 +227,35 @@ def plot_panel(
             linewidth=2,
             marker="o",
             markersize=6,
-            markeredgecolor="none",
+            markerfacecolor="none",
+            markeredgecolor="#111827",
+            markeredgewidth=1.4,
             label="Pareto front",
             zorder=3,
             drawstyle="steps-post",
         )
+        x_min, x_max = ax.get_xlim()
+        y_min, y_max = ax.get_ylim()
+        first = front_sorted[0]
+        last = front_sorted[-1]
+        ax.plot(
+            [first[x_key], first[x_key]],
+            [first[y_key], y_max],
+            color="#111827",
+            linewidth=2,
+            solid_capstyle="butt",
+            zorder=3,
+        )
+        ax.plot(
+            [last[x_key], x_max],
+            [last[y_key], last[y_key]],
+            color="#111827",
+            linewidth=2,
+            solid_capstyle="butt",
+            zorder=3,
+        )
+        ax.set_xlim(x_min, x_max)
+        ax.set_ylim(y_min, y_max)
 
     ax.set_xlabel(x_label, fontsize=11, fontweight="medium")
     ax.set_ylabel(y_label, fontsize=11, fontweight="medium")

@@ -20,9 +20,9 @@ mcdp {
     requires bird_avg_speed [`bird_avg_speed]
     requires student_policy [`student_policy]
 
-    sub rs = instance `routing_service
-    # sub g = instance `guidelines
-    sub bc = instance `fleet_bus_count
+    sub rs = instance `routing_service_simple
+    # sub g = instance `guidelines_simple
+    sub bc = instance `fleet_bus_count_simple
     sub dr = instance `driver
     sub mo = instance `monitor
     sub mt = instance `maintenance
@@ -53,7 +53,7 @@ mcdp {
     # monitor_students_served required by g <= monitor_students_served provided by rs
     # wheelchair_students_served required by g <= wheelchair_students_served provided by rs
 
-    # students_unserved required by rs <= students_unserved provided by g
+    #students_unserved required by rs <= students_unserved provided by g
     # monitor_students_unserved required by rs <= monitor_students_unserved provided by g
     # wheelchair_students_unserved required by rs <= wheelchair_students_unserved provided by g
 

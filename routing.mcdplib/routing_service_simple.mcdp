@@ -40,5 +40,5 @@ dp {
   requires bird_avg_speed [`bird_avg_speed]
   requires student_policy [`student_policy]
 
-  implemented-by yaml resource("routing_service.dpc.yaml")
+  implemented-by yaml resource("routing_service_simple.dpc.yaml")
 }

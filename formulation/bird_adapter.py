@@ -1736,7 +1736,7 @@ def summarize_bird_solution_for_mcdp(
     instance: BirdExportInstance,
     solution: BirdBackendSolution,
 ) -> dict[str, object]:
-    """Summarize a BiRD solution into scalar values for routing MCDP catalogues."""
+    """Summarize a BiRD solution into scalar values for routing MCDP catalogs."""
     demand_rows_by_school = _bird_demand_rows_by_school(instance)
     demand_count = len(instance.demand_rows)
     school_count = len(instance.schools)

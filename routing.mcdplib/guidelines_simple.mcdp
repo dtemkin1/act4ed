@@ -11,5 +11,5 @@ dp {
   requires wheelchair_students_served [Nat]
   requires student_policy [`student_policy]
 
-  implemented-by yaml resource("guidelines.dpc.yaml")
+  implemented-by yaml resource("guidelines_simple.dpc.yaml")
 }

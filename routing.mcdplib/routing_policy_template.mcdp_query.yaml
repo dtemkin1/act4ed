@@ -1,0 +1,33 @@
+title: Policy Routing Template
+description: Template for policy-specific routing questions without the guidelines DP linked into routing.mcdp.
+model: "`routing"
+query:
+  query_type: FixFunMinRes
+
+  # Change these to the minimum service level required by the policy.
+  # The values below match the checked-in all-students catalogue rows.
+  min_f:
+    students_served: "8210"
+    monitor_students_served: "1096"
+    wheelchair_students_served: "0"
+
+  # Change student_policy, unserved caps, and total_cost to ask specific
+  # policy/budget questions. Since the policy poset is flat, this selects one
+  # policy exactly.
+  max_r:
+    total_cost: "12000000 USD"
+    emissions: "10000000 kg"
+    students_unserved: "0"
+    monitor_students_unserved: "0"
+    wheelchair_students_unserved: "0"
+    # Legacy stop-count cap; tune unique_stops_used for stop-count questions.
+    stops_used: "100000"
+    unique_stops_used: "100000"
+    bird_method: "`bird_method: scenario"
+    bird_lambda: "`bird_lambda: lambda_1e3"
+    bird_partial: "`bird_partial: partial_true"
+    bird_dwell: "`bird_dwell: dwell_10"
+    bird_arrival_window: "`bird_arrival_window: arrival_early40_late10"
+    bird_avg_speed: "`bird_avg_speed: speed_30mph"
+    student_policy: "`student_policy: all_students"
+  optimize_for: [total_cost]

@@ -18,9 +18,10 @@ from experiments.mcdp.routing_bird import (BUS_TYPES, GRID_AVG_SPEEDS,
                                            read_bus_inventory_counts,
                                            routing_service_catalogue,
                                            routing_service_entry,
+                                           write_catalogue,
                                            write_guidelines_module,
                                            write_poset,
-                                           write_static_catalogues)
+                                           write_static_catalogs)
 
 
 class RoutingBirdMcdpTests(unittest.TestCase):
@@ -39,6 +40,7 @@ class RoutingBirdMcdpTests(unittest.TestCase):
             "sped_students_unserved": 1,
             "wheelchair_students_unserved": 0,
             "stops_used": 5,
+            "unique_stops_used": 4,
             "monitor_buses": 2,
             "by_type": {
                 "C": {"buses_used": 1, "distance_km": 12.5, "runtime_s": 100.0},
@@ -70,9 +72,9 @@ class RoutingBirdMcdpTests(unittest.TestCase):
             "`student_policy",
         ])
         self.assertEqual(entry["f_max"], ["3", "2", "1"])
-        self.assertEqual(entry["r_min"][:9], ["4", "1", "0", "5", "2", "1", "0", "1", "0"])
-        self.assertEqual(entry["r_min"][9:13], ["12.5 km", "0 km", "7.5 km", "0 km"])
-        self.assertEqual(entry["r_min"][13:17], ["100 s", "0 s", "50 s", "0 s"])
+        self.assertEqual(entry["r_min"][:10], ["4", "1", "0", "5", "4", "2", "1", "0", "1", "0"])
+        self.assertEqual(entry["r_min"][10:14], ["12.5 km", "0 km", "7.5 km", "0 km"])
+        self.assertEqual(entry["r_min"][14:18], ["100 s", "0 s", "50 s", "0 s"])
         self.assertEqual(entry["r_min"][-7:], [
             "`bird_method: scenario",
             "`bird_lambda: lambda_1e4",
@@ -109,6 +111,32 @@ class RoutingBirdMcdpTests(unittest.TestCase):
         self.assertIn("poset {", contents)
         self.assertIn("lambda_1e3 lambda_1e4 lambda_1e5 lambda_1e6", contents)
         self.assertNotIn(">=", contents)
+
+    def test_write_catalogue_keeps_long_implementation_ids_as_simple_keys(self) -> None:
+        implementation_id = (
+            "bird_all_students_C52_B21_BWC11_WC2_lbh_lambda_1e3_speed_10mph_"
+            "partial_true_spillover_false_dwell_10_arrival_early20_late10"
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "catalogue.dpc.yaml"
+            write_catalogue(
+                path,
+                {
+                    "F": ["Nat"],
+                    "R": ["Nat"],
+                    "implementations": {
+                        implementation_id: {
+                            "f_max": ["1"],
+                            "r_min": ["2"],
+                        }
+                    },
+                },
+            )
+            contents = path.read_text(encoding="utf-8")
+
+        self.assertIn(f"  {implementation_id}:", contents)
+        self.assertNotIn("\n  ? ", contents)
+        self.assertNotIn("\n  : f_max:", contents)
 
     def test_grid_average_speeds_reach_bird_config_and_labels(self) -> None:
         grid_points = list(iter_grid())
@@ -152,7 +180,7 @@ class RoutingBirdMcdpTests(unittest.TestCase):
             {"f_max": ["1", "1", "0", "0"], "r_min": ["60 USD"]},
         )
 
-    def test_static_catalogues_bound_fleet_by_observed_route_usage(self) -> None:
+    def test_static_catalogs_use_only_observed_route_fleets(self) -> None:
         costs = {
             "capital": {"C": 10, "B": 20, "BWC": 30, "WC": 40},
             "capital_annualization_factor": 1.0,
@@ -185,7 +213,7 @@ class RoutingBirdMcdpTests(unittest.TestCase):
                 "bird_method": "scenario",
                 "bird_lambda": "lambda_1e3",
                 "bird_partial": "partial_true",
-                "bird_dwell": "dwell_0",
+                "bird_dwell": "dwell_10",
                 "bird_arrival_window": "arrival_default",
                 "bird_avg_speed": "speed_30mph",
                 "student_policy": "all_students",
@@ -194,23 +222,82 @@ class RoutingBirdMcdpTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             routing_lib = Path(tmpdir) / "routing.mcdplib"
-            write_static_catalogues(
+            write_static_catalogs(
                 routing_lib=routing_lib,
                 costs=costs,
                 routing_implementations={"route": route},
             )
-            fleet_path = routing_lib / "yaml_catalogues" / "fleet_bus_count.dpc.yaml"
+            fleet_path = routing_lib / "yaml_catalogs" / "fleet_bus_count.dpc.yaml"
+            simple_route_path = (
+                routing_lib / "yaml_catalogs" / "routing_service_simple.dpc.yaml"
+            )
+            catalogue = yaml.safe_load(fleet_path.read_text(encoding="utf-8"))
+            simple_route_catalogue = yaml.safe_load(
+                simple_route_path.read_text(encoding="utf-8")
+            )
+
+        self.assertEqual(len(catalogue["implementations"]), 1)
+        self.assertIn("fleet_2_0_1_0", catalogue["implementations"])
+        self.assertNotIn("fleet_0_0_0_0", catalogue["implementations"])
+        self.assertEqual(len(simple_route_catalogue["implementations"]), 1)
+
+    def test_static_catalogs_reuse_existing_route_catalogue_for_fleet(self) -> None:
+        costs = {
+            "capital": {"C": 10, "B": 20, "BWC": 30, "WC": 40},
+            "capital_annualization_factor": 1.0,
+            "school_days": 180,
+            "driver_yearly_pay": 1,
+            "monitor_yearly_pay": 1,
+            "diesel_cost_per_gallon": 1,
+            "diesel_co2_kg_per_gallon": 1,
+            "fuel_cost_per_km": 1,
+            "emissions_kg_per_km": 1,
+            "maintenance_distance_factor": {"C": 0, "B": 0, "BWC": 0, "WC": 0},
+            "maintenance_runtime_factor": {"C": 0, "B": 0, "BWC": 0, "WC": 0},
+        }
+        route = routing_service_entry(
+            {
+                "students_served": 3,
+                "sped_students_served": 0,
+                "wheelchair_students_served": 0,
+                "students_unserved": 0,
+                "sped_students_unserved": 0,
+                "wheelchair_students_unserved": 0,
+                "stops_used": 1,
+                "monitor_buses": 0,
+                "by_type": {"B": {"buses_used": 1}},
+            },
+            {
+                "bird_method": "scenario",
+                "bird_lambda": "lambda_1e3",
+                "bird_partial": "partial_true",
+                "bird_dwell": "dwell_10",
+                "bird_arrival_window": "arrival_default",
+                "bird_avg_speed": "speed_30mph",
+                "student_policy": "all_students",
+            },
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            routing_lib = Path(tmpdir) / "routing.mcdplib"
+            yaml_dir = routing_lib / "yaml_catalogs"
+            write_static_catalogs(
+                routing_lib=routing_lib,
+                costs=costs,
+                routing_implementations={"route": route},
+            )
+            write_static_catalogs(routing_lib=routing_lib, costs=costs)
+            fleet_path = yaml_dir / "fleet_bus_count.dpc.yaml"
             catalogue = yaml.safe_load(fleet_path.read_text(encoding="utf-8"))
 
-        self.assertEqual(len(catalogue["implementations"]), 6)
-        self.assertIn("fleet_2_0_1_0", catalogue["implementations"])
-        self.assertNotIn("fleet_3_0_1_0", catalogue["implementations"])
+        self.assertEqual(len(catalogue["implementations"]), 1)
+        self.assertIn("fleet_0_1_0_0", catalogue["implementations"])
 
     def test_checked_in_routing_service_catalogue_schema_matches_plan(self) -> None:
         path = (
             Path(__file__).resolve().parents[1]
             / "routing.mcdplib"
-            / "yaml_catalogues"
+            / "yaml_catalogs"
             / "routing_service.dpc.yaml"
         )
         data = yaml.safe_load(path.read_text(encoding="utf-8"))
@@ -222,19 +309,19 @@ class RoutingBirdMcdpTests(unittest.TestCase):
         path = (
             Path(__file__).resolve().parents[1]
             / "routing.mcdplib"
-            / "yaml_catalogues"
+            / "yaml_catalogs"
             / "routing_service.dpc.yaml"
         )
         data = yaml.safe_load(path.read_text(encoding="utf-8"))
         posets = config_posets()
         config_indices = {
-            "bird_method": 17,
-            "bird_lambda": 18,
-            "bird_partial": 19,
-            "bird_dwell": 20,
-            "bird_arrival_window": 21,
-            "bird_avg_speed": 22,
-            "student_policy": 23,
+            "bird_method": 18,
+            "bird_lambda": 19,
+            "bird_partial": 20,
+            "bird_dwell": 21,
+            "bird_arrival_window": 22,
+            "bird_avg_speed": 23,
+            "student_policy": 24,
         }
 
         def parse_poset_value(value: str) -> str:
@@ -257,7 +344,10 @@ class RoutingBirdMcdpTests(unittest.TestCase):
             guidelines = (lib / "guidelines.mcdp").read_text(encoding="utf-8")
 
         self.assertIn("provides students_unserved [Nat]", guidelines)
+        self.assertIn("provides monitor_students_unserved [Nat]", guidelines)
+        self.assertIn("requires monitor_students_served [Nat]", guidelines)
         self.assertIn("requires student_policy [`student_policy]", guidelines)
+        self.assertNotIn("sped_students", guidelines)
         self.assertFalse((lib / "routing_policy.mcdp").exists())
 
     def test_policy_catalogue_schema(self) -> None:

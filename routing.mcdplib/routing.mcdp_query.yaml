@@ -1,16 +1,16 @@
-title: Simple Routing Query
+title: Routing Query
 description: Basic example query for the full routing design problem.
-model: "`routing_simple"
+model: "`routing"
 query:
   query_type: FixFunMinRes
   min_f:
-    students_served: "0"
+    students_served: "10"
     monitor_students_served: "0"
     wheelchair_students_served: "0"
   max_r:
     total_cost: "20_000_000 USD"
-    emissions: "10000000 kg"
-    students_unserved: "100000"
+    emissions: "1000000 kg"
+    students_unserved: "0"
     monitor_students_unserved: "100000"
     wheelchair_students_unserved: "100000"
     unique_stops_used: "100000"

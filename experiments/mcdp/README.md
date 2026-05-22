@@ -9,7 +9,7 @@ posets, guidelines/catalogue defaults, and cost modules without running the
 BiRD grid.
 
 ```bash
-PYTHONPATH=. uv run python -c "from experiments.mcdp.routing_bird import write_static_catalogues; write_static_catalogues(routing_implementations=None)"
+PYTHONPATH=. uv run python -c "from experiments.mcdp.routing_bird import write_static_catalogs; write_static_catalogs(routing_implementations=None)"
 ```
 
 ## Run the BiRD Grid
@@ -33,10 +33,11 @@ Useful options:
 - `--workers N`: number of concurrent grid-point solves (defaults to number of cores / cores per solve).
 - `--cpus-per-solve N`: Julia/Gurobi thread budget per solve (defaults to 4 CPUs).
 
-The grid writes `routing.mcdplib/yaml_catalogues/routing_service.dpc.yaml` and
-strict policy rows in `routing.mcdplib/yaml_catalogues/guidelines.dpc.yaml`.
+The grid writes `routing.mcdplib/yaml_catalogs/routing_service.dpc.yaml` and
+strict policy rows in `routing.mcdplib/yaml_catalogs/guidelines.dpc.yaml`.
 When route implementations are available, the fleet catalogue is bounded by the
-maximum observed `used_*` bus counts rather than the full bus inventory.
+exact unique `used_*` bus-count vectors observed in the solved route catalogue
+rather than the full bus inventory Cartesian product.
 
 ## Run MCDP Queries
 
@@ -45,7 +46,8 @@ the filename without `.mcdp_query.yaml`.
 
 Currently we have:
 
-- `routing_simple`: basic full routing design query over cost, emissions, unserved students, stops used, BiRD configuration caps, and `student_policy`.
+- `routing_simple`: compact smoke query over cost, emissions, unserved students, unique stops used, BiRD configuration caps, and `student_policy`; it uses query-specific route, fleet, and guideline catalogues.
+- `routing_policy_template`: adaptable policy query that puts the student policy, minimum service level, unserved caps, budget, and BiRD configuration directly in the query. Use this when experimenting with `guidelines` disconnected from `routing.mcdp`.
 
 Run it with the MCDP Docker image:
 
@@ -61,8 +63,8 @@ rename it to `routing.mcdplib/<query_name>.mcdp_query.yaml`, and edit:
 
 - `model`: usually ``"`routing"``.
 - `min_f`: minimum required functionality, such as served students.
-- `max_r`: resource caps, such as total cost, emissions, unserved counts, and
-  BiRD config/student-policy poset values.
+- `max_r`: resource caps, such as total cost, emissions, unserved counts,
+  `unique_stops_used`, and BiRD config/student-policy poset values.
 - `optimize_for`: resource objective list.
 
 Then run:

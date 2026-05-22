@@ -15,6 +15,7 @@ from typing import Any, Literal
 import yaml
 from loguru import logger
 from tqdm import tqdm
+from yaml.events import AliasEvent, CollectionStartEvent, NodeEvent, ScalarEvent
 
 from experiments.existing_data.utils import get_assigned_students
 from experiments.helpers import setup
@@ -36,15 +37,17 @@ DEFAULT_PLACE_NAME = "Framingham, Massachusetts, USA"
 DEFAULT_PROBLEM_NAME = "framingham"
 DEFAULT_CPUS_PER_SOLVE = 4
 PROGRESS_HEARTBEAT_SECONDS = 60.0
+CATALOGUE_SIMPLE_KEY_LIMIT = 4096
 
 BUS_TYPES = ("C", "B", "BWC", "WC")
 
 ROUTING_F = ["Nat", "Nat", "Nat"]
 ROUTING_R = [
     "Nat",  # students_unserved
-    "Nat",  # sped_students_unserved
+    "Nat",  # monitor_students_unserved
     "Nat",  # wheelchair_students_unserved
     "Nat",  # stops_used
+    "Nat",  # unique_stops_used
     "Nat",  # monitor_buses (total buses requiring a monitor)
     "Nat",  # buses_used C
     "Nat",  # buses_used B
@@ -66,6 +69,24 @@ ROUTING_R = [
     "`bird_avg_speed",  # average bus speed setting
     "`student_policy",  # student body/policy cohort selected for routing
 ]
+ROUTING_CONFIG_POSETS = (
+    "bird_method",
+    "bird_lambda",
+    "bird_partial",
+    "bird_dwell",
+    "bird_arrival_window",
+    "bird_avg_speed",
+    "student_policy",
+)
+ROUTING_SIMPLE_CONFIG_LABELS = {
+    "bird_method": "scenario",
+    "bird_lambda": "lambda_1e3",
+    "bird_partial": "partial_true",
+    "bird_dwell": "dwell_10",
+    "bird_arrival_window": "arrival_default",
+    "bird_avg_speed": "speed_30mph",
+    "student_policy": "all_students",
+}
 
 GRID_FLEET = {
     "C": (52,),
@@ -355,6 +376,13 @@ def _poset_value(poset_name: str, value: str) -> str:
     return f"`{poset_name}: {value}"
 
 
+def _parse_poset_label(value: str) -> str:
+    text = str(value).strip().strip('"').strip("'").strip("`")
+    if ":" not in text:
+        return text
+    return text.split(":", 1)[1].strip()
+
+
 def _type_summary(summary: Mapping[str, Any], bus_type: str) -> Mapping[str, Any]:
     by_type = summary.get("by_type", {})
     if not isinstance(by_type, Mapping):
@@ -378,6 +406,7 @@ def routing_service_entry(
             str(int(summary["sped_students_unserved"])),
             str(int(summary["wheelchair_students_unserved"])),
             str(int(summary["stops_used"])),
+            str(int(summary.get("unique_stops_used", summary["stops_used"]))),
             str(int(summary["monitor_buses"])),
             *[
                 str(int(_type_summary(summary, bus_type).get("buses_used", 0)))
@@ -418,13 +447,29 @@ def fleet_catalogue(
     max_counts: Mapping[str, int],
     costs: Mapping[str, Any],
 ) -> dict[str, Any]:
+    ranges = [range(int(max_counts[bus_type]) + 1) for bus_type in BUS_TYPES]
+    counts = (
+        dict(zip(BUS_TYPES, values, strict=True))
+        for values in product(*ranges)
+    )
+    return fleet_catalogue_for_counts(counts, costs)
+
+
+def fleet_catalogue_for_counts(
+    fleet_counts: Iterable[Mapping[str, int]],
+    costs: Mapping[str, Any],
+) -> dict[str, Any]:
     capital = costs["capital"]
     annualization = float(costs["capital_annualization_factor"])
     implementations: dict[str, dict[str, list[str]]] = {}
-    ranges = [range(int(max_counts[bus_type]) + 1) for bus_type in BUS_TYPES]
+    seen: set[tuple[int, ...]] = set()
 
-    for values in product(*ranges):
-        counts = dict(zip(BUS_TYPES, values, strict=True))
+    for raw_counts in fleet_counts:
+        counts = {bus_type: int(raw_counts.get(bus_type, 0)) for bus_type in BUS_TYPES}
+        key = tuple(counts[bus_type] for bus_type in BUS_TYPES)
+        if key in seen:
+            continue
+        seen.add(key)
         name = "fleet_" + "_".join(str(counts[bus_type]) for bus_type in BUS_TYPES)
         cost = sum(
             float(capital[bus_type]) * counts[bus_type] for bus_type in BUS_TYPES
@@ -441,15 +486,49 @@ def fleet_catalogue(
     }
 
 
-def fleet_bounds_for_routing_implementations(
+def fleet_counts_for_routing_implementations(
     implementations: Mapping[str, dict[str, list[str]]],
-) -> dict[str, int]:
-    bounds = {bus_type: 0 for bus_type in BUS_TYPES}
+) -> tuple[dict[str, int], ...]:
+    counts: set[tuple[int, ...]] = set()
     for implementation in implementations.values():
         r_min = implementation["r_min"]
-        for index, bus_type in enumerate(BUS_TYPES):
-            bounds[bus_type] = max(bounds[bus_type], int(r_min[5 + index]))
-    return bounds
+        counts.add(tuple(int(r_min[6 + index]) for index in range(len(BUS_TYPES))))
+    return tuple(
+        dict(zip(BUS_TYPES, count_tuple, strict=True))
+        for count_tuple in sorted(counts)
+    )
+
+
+def routing_implementations_matching_config(
+    implementations: Mapping[str, dict[str, list[str]]],
+    required_labels: Mapping[str, str],
+) -> dict[str, dict[str, list[str]]]:
+    selected: dict[str, dict[str, list[str]]] = {}
+    config_count = len(ROUTING_CONFIG_POSETS)
+    for name, implementation in implementations.items():
+        r_min = implementation["r_min"]
+        config_labels = {
+            poset_name: _parse_poset_label(value)
+            for poset_name, value in zip(
+                ROUTING_CONFIG_POSETS,
+                r_min[-config_count:],
+                strict=True,
+            )
+        }
+        if all(config_labels.get(name) == label for name, label in required_labels.items()):
+            selected[name] = implementation
+    return selected
+
+
+def guideline_implementations_matching_policy(
+    implementations: Mapping[str, dict[str, list[str]]],
+    policy_label: str,
+) -> dict[str, dict[str, list[str]]]:
+    return {
+        name: implementation
+        for name, implementation in implementations.items()
+        if _parse_poset_label(implementation["r_min"][-1]) == policy_label
+    }
 
 
 def _student_counts(students: Iterable[Student]) -> dict[str, int]:
@@ -537,9 +616,101 @@ def write_poset(path: Path, elements: Iterable[str]) -> None:
     path.write_text("poset {\n    " + " ".join(elements) + "\n}\n", encoding="utf-8")
 
 
+class CatalogueDumper(yaml.SafeDumper):
+    """Safe YAML dumper that keeps long implementation IDs as plain keys."""
+
+    def check_simple_key(self) -> bool:
+        length = 0
+        if isinstance(self.event, NodeEvent) and self.event.anchor is not None:
+            if self.prepared_anchor is None:
+                self.prepared_anchor = self.prepare_anchor(self.event.anchor)
+            length += len(self.prepared_anchor)
+        if (
+            isinstance(self.event, (ScalarEvent, CollectionStartEvent))
+            and self.event.tag is not None
+        ):
+            if self.prepared_tag is None:
+                self.prepared_tag = self.prepare_tag(self.event.tag)
+            length += len(self.prepared_tag)
+        if isinstance(self.event, ScalarEvent):
+            if self.analysis is None:
+                self.analysis = self.analyze_scalar(self.event.value)
+            length += len(self.analysis.scalar)
+        return length < CATALOGUE_SIMPLE_KEY_LIMIT and (
+            isinstance(self.event, AliasEvent)
+            or (
+                isinstance(self.event, ScalarEvent)
+                and not self.analysis.empty
+                and not self.analysis.multiline
+            )
+            or self.check_empty_sequence()
+            or self.check_empty_mapping()
+        )
+
+
 def write_catalogue(path: Path, data: Mapping[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(yaml.safe_dump(dict(data), sort_keys=False), encoding="utf-8")
+    path.write_text(
+        yaml.dump(
+            dict(data),
+            Dumper=CatalogueDumper,
+            sort_keys=False,
+            width=CATALOGUE_SIMPLE_KEY_LIMIT,
+        ),
+        encoding="utf-8",
+    )
+
+
+def read_routing_service_implementations(
+    path: Path,
+) -> dict[str, dict[str, list[str]]] | None:
+    if not path.exists():
+        return None
+    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    if not isinstance(data, Mapping):
+        raise ValueError(f"expected mapping in routing service catalogue {path}")
+    implementations = data.get("implementations")
+    if not isinstance(implementations, Mapping):
+        return None
+    return dict(implementations)
+
+
+def write_routing_simple_catalogs(
+    yaml_dir: Path,
+    *,
+    routing_implementations: Mapping[str, dict[str, list[str]]],
+    guideline_implementations: Mapping[str, dict[str, list[str]]],
+    costs: Mapping[str, Any],
+) -> None:
+    simple_routes = routing_implementations_matching_config(
+        routing_implementations,
+        ROUTING_SIMPLE_CONFIG_LABELS,
+    )
+    if not simple_routes:
+        raise ValueError("routing_simple route catalogue would be empty")
+
+    simple_guidelines = guideline_implementations_matching_policy(
+        guideline_implementations,
+        ROUTING_SIMPLE_CONFIG_LABELS["student_policy"],
+    )
+    if not simple_guidelines:
+        raise ValueError("routing_simple guideline catalogue would be empty")
+
+    write_catalogue(
+        yaml_dir / "routing_service_simple.dpc.yaml",
+        routing_service_catalogue(simple_routes),
+    )
+    write_catalogue(
+        yaml_dir / "fleet_bus_count_simple.dpc.yaml",
+        fleet_catalogue_for_counts(
+            fleet_counts_for_routing_implementations(simple_routes),
+            costs,
+        ),
+    )
+    write_catalogue(
+        yaml_dir / "guidelines_simple.dpc.yaml",
+        guidelines_catalogue(simple_guidelines),
+    )
 
 
 def write_cost_modules(routing_lib: Path, costs: Mapping[str, Any]) -> None:
@@ -659,23 +830,226 @@ def write_cost_modules(routing_lib: Path, costs: Mapping[str, Any]) -> None:
     )
 
 
-def write_guidelines_module(routing_lib: Path) -> None:
-    (routing_lib / "guidelines.mcdp").write_text(
-        """dp {
+def write_guidelines_module(
+    routing_lib: Path,
+    *,
+    module_name: str = "guidelines",
+    catalogue_name: str = "guidelines.dpc.yaml",
+) -> None:
+    (routing_lib / f"{module_name}.mcdp").write_text(
+        f"""dp {{
   # Policy/planning budget cap and allowable unserved counts.
   provides roi_budget [USD]
   provides students_unserved [Nat]
-  provides sped_students_unserved [Nat]
+  provides monitor_students_unserved [Nat]
   provides wheelchair_students_unserved [Nat]
 
   # Minimum service level and student body selected by policy/planning.
   requires students_served [Nat]
-  requires sped_students_served [Nat]
+  requires monitor_students_served [Nat]
   requires wheelchair_students_served [Nat]
   requires student_policy [`student_policy]
 
-  implemented-by yaml resource("guidelines.dpc.yaml")
-}
+  implemented-by yaml resource("{catalogue_name}")
+}}
+""",
+        encoding="utf-8",
+    )
+
+
+def write_routing_service_module(
+    routing_lib: Path,
+    *,
+    module_name: str = "routing_service",
+    catalogue_name: str = "routing_service.dpc.yaml",
+) -> None:
+    (routing_lib / f"{module_name}.mcdp").write_text(
+        f"""dp {{
+  # demand satisfied by a BiRD run
+  provides students_served [Nat]
+  provides monitor_students_served [Nat]
+  provides wheelchair_students_served [Nat]
+
+  # demand left unserved by the same BiRD run
+  requires students_unserved [Nat]
+  requires monitor_students_unserved [Nat]
+  requires wheelchair_students_unserved [Nat]
+
+  # route complexity and staffing selected by BiRD
+  requires stops_used [Nat]
+  requires unique_stops_used [Nat]
+  requires monitor_buses [Nat]
+
+  # used buses by fleet type
+  requires used_C [Nat]
+  requires used_B [Nat]
+  requires used_BWC [Nat]
+  requires used_WC [Nat]
+
+  # daily telemetry by fleet type
+  requires distance_C [km]
+  requires distance_B [km]
+  requires distance_BWC [km]
+  requires distance_WC [km]
+
+  requires runtime_C [s]
+  requires runtime_B [s]
+  requires runtime_BWC [s]
+  requires runtime_WC [s]
+
+  # discrete BiRD configuration choices
+  requires bird_method [`bird_method]
+  requires bird_lambda [`bird_lambda]
+  requires bird_partial [`bird_partial]
+  requires bird_dwell [`bird_dwell]
+  requires bird_arrival_window [`bird_arrival_window]
+  requires bird_avg_speed [`bird_avg_speed]
+  requires student_policy [`student_policy]
+
+  implemented-by yaml resource("{catalogue_name}")
+}}
+""",
+        encoding="utf-8",
+    )
+
+
+def write_fleet_bus_count_module(
+    routing_lib: Path,
+    *,
+    module_name: str = "fleet_bus_count",
+    catalogue_name: str = "fleet_bus_count.dpc.yaml",
+) -> None:
+    (routing_lib / f"{module_name}.mcdp").write_text(
+        f"""dp {{
+    provides available_C [Nat]
+    provides available_B [Nat]
+    provides available_BWC [Nat]
+    provides available_WC [Nat]
+
+    requires capital_cost [USD]
+
+    implemented-by yaml resource("{catalogue_name}")
+}}
+""",
+        encoding="utf-8",
+    )
+
+
+def write_routing_model(
+    routing_lib: Path,
+    *,
+    module_name: str = "routing",
+    routing_service_module: str = "routing_service",
+    guidelines_module: str = "guidelines",
+    fleet_bus_count_module: str = "fleet_bus_count",
+) -> None:
+    (routing_lib / f"{module_name}.mcdp").write_text(
+        f"""mcdp {{
+    provides students_served [Nat]
+    provides monitor_students_served [Nat]
+    provides wheelchair_students_served [Nat]
+
+    requires total_cost [USD]
+    requires emissions [kg]
+    requires students_unserved [Nat]
+    requires monitor_students_unserved [Nat]
+    requires wheelchair_students_unserved [Nat]
+    requires stops_used [Nat]
+    requires unique_stops_used [Nat]
+
+    # bird algorithm configurations
+    requires bird_method [`bird_method]
+    requires bird_lambda [`bird_lambda]
+    requires bird_partial [`bird_partial]
+    requires bird_dwell [`bird_dwell]
+    requires bird_arrival_window [`bird_arrival_window]
+    requires bird_avg_speed [`bird_avg_speed]
+    requires student_policy [`student_policy]
+
+    sub rs = instance `{routing_service_module}
+    sub g = instance `{guidelines_module}
+    sub bc = instance `{fleet_bus_count_module}
+    sub dr = instance `driver
+    sub mo = instance `monitor
+    sub mt = instance `maintenance
+    sub fu = instance `fuel
+
+    # expose the route catalogue functionality to the top-level query
+    provided students_served <= students_served provided by rs
+    provided monitor_students_served <= monitor_students_served provided by rs
+    provided wheelchair_students_served <= wheelchair_students_served provided by rs
+
+    # expose route catalogue requirements to the top-level query
+    required students_unserved >= students_unserved required by rs
+    required monitor_students_unserved >= monitor_students_unserved required by rs
+    required wheelchair_students_unserved >= wheelchair_students_unserved required by rs
+    required stops_used >= stops_used required by rs
+    required unique_stops_used >= unique_stops_used required by rs
+    required bird_method >= bird_method required by rs
+    required bird_lambda >= bird_lambda required by rs
+    required bird_partial >= bird_partial required by rs
+    required bird_dwell >= bird_dwell required by rs
+    required bird_arrival_window >= bird_arrival_window required by rs
+    required bird_avg_speed >= bird_avg_speed required by rs
+    required student_policy >= student_policy required by rs
+    required student_policy >= student_policy required by g
+
+    # policy/guideline constraints
+    students_served required by g <= students_served provided by rs
+    monitor_students_served required by g <= monitor_students_served provided by rs
+    wheelchair_students_served required by g <= wheelchair_students_served provided by rs
+
+    students_unserved required by rs <= students_unserved provided by g
+    monitor_students_unserved required by rs <= monitor_students_unserved provided by g
+    wheelchair_students_unserved required by rs <= wheelchair_students_unserved provided by g
+
+    required total_cost >= (
+        fuel_cost required by fu +
+        maintenance_cost required by mt +
+        driver_cost required by dr +
+        monitor_cost required by mo +
+        capital_cost required by bc
+    )
+    (
+        fuel_cost required by fu +
+        maintenance_cost required by mt +
+        driver_cost required by dr +
+        monitor_cost required by mo +
+        capital_cost required by bc
+    ) <= roi_budget provided by g
+
+    # emissions
+    required emissions >= emissions required by fu
+
+    # routing requirements must be supported by cost resources
+    monitor_buses required by rs <= monitor_buses provided by mo
+
+    used_C required by rs <= used_C provided by dr
+    used_B required by rs <= used_B provided by dr
+    used_BWC required by rs <= used_BWC provided by dr
+    used_WC required by rs <= used_WC provided by dr
+
+    distance_C required by rs <= distance_C provided by fu
+    distance_B required by rs <= distance_B provided by fu
+    distance_BWC required by rs <= distance_BWC provided by fu
+    distance_WC required by rs <= distance_WC provided by fu
+
+    distance_C required by rs <= distance_C provided by mt
+    distance_B required by rs <= distance_B provided by mt
+    distance_BWC required by rs <= distance_BWC provided by mt
+    distance_WC required by rs <= distance_WC provided by mt
+
+    runtime_C required by rs <= runtime_C provided by mt
+    runtime_B required by rs <= runtime_B provided by mt
+    runtime_BWC required by rs <= runtime_BWC provided by mt
+    runtime_WC required by rs <= runtime_WC provided by mt
+
+    # routing fleet requirements must be met by the purchased fleet mix
+    used_C required by rs <= available_C provided by bc
+    used_B required by rs <= available_B provided by bc
+    used_BWC required by rs <= available_BWC provided by bc
+    used_WC required by rs <= available_WC provided by bc
+}}
 """,
         encoding="utf-8",
     )
@@ -973,7 +1347,7 @@ def _config_labels_from_stored_data(data: Mapping[str, Any]) -> dict[str, str | 
     }
 
 
-def write_static_catalogues(
+def write_static_catalogs(
     *,
     routing_lib: Path = ROUTING_LIB,
     costs: Mapping[str, Any] | None = None,
@@ -981,15 +1355,25 @@ def write_static_catalogues(
     guideline_implementations: Mapping[str, dict[str, list[str]]] | None = None,
 ) -> None:
     selected_costs = dict(costs or load_routing_costs())
-    yaml_dir = routing_lib / "yaml_catalogues"
-    fleet_bounds = (
-        fleet_bounds_for_routing_implementations(routing_implementations)
+    yaml_dir = routing_lib / "yaml_catalogs"
+    fleet_route_implementations = (
+        routing_implementations
         if routing_implementations is not None
-        else read_bus_inventory_counts()
+        else read_routing_service_implementations(
+            yaml_dir / "routing_service.dpc.yaml"
+        )
+    )
+    fleet_data = (
+        fleet_catalogue_for_counts(
+            fleet_counts_for_routing_implementations(fleet_route_implementations),
+            selected_costs,
+        )
+        if fleet_route_implementations is not None
+        else fleet_catalogue(read_bus_inventory_counts(), selected_costs)
     )
     write_catalogue(
         yaml_dir / "fleet_bus_count.dpc.yaml",
-        fleet_catalogue(fleet_bounds, selected_costs),
+        fleet_data,
     )
     write_catalogue(
         yaml_dir / "guidelines.dpc.yaml",
@@ -1007,10 +1391,49 @@ def write_static_catalogues(
             yaml_dir / "routing_service.dpc.yaml",
             routing_service_catalogue(routing_implementations),
         )
+    if fleet_route_implementations is not None:
+        write_routing_simple_catalogs(
+            yaml_dir,
+            routing_implementations=fleet_route_implementations,
+            guideline_implementations=(
+                guideline_implementations
+                if guideline_implementations is not None
+                else {
+                    f"guideline_{policy_label}": default_guideline_entry(policy_label)
+                    for policy_label in GRID_STUDENT_POLICIES
+                }
+            ),
+            costs=selected_costs,
+        )
     for name, elements in config_posets().items():
         write_poset(routing_lib / f"{name}.mcdp_poset", elements)
     write_cost_modules(routing_lib, selected_costs)
     write_guidelines_module(routing_lib)
+    write_guidelines_module(
+        routing_lib,
+        module_name="guidelines_simple",
+        catalogue_name="guidelines_simple.dpc.yaml",
+    )
+    write_routing_service_module(routing_lib)
+    write_routing_service_module(
+        routing_lib,
+        module_name="routing_service_simple",
+        catalogue_name="routing_service_simple.dpc.yaml",
+    )
+    write_fleet_bus_count_module(routing_lib)
+    write_fleet_bus_count_module(
+        routing_lib,
+        module_name="fleet_bus_count_simple",
+        catalogue_name="fleet_bus_count_simple.dpc.yaml",
+    )
+    write_routing_model(routing_lib)
+    write_routing_model(
+        routing_lib,
+        module_name="routing_simple",
+        routing_service_module="routing_service_simple",
+        guidelines_module="guidelines_simple",
+        fleet_bus_count_module="fleet_bus_count_simple",
+    )
 
 
 def parse_args() -> argparse.Namespace:
@@ -1286,8 +1709,8 @@ def main() -> None:
         error_count,
     )
 
-    logger.info("Writing static routing catalogues to {}", args.routing_lib)
-    write_static_catalogues(
+    logger.info("Writing static routing catalogs to {}", args.routing_lib)
+    write_static_catalogs(
         routing_lib=args.routing_lib,
         costs=costs,
         routing_implementations=implementations or None,
