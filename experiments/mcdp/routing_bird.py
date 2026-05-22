@@ -1261,6 +1261,7 @@ class GridPointSolveResult:
     status: str | None = None
     error: str | None = None
     problem_runtime_s: float | None = None
+    solver_runtime_s: float | None = None
 
 
 def solve_grid_point_result(
@@ -1297,6 +1298,7 @@ def solve_grid_point_result(
         summary=summary,
         status=solution.status,
         problem_runtime_s=time.perf_counter() - start,
+        solver_runtime_s=solution.runtime_seconds,
     )
 
 
@@ -1652,6 +1654,7 @@ def main() -> None:
             "config_labels": grid_point.config_labels,
             "status": result.status,
             "problem_runtime_s": result.problem_runtime_s,
+            "solver_runtime_s": result.solver_runtime_s,
             "summary": result.summary,
         }
         success_count += 1
